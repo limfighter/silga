@@ -8,8 +8,10 @@ PPE backend — FastAPI 스켈레톤
 갱신 필요, 계약 변경이라 버전 v0.2 표기 대상).
 """
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
+from typing import Optional
 import requests
 
 from app.services import danawa
@@ -25,9 +27,16 @@ from app.schemas.estimate import (
     BuildCompareResponse,
 )
 from app.schemas.compare import ProductCompareResponse
+from app.schemas.build import (
+    BuildCreateRequest,
+    BuildSummary,
+    BuildDetail,
+    BuildItemDetail,
+)
 from app.utils import format_won
-from app.database import Base, engine
-import app.models  # noqa: F401 — Base.metadata에 3개 테이블 등록시키기 위한 임포트
+from app.database import Base, engine, get_db
+from app.models import Product, Build, BuildItem
+from app.timezone_utils import now_kst
 
 app = FastAPI(title="PPE backend", version="0.1.0")
 
@@ -251,6 +260,137 @@ def compare_build(payload: BuildCompareRequest):
         total_price_formatted=format_won(total_price),
         breakdown=breakdown,
         market_price=payload.market_price,
+        verdict=verdict,
+        diff_percent=diff_percent,
+    )
+
+
+def _cache_product(db: Session, code: int, title: Optional[str] = None, spec: Optional[str] = None, img: Optional[str] = None):
+    """
+    products 테이블은 재조회 최소화용 캐시(가격 제외, REFERENCE.md #DB-스키마
+    참조) — build_item.product_code FK가 가리킬 로우가 있어야 하므로, 빌드
+    저장 시점에 title/spec/img를 upsert 해둠. 가격은 여기 저장하지 않음.
+    """
+    existing = db.query(Product).filter(Product.code == code).first()
+    if existing:
+        if title is not None:
+            existing.title = title
+        if spec is not None:
+            existing.spec = spec
+        if img is not None:
+            existing.img = img
+        existing.cached_at = now_kst()
+    else:
+        db.add(Product(code=code, title=title, spec=spec, img=img, cached_at=now_kst()))
+    db.commit()
+
+
+@app.post("/builds", response_model=BuildSummary, status_code=201)
+def create_build(payload: BuildCreateRequest, db: Session = Depends(get_db)):
+    """
+    POST /builds  body: {name, market_price?, items: [{category, code}, ...]}
+
+    REFERENCE.md 원 계약에는 없던 신규 엔드포인트 — DB 스키마(builds/build_items)는
+    이미 설계돼 있었는데 이걸 채워넣는 CRUD가 누락돼 있었음. 빌드 탭 "생성 →
+    분석하기" 흐름이 실제로 저장까지 하려면 필요.
+    """
+    build = Build(name=payload.name, market_price=payload.market_price, created_at=now_kst())
+    db.add(build)
+    db.commit()
+    db.refresh(build)
+
+    for item in payload.items:
+        # products 캐시에 없으면 채워넣기 (FK 무결성 + 목록 화면 title 표시용)
+        try:
+            data = danawa.get_product(item.code)
+        except requests.RequestException:
+            data = {}
+        _cache_product(db, item.code, title=data.get("title"), spec=data.get("spec"), img=data.get("img"))
+
+        db.add(BuildItem(build_id=build.id, category=item.category, product_code=item.code))
+    db.commit()
+
+    return BuildSummary(
+        id=build.id,
+        name=build.name,
+        market_price=build.market_price,
+        created_at=build.created_at,
+        item_count=len(payload.items),
+        total_price=None,
+        total_price_formatted=None,
+        verdict=None,
+    )
+
+
+@app.get("/builds", response_model=list[BuildSummary])
+def list_builds(db: Session = Depends(get_db)):
+    """
+    GET /builds → 저장된 빌드 목록 (앱 셸 "내 빌드" 카드 목록에 대응)
+
+    카드에 적정가/고가/저가 태그를 보여주려면 라이브 가격 조회가 필요해서,
+    목록 조회 시점에 빌드마다 _compute_estimate를 다시 돌림 — 개인 프로젝트
+    규모라 지금은 그대로 감(빌드 개수 많아지면 느려질 수 있음, 나중에 재검토).
+    """
+    builds = db.query(Build).all()
+    results = []
+
+    for build in builds:
+        items = [EstimateItem(code=bi.product_code, category=bi.category) for bi in build.items]
+        total_price, _ = _compute_estimate(items) if items else (0, [])
+
+        verdict = None
+        if build.market_price and total_price:
+            verdict, _ = calc_verdict(total_price, build.market_price)
+
+        results.append(
+            BuildSummary(
+                id=build.id,
+                name=build.name,
+                market_price=build.market_price,
+                created_at=build.created_at,
+                item_count=len(items),
+                total_price=total_price or None,
+                total_price_formatted=format_won(total_price) if total_price else None,
+                verdict=verdict,
+            )
+        )
+
+    return results
+
+
+@app.get("/builds/{build_id}", response_model=BuildDetail)
+def get_build_detail(build_id: int, db: Session = Depends(get_db)):
+    """
+    GET /builds/{id} → 빌드 상세 (판정 게이지 + breakdown, 앱 셸 빌드 상세 화면에 대응)
+    """
+    build = db.query(Build).filter(Build.id == build_id).first()
+    if build is None:
+        raise HTTPException(status_code=404, detail="빌드를 찾을 수 없음")
+
+    items = [EstimateItem(code=bi.product_code, category=bi.category) for bi in build.items]
+    total_price, breakdown = _compute_estimate(items) if items else (0, [])
+
+    verdict = None
+    diff_percent = None
+    if build.market_price and total_price:
+        verdict, diff_percent = calc_verdict(total_price, build.market_price)
+
+    return BuildDetail(
+        id=build.id,
+        name=build.name,
+        market_price=build.market_price,
+        created_at=build.created_at,
+        items=[
+            BuildItemDetail(
+                category=bd.category,
+                code=item.code,
+                title=bd.title,
+                price=bd.price,
+            )
+            for bd, item in zip(breakdown, items)
+        ],
+        total_price=total_price,
+        total_price_formatted=format_won(total_price),
         verdict=verdict,
         diff_percent=diff_percent,
     )
