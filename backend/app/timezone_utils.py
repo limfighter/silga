@@ -1,5 +1,5 @@
 """
-서버 시간대 KST 통일 (PPE_REFERENCE.md #프로젝트-개요 참조 — 다나와 자체가 KST
+서버 시간대 KST 통일 (실가_REFERENCE.md #프로젝트-개요 참조 — 다나와 자체가 KST
 기준 서비스라 GTHV 프로젝트의 UTC 통일 규칙과 다름, 주의).
 
 타임존 미표기(naive) datetime 값 저장 금지 원칙 — 모든 DB 컬럼은

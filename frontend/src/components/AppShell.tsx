@@ -22,7 +22,7 @@ const TITLES: Record<string, string> = {
 
 function titleFor(pathname: string): string {
   if (pathname.startsWith("/build")) return "빌드";
-  return TITLES[pathname] ?? "PPE";
+  return TITLES[pathname] ?? "실가";
 }
 
 export default function AppShell() {

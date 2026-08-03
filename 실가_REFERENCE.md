@@ -1,0 +1,353 @@
+# 실가 REFERENCE — 규칙 · 구조 · 절차
+이 파일은 거의 바뀌지 않는 정보만 담는다. 현재 상태/수정예정 → 실가_인수인계.md, 이력 → 실가_HISTORY.md
+규칙/구조 자체가 변경될 때만 이 파일을 갱신한다.
+
+※ 정식 이름 "실가"로 확정됨 (2026-08-03). 그 전까지는 PPE(Parts Price Engine)라는
+  임시 코드네임을 썼음 — 3파일 파일명+본문 일괄 치환 완료.
+
+---
+
+## 프로젝트 개요
+- 다나와 실시간 최저가 기반 PC 부품 가격 추적 + 조립PC 적정가 판정 엔진
+- 용도 2갈래: ① 개인용 웹앱 (직접 사용) ② AI 라우터 경유지 (Claude 등이 tool처럼 호출)
+- 개발 순서: 웹 프론트 먼저 (디버깅 편의) → API 명세 확정 → Flutter로 이식
+- 백엔드 후보: FastAPI (Python) — Playwright/danawa-py 등 크롤링 생태계 우위로 우선 채택
+- 개인 프로젝트: 인증/로그인 없음, 상업적 이용·재판매 없음
+- 서버 시간대: KST 통일 (다나와 자체가 KST 기준 서비스라 GTHV의 UTC 통일 규칙과 다름 — 주의)
+- 종결 목표 없음 (개인 도구, 필요 기능 생기면 그때 확장)
+
+---
+
+## 버전 관리 규칙
+```
+세 번째 자리: 버그수정 / 잔업데이트 (API 계약 변경 없음)     예: v0.1.1
+두 번째 자리: 기능 추가 / 엔드포인트 변경 (계약 영향)         예: v0.2
+첫 번째 자리: 전면 재설계 (아키텍처 변경)                    예: v1.0
+
+Git 커밋 기준:
+  - 두 번째 자리 이상 변경 시 커밋 필수
+  - 세 번째 자리 변경은 커밋 선택
+  - bak 파일은 두 번째 자리 변경 시만 생성 (백엔드 단일 진입 파일 한정)
+
+커밋 메시지 컨벤션:
+  "type: 내용 요약" 형식 — feat / fix / refactor / docs / chore
+  예: git commit -m "feat: /compare 엔드포인트 추가 (v0.2)"
+
+커밋 방법:
+  git add <변경 파일만>
+  git commit -m "feat: v0.2 변경내용 요약"
+
+롤백 방법:
+  git log --oneline
+  git checkout <해시> <파일>
+```
+
+---
+
+## 개발 시작 전 체크리스트
+```
+매 개발 세션 시작 시 반드시 확인
+
+[ ] 실가_인수인계.md 수정 예정 사항 확인
+    → 오늘 작업과 겹치는 항목 있으면 같이 처리
+
+[ ] API 계약(본 문서 "엔드포인트 설계") ↔ 실제 코드 일치 확인
+    → 프론트가 이미 이 계약대로 목업돼 있음 (app-shell-mockup.html) — 응답 필드명 임의 변경 금지
+
+[ ] 수정 파일 버전 주석 업데이트
+[ ] 엔드포인트/DB 스키마 수정 시:
+    → 실가_인수인계.md 상태 갱신 + 실가_HISTORY.md append
+[ ] 구조 변경(두 번째 자리 이상) 완료 시:
+    → REFERENCE.md 엔드포인트 설계 / 데이터 소스 섹션 갱신 여부 확인
+[ ] 크롤링/비공식 API 관련 수정 시:
+    → "데이터 소스 신뢰도" 섹션의 매너 크롤링 원칙(요청 간격 등) 재확인
+[ ] datetime은 KST 통일, 타임존 미표기 값 저장 금지
+```
+
+---
+
+## 저장소 구조 (확정 — 2026-08-03, 2026-08-03 실제 생성+git 리포 형성 완료)
+```
+silga/                (git 리포 루트, 커밋 4개: v0.2 백엔드/v0.3 빌드CRUD/v0.4 프론트/docs)
+├── README.md          로컬 실행 방법 + 현재 상태 요약
+├── .gitignore
+├── backend/          FastAPI (API 엔드포인트 전부 여기 포함, 별도 API 레이어 분리 안 함)
+│   ├── app/
+│   │   ├── main.py
+│   │   ├── database.py         SQLAlchemy 엔진/세션, SQLite(WAL)
+│   │   ├── timezone_utils.py   KST 헬퍼 + KSTDateTime 커스텀 타입 (#기술-스택 하단 참조)
+│   │   ├── utils.py            format_won()
+│   │   ├── services/
+│   │   │   ├── danawa.py       danawa_patched.py 편입 완료 + 원본 get_price_variance 통합
+│   │   │   └── verdict.py      calc_verdict() (#엔드포인트-설계 verdict 임계값 참조)
+│   │   ├── models/              product.py / build.py / build_item.py (#DB-스키마 참조)
+│   │   └── schemas/             search/product/history/estimate/compare/build.py
+│   │                            (#엔드포인트-설계 계약과 1:1 대응)
+│   └── requirements.txt
+├── frontend/         Vite+React+TS+React Router+TanStack Query (app-shell-mockup.html 재구현)
+│   └── src/
+│       ├── components/  AppShell.tsx(사이드바/탑바), PartRow.tsx(자동완성)
+│       ├── pages/        Search/BuildList/BuildCreate/BuildDetail/Placeholder
+│       ├── lib/           api.ts(백엔드 클라이언트), useDebouncedValue.ts
+│       └── styles/global.css  디자인 토큰 이식
+└── scripts/
+    └── e2e_smoke_test.py       Playwright E2E 스모크 테스트
+
+Phase 5(Flutter 이식) 시점에 flutter/ 추가되어 3개 체제로 전환 예정 (지금은 2개)
+```
+
+---
+
+## DB 스키마 (확정 — 2026-08-03)
+```
+products      부품 기본정보 캐시 (code PK, title, category, spec, img, cached_at)
+              → 재조회 최소화용 캐시, 실시간 가격은 항상 danawa 재조회
+
+builds        저장한 조립샷 (id PK, name, market_price, created_at)
+
+build_items   빌드-부품 연결 (id PK, build_id FK, category, product_code FK)
+
+price_history 테이블 없음 — 의도적 제외 (아래 참조)
+```
+
+**⚠️ SQLite + datetime 타임존 관련 실device 이슈 (2026-08-03 발견, 해결 완료):**
+SQLAlchemy의 `DateTime(timezone=True)`는 SQLite 다이얼렉트에서 사실상
+no-op임 — 오프셋 없이 저장되고, 복원 시 tzinfo가 사라져서 "datetime은 KST
+통일, 타임존 미표기 값 저장 금지" 체크리스트 원칙과 충돌함. `KSTDateTime`
+커스텀 TypeDecorator(`backend/app/timezone_utils.py`)로 해결 — 오프셋
+포함 ISO 8601 문자열로 직접 저장/복원, naive datetime 저장 시도는 예외
+발생. **앞으로 이 프로젝트에서 datetime 컬럼을 추가할 땐 `DateTime(timezone=True)`
+대신 반드시 `KSTDateTime`을 쓸 것.**
+
+**price_history를 안 만들기로 한 이유 (오버엔지니어링 판단):**
+- 개별 부품 가격 추이(홈 탭 동향, 통계 탭)는 danawa의 `get_price_variance()`가
+  이미 히스토리를 제공하므로 우리가 스케줄러 돌려서 중복 축적할 필요 없음
+- "내 빌드 총액이 시간에 따라 어떻게 변하는지"도 결국 `build_items`의
+  `product_code`들로 그때그때 `get_price_variance()`를 호출해서 날짜별로
+  합산하면 되는 문제 — 별도 스냅샷 테이블 불필요
+- 결론: DB는 순수 "구조 저장용"(빌드 구성 자체를 기억하는 용도)으로 한정,
+  가격 데이터는 절대 자체 축적하지 않고 항상 danawa를 통해 실시간/준실시간
+  계산. APScheduler(자동 주기 크롤링)도 이 결정에 따라 우선순위 낮음 유지
+  (지정가 알림 기능 등 실제로 주기적 감시가 필요해지는 시점에만 재검토)
+
+---
+
+## 기술 스택 (전체 확정 — 2026-08-03)
+```
+백엔드     FastAPI (Python 3.11+)
+데이터소스  1순위: danawa-py 방식 (다나와 비공식 내부 API 직접 호출) — 검증 전
+           2순위(1순위 장애 시 대체): Playwright 기반 자체 크롤러
+           참고 구현: sammy310/Danawa-Crawler (Scrapy+Selenium, GitHub Actions 매일 크론)
+스케줄러   APScheduler (Celery 등 무거운 큐 불필요 — 개인 프로젝트 규모)
+DB         SQLite (WAL 모드) — 개인용 트래픽 규모에 충분, 서버 운영 부담 없음
+           트래픽/데이터량 커지면 PostgreSQL 이전 검토 (지금은 과설계 지양)
+
+웹 프론트   Vite + React + TypeScript + React Router
+           → Next.js 미채택: 백엔드가 FastAPI로 이미 분리돼 있어 SSR 불필요,
+             순수 SPA가 가볍고 Flutter 이식 시 라우팅 구조 매핑도 더 직관적
+서버상태   TanStack Query (React Query) — REST 캐싱/재검증 직접 구현 안 함
+차트       Recharts — 목업의 손그림 SVG(gauge 제외)를 실 라이브러리로 교체
+           판정 게이지(SVG 반원 다이얼)는 Recharts로 안 되는 커스텀 컴포넌트라
+           목업 그대로 SVG 직접 구현 유지
+스타일링   바닐라 CSS, 디자인 토큰(REFERENCE.md #디자인-토큰) 그대로 CSS 변수 사용
+           → Tailwind 미채택: 이미 커스텀 토큰 시스템이 있어 얹으면 충돌/중복
+
+모바일(이식 단계) Flutter + Riverpod(상태관리) + go_router(라우팅)
+           웹/Flutter 공통: 동일 REST API 한 벌만 사용, 프론트는 얇은 렌더링 레이어
+
+알림       FCM (Flutter 이식 이후 적용, 웹 단계에서는 보류)
+배포       미정 — 개인 로컬 실행으로 시작, 원격 접근 필요해지면 그때 결정
+           (지금 단계 급하지 않음, 결정 자체를 의도적으로 미룸)
+           후보: Fly.io / Railway (SQLite+단일 프로세스 앱에 특화, 마찰 최소)
+                GCP Compute Engine VM (e2-micro 무료 티어, 지금 스택 그대로
+                무수정 배포 가능하나 확장은 수동)
+                GCP Cloud Run (서버리스 자동 확장, 단 SQLite 파일을 GCS
+                FUSE로 마운트해야 해서 단일 인스턴스 고정 필요 — 결국
+                SQLite 쓰는 한 확장성 이점 못 씀. 진짜 확장 필요해지면
+                Postgres 이전 + 멀티 인스턴스가 정공법)
+           Cloudflare(Workers)는 후보에서 제외 — Python은 Pyodide 경유라
+           FastAPI/uvicorn이 그대로 안 올라가고, SQLite도 D1/Durable
+           Objects로 갈아타야 해서 스택 재설계 수준의 변경 필요
+```
+
+---
+
+## 데이터 소스 신뢰도 기준 (불변 사실)
+```
+danawa-py (MineEric64/danawa-py, Apache-2.0):
+  - 다나와 개발자가 아닌 유저가 만든 비공식 API. 다나와가 내부적으로 쓰는
+    엔드포인트를 리버스 엔지니어링한 것으로 추정 (요청/응답 방식이 스크래핑이
+    아니라 API 콜 형태)
+  - 제공 함수 3개: get_product_codes(keyword) / get_product(product_code) /
+    get_price_variance(product_code, by_month)
+  - 저장소 커밋 9개뿐, 유지보수 활발하지 않음 — 2026-08-03 실동작 검증 결과
+    이 우려가 실제로 맞아떨어짐 확인됨: get_product_codes / get_product
+    2개 함수가 다나와 측 DOM 구조 변경으로 이미 깨져 있었음(get_price_variance만
+    원본 그대로 정상). 상세 원인/패치 내역은 실가_HISTORY.md 2026-08-03 v1 참조
+  - PyPI 미등록, setup.py/pyproject.toml도 없어 pip install 불가(git URL
+    설치도 불가) — 단일 파일(danawa.py)을 프로젝트에 직접 vendoring해야 함
+  - **결론: 원본 그대로는 채택 불가, 자체 패치본(danawa_patched.py) 사용
+    확정.** get_product_codes/get_product는 재작성, get_price_variance는
+    원본 그대로 사용. danawa_patched.py는 아직 실가 프로젝트 정식 경로로
+    편입 전(실가_인수인계.md "수정 예정 사항" 참조)
+  - 법적 리스크: 낮음 (개인용, 비상업), 단 다나와 이용약관상 자동화 접근에
+    대한 태도가 우호적이지 않을 수 있음 (robots.txt가 danawa.com 계열 전체를
+    막고 있음을 확인함, 2026-08-03) — 과도한 요청 빈도 지양
+
+sammy310/Danawa-Crawler (MIT):
+  - Scrapy + Selenium, PC부품 전 카테고리, GitHub Actions로 매일 09:00 KST
+    자동 실행 중인 걸로 확인됨(2026-08-03 기준 살아있는 프로젝트)
+  - danawa-py가 막히거나 필드 부족 시 셀렉터 구조 참고용 / 대체 수단
+
+다나와 공식 오픈API (api.danawa.com):
+  - 2012년 "열린 개발자 공간"으로 공개된 이력 확인, 카테고리/검색/뉴스/장터
+    API 제공 — 단 "가격정보/최저가"가 공개 범위에 명시적으로 포함되는지
+    불확실, 2026년 현재도 키 발급이 되는지 미검증
+  - robots.txt 차단으로 자동 조회 불가 → 사람이 직접 브라우저로 확인 필요
+  - 상태: 미검증 (인수인계 확인 필요 항목)
+
+매너 크롤링 원칙 (danawa-py/자체 크롤러 공통):
+  - 요청 간격 최소 5~10초, 동시 병렬 요청 지양
+  - User-Agent 명시
+  - 상업적 재판매/API 재공개 목적 아님 (개인 참고용 한정)
+```
+
+---
+
+## 엔드포인트 설계 (계약 — app-shell-mockup.html이 이 계약 전제로 만들어짐)
+```
+GET  /search?q={keyword}
+  → [{code, title, price, price_formatted}, ...]
+
+GET  /product/{code}
+  → {code, title, category, current_price, cash_price, spec,
+     variants: [{type, price, mall_count, pcode, is_current}, ...]}
+  ※ variants(정품/벌크/해외구매 등 유형별 최저가 비교)는 참고 정보 전용.
+    /estimate, /compare의 실측 합계·판정 계산에는 절대 미반영 — 해외구매는
+    통관/배송 지연/AS 불가 등 국내 구매와 리스크가 근본적으로 달라 판정
+    로직을 오염시킬 수 있음. 프론트에서 "해외구매 참고가" 형태의 부가
+    표시로만 사용할 것 (합계·게이지 계산에서 제외)
+
+GET  /product/{code}/history?months={1|3|6|12}
+  → {min, max, prices: [{date, price}, ...]}
+
+POST /estimate
+  body: [{code}, {code}, ...]
+  → {total_price, total_price_formatted, breakdown: [{category, title, price}, ...]}
+
+GET  /product/{code}/compare?market_price={n}
+  → {title, lowest_price, estimate_total, market_price, verdict, diff_percent}
+  verdict ∈ {"저가", "적정가", "고가"} — 판정 게이지(빌드 상세 화면) 구간과 1:1 대응
+  ※ 단일 상품 기준 — estimate_total은 그 상품 하나의 lowest_price와 동일값
+
+POST /build/compare  (신규, v0.3 — 원 계약에 없었음)
+  body: {items: [{code, category}, ...], market_price}
+  → {total_price, total_price_formatted, breakdown: [...],
+     market_price, verdict, diff_percent}
+  ※ 빌드 전체 기준. /compare 엔드포인트가 "단일상품"인지 "빌드전체"인지 스펙
+    불일치가 있었음(silga-mockup.html API 예시 숫자가 빌드전체 기준이었음,
+    2026-08-03 발견) → 확인 후 단일상품용(위 GET, 원 계약 유지)과 빌드전체용
+    (이 엔드포인트, 신규) 둘 다 만듦. /estimate와 계산 로직 공유
+
+POST /builds  (신규, v0.3 — 원 계약에 없었음)
+  body: {name, market_price?, items: [{category, code}, ...]}
+  → BuildSummary {id, name, market_price, created_at, item_count,
+     total_price, total_price_formatted, verdict}
+  ※ builds/build_items DB 테이블은 있었는데 채워넣는 CRUD가 누락돼 있었음
+
+GET  /builds  (신규, v0.3)
+  → [BuildSummary, ...]  — 저장된 빌드 목록(앱 셸 "내 빌드" 카드 목록)
+  ※ 카드에 판정 태그를 보여주려면 라이브 가격 재조회가 필요해서, 목록
+    조회 시점에 빌드마다 계산을 다시 돌림 — 개인 프로젝트 규모라 지금은
+    그대로 감, 빌드 개수 많아지면 재검토
+
+GET  /builds/{id}  (신규, v0.3)
+  → BuildDetail {id, name, market_price, created_at, items: [...],
+     total_price, total_price_formatted, verdict, diff_percent}
+
+verdict 판정 임계값:
+  diff_percent = (market_price - estimate_total) / estimate_total * 100
+  diff_percent > +5%  → "고가"
+  diff_percent < -5%  → "저가"
+  그 외              → "적정가"
+  ※ ±5%는 REFERENCE.md에 수치가 없어 2026-08-03 구현 시 임의로 잡은 가정값
+    (backend/app/services/verdict.py 상수로 분리). silga-mockup.html API
+    예시(estimate_total=3390000, market_price=3464000 → diff_percent=2.1,
+    "적정가")로 공식 자체는 검증됐으나 경계값(±5%)은 미확정 — 실사용해보고
+    조정 필요 여부 논의 요망 (실가_인수인계.md "결정 필요" 참조)
+
+/product/{code} 응답 추가 필드 (원 계약 외, 2026-08-03 추가):
+  + in_stock: bool
+  "일시 품절"(다나와 페이지의 lowest_blank 클래스)과 "스크래핑 실패"를
+  구분하기 위해 추가. 실측 사례: PALIT RTX5070Ti(76465883, silga-mockup.html
+  API 예시에 쓰인 코드)가 검증 당시 실제로 품절 상태였음
+
+설계 원칙:
+  - 응답에 사람이 읽는 필드(*_formatted)와 AI/계산용 raw 필드(숫자)를 함께 포함
+    → 프론트는 formatted 필드, AI 라우터는 raw 필드 사용. 응답 이원화하지 않음
+  - 실측 합계/판정 계산(estimate, compare)은 항상 다나와 공식 lowest_price
+    단일 필드만 기준으로 삼음. 판매처별 가격 리스트(prices)에서 직접
+    min() 계산해서 최저가로 대체하는 로직은 금지 — 리스트에 다나와가
+    최저가 산정에서 제외한(안전결제 미지원 등으로 추정) 판매처가 섞여
+    있고, 우리가 가져오는 리스트 자체도 상위 일부만 잘려 있어 불완전함
+    (2026-08-03 danawa-py 검증 시 실측 확인, 실가_HISTORY.md 참조)
+  - 에러는 명확한 상태코드로 구분 ("상품 없음" vs "데이터 소스 자체 장애")
+```
+
+---
+
+## 화면/탭 구조 (app-shell-mockup.html 기준 → frontend/에 실제 구현, 2026-08-03)
+```
+사이드바 (기본 아이콘 레일 72px, 햄버거로 240px 확장)
+├─ 홈       — 준비 중 (플레이스홀더만 라우팅됨)
+├─ 검색     — ✅ 완료, /search 실데이터 연동
+├─ 빌드     — ✅ 완료, 3단계 흐름 전부 실데이터 연동
+│    ├─ 목록   GET /builds 연동, 적정가/고가/저가 태그 + 총액 실시간 계산
+│    ├─ 생성   카테고리별 자동완성(디바운스 500ms) + POST /builds 저장
+│    │        + 비교 판매가 입력 → "분석하기" → 저장 후 상세로 자동 이동
+│    └─ 상세   GET /builds/{id} 연동, 판정 게이지(SVG 반원 다이얼, diff_percent
+│              기반 니들 각도 동적 계산) + 부품별 breakdown + 합계
+├─ 즐겨찾기  — 준비 중 (플레이스홀더만 라우팅됨)
+├─ 최근기록  — 준비 중 (플레이스홀더만 라우팅됨)
+├─ 통계      — 준비 중, 오실로스코프풍 라인차트 이식 예정
+└─ 설정      — 준비 중 (플레이스홀더만 라우팅됨)
+
+Playwright E2E 스모크 테스트(scripts/e2e_smoke_test.py)로 검색→자동완성→
+빌드생성→상세→목록 전체 흐름 실브라우저 검증 완료.
+```
+
+---
+
+## 디자인 토큰
+```
+배경   #0a0b0d (near-black)
+서페이스 #16171b / #1c1e23
+선     #2a2d33 / #1f2126
+텍스트  #f2f3f5 (primary) / #8b8f97 (dim) / #54575f (faint)
+
+accent
+  cyan(적정/좋음)   #5eead4
+  magenta(고가/경고) #ff3b6e
+  amber(변동/주의)   #ffb020
+
+폰트
+  디스플레이  Black Han Sans (헤드라인, 절제해서 사용)
+  데이터/코드 JetBrains Mono (가격 숫자, 계기판 라벨, 코드 블록)
+  본문       Pretendard
+
+시그니처 요소
+  판정 게이지 — SVG 반원 다이얼(저가/적정/고가 3구간 색상 arc) + 니들 애니메이션
+  (prefers-reduced-motion 시 애니메이션 생략, 최종 각도로 고정 표시)
+```
+
+---
+
+## 산출물 파일 목록
+```
+/mnt/user-data/outputs/silga-mockup.html       랜딩형 목업 (참고용, 앱 셸로 대체됨)
+/mnt/user-data/outputs/app-shell-mockup.html   초기 채택 목업 — frontend/에 실제 구현으로 대체됨
+/mnt/user-data/outputs/ppe-final.zip           2026-08-03 세션 최종 산출물 — git 리포 전체
+                                                (backend/ frontend/ scripts/ + 커밋 4개)
+                                                ※ 컨테이너 세션 리셋되므로 로컬 보관 후
+                                                  GitHub 원격 리포에 push 권장 (README.md 참조)
+```

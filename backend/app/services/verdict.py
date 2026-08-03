@@ -1,7 +1,7 @@
 """
 판정(verdict) 계산 로직.
 
-임계값(±5%)은 PPE_REFERENCE.md에 명시된 수치가 없어 임의로 잡은 가정값.
+임계값(±5%)은 실가_REFERENCE.md에 명시된 수치가 없어 임의로 잡은 가정값.
 실사용하면서 판정 게이지 체감과 안 맞으면 VERDICT_THRESHOLD_PERCENT만 조정하면 됨.
 
 공식 검증: silga-mockup.html API 터미널 예시(estimate_total=3390000,

@@ -1,18 +1,18 @@
 """
-danawa.py — PPE 프로젝트 데이터소스 모듈
+danawa.py — 실가 프로젝트 데이터소스 모듈
 
 출처:
   - get_product, get_product_codes: MineEric64/danawa-py(Apache-2.0) 원본을
-    PPE 프로젝트용으로 패치한 버전. 패치 근거는 PPE_HISTORY.md 2026-08-03 v1 참조.
+    실가 프로젝트용으로 패치한 버전. 패치 근거는 실가_HISTORY.md 2026-08-03 v1 참조.
   - get_price_variance: MineEric64/danawa-py 원본 그대로 (패치 불필요 확인됨,
-    PPE_HISTORY.md 2026-08-03 v1 참조). GitHub main 브랜치 기준 코드 이식.
+    실가_HISTORY.md 2026-08-03 v1 참조). GitHub main 브랜치 기준 코드 이식.
   - _get_header: 원본 공통 헤더 헬퍼, 변경 없음.
 
 주의:
   - PyPI 미등록 패키지라 vendoring(파일 직접 복사) 방식으로 편입함.
   - 판정/합계 계산(estimate, compare)에는 반드시 lowest_price 단일 필드만
     사용할 것 — prices 리스트로 직접 min() 계산 금지
-    (PPE_REFERENCE.md #엔드포인트-설계 설계 원칙 참조).
+    (실가_REFERENCE.md #엔드포인트-설계 설계 원칙 참조).
 """
 
 import re
@@ -95,7 +95,7 @@ def get_product(product_code: int) -> dict:
       - 판매처명은 로고 이미지형(대형몰)/텍스트형(소형몰) 두 케이스 모두 대응
       - variants(정품/벌크/해외구매 등 유형별 최저가 비교) 필드 신규 추가
         — 원본에는 없던 필드. 참고 정보 전용이며 estimate/compare 계산에는
-        절대 미반영 (PPE_REFERENCE.md #엔드포인트-설계 참조)
+        절대 미반영 (실가_REFERENCE.md #엔드포인트-설계 참조)
     """
     response = requests.get("https://prod.danawa.com/info/?pcode={}".format(product_code),
                             headers=_get_header(host="prod.danawa.com"))
@@ -208,11 +208,11 @@ def get_price_variance(product_code: int, by_month: int = 1) -> dict:
 
     원본(MineEric64/danawa-py) 그대로 사용 — 2026-08-03 실동작 검증 결과 이
     함수만 다나와 측 구조 변경 영향 없이 정상 동작함을 확인함
-    (PPE_HISTORY.md 2026-08-03 v1 참조). 패치 없음.
+    (실가_HISTORY.md 2026-08-03 v1 참조). 패치 없음.
 
     /product/{code}/history 엔드포인트, 홈 탭 "동향" 섹션, 통계 탭에서 사용.
     price_history 테이블을 따로 두지 않고 이 함수를 그때그때 호출하는 방식으로
-    대체하기로 확정됨 (PPE_REFERENCE.md #DB-스키마 참조).
+    대체하기로 확정됨 (실가_REFERENCE.md #DB-스키마 참조).
     """
     if by_month not in (1, 3, 6, 12):
         raise AttributeError("by_month value must be 1, 3, 6 or 12.")

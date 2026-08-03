@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>앱 목업</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<style>
+  :root{
+    --bg:#0a0b0d;
+    --bg-alt:#0d0e11;
+    --surface:#16171b;
+    --surface-2:#1c1e23;
+    --line:#2a2d33;
+    --line-soft:#1f2126;
+    --text:#f2f3f5;
+    --text-dim:#8b8f97;
+    --text-faint:#54575f;
+    --cyan:#5eead4;
+    --cyan-soft:rgba(94,234,212,.14);
+    --magenta:#ff3b6e;
+    --magenta-soft:rgba(255,59,110,.14);
+    --amber:#ffb020;
+    --amber-soft:rgba(255,176,32,.14);
+    --font-display:'Black Han Sans','Pretendard',sans-serif;
+    --font-body:'Pretendard',-apple-system,sans-serif;
+    --font-mono:'JetBrains Mono',monospace;
+    --sidebar-w:236px;
+    --sidebar-w-collapsed:72px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--font-body);
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    height:100vh;
+    overflow:hidden;
+  }
+  button{font-family:inherit;cursor:pointer;}
+  input{font-family:inherit;}
+  :focus-visible{outline:2px solid var(--cyan);outline-offset:2px;border-radius:2px;}
+
+  /* ============ APP SHELL ============ */
+  .app{display:flex;height:100vh;}
+
+  /* ---------- sidebar ---------- */
+  .sidebar{
+    width:var(--sidebar-w-collapsed);
+    flex-shrink:0;
+    background:var(--bg-alt);
+    border-right:1px solid var(--line-soft);
+    display:flex;
+    flex-direction:column;
+    transition:width .22s ease;
+    overflow:hidden;
+  }
+  .sidebar.expanded{width:var(--sidebar-w);}
+
+  .side-top{
+    display:flex;
+    align-items:center;
+    height:64px;
+    flex-shrink:0;
+    padding:0 22px;
+    gap:14px;
+  }
+  .hamburger{
+    width:24px;height:24px;
+    background:none;border:none;
+    display:flex;align-items:center;justify-content:center;
+    color:var(--text-dim);
+    flex-shrink:0;
+    border-radius:6px;
+    transition:color .2s;
+  }
+  .hamburger:hover{color:var(--cyan);}
+  .brand-mark{
+    width:20px;height:20px;
+    border:1.5px solid var(--cyan);
+    border-radius:5px;
+    flex-shrink:0;
+    box-shadow:0 0 10px rgba(94,234,212,.4);
+    opacity:0;
+    transition:opacity .18s;
+    white-space:nowrap;
+  }
+  .sidebar.expanded .brand-mark{opacity:1;}
+
+  .side-nav{
+    flex:1;
+    padding:8px 10px;
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+    overflow-y:auto;
+  }
+  .nav-item{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    height:44px;
+    padding:0 13px;
+    border-radius:10px;
+    color:var(--text-dim);
+    background:none;
+    border:none;
+    width:100%;
+    text-align:left;
+    position:relative;
+    transition:background .18s, color .18s;
+  }
+  .nav-item svg{flex-shrink:0;width:20px;height:20px;}
+  .nav-item .label{
+    font-size:14px;
+    font-weight:500;
+    white-space:nowrap;
+    opacity:0;
+    transition:opacity .15s;
+  }
+  .sidebar.expanded .nav-item .label{opacity:1;}
+  .nav-item:hover{background:var(--surface);color:var(--text);}
+  .nav-item.active{
+    background:var(--cyan-soft);
+    color:var(--cyan);
+  }
+  .nav-item.active::before{
+    content:'';
+    position:absolute;
+    left:-10px;top:8px;bottom:8px;
+    width:3px;
+    border-radius:0 4px 4px 0;
+    background:var(--cyan);
+    box-shadow:0 0 8px var(--cyan);
+  }
+
+  .side-bottom{
+    padding:14px 10px 18px;
+    border-top:1px solid var(--line-soft);
+  }
+
+  /* ---------- main area ---------- */
+  .main{
+    flex:1;
+    overflow-y:auto;
+    background:var(--bg);
+  }
+  .topbar{
+    height:64px;
+    display:flex;
+    align-items:center;
+    padding:0 32px;
+    border-bottom:1px solid var(--line-soft);
+    position:sticky;top:0;
+    background:rgba(10,11,13,.85);
+    backdrop-filter:blur(8px);
+    z-index:10;
+  }
+  .topbar h1{
+    font-family:var(--font-display);
+    font-size:19px;
+    letter-spacing:.01em;
+  }
+  .page{padding:36px 32px 64px;max-width:1100px;}
+  .page-section{display:none;}
+  .page-section.visible{display:block;}
+
+  /* ---------- empty state (placeholder tabs) ---------- */
+  .empty-state{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    padding:110px 20px;
+    color:var(--text-faint);
+  }
+  .empty-state svg{opacity:.35;margin-bottom:20px;}
+  .empty-state .t{font-size:15px;color:var(--text-dim);font-weight:600;margin-bottom:6px;}
+  .empty-state .d{font-size:13px;color:var(--text-faint);font-family:var(--font-mono);}
+
+  /* ============ BUILD TAB ============ */
+  .build-view{display:none;}
+  .build-view.visible{display:block;}
+
+  .build-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:28px;
+  }
+  .build-header h2{font-family:var(--font-display);font-size:24px;}
+  .btn-primary{
+    background:var(--cyan);
+    color:#06110e;
+    border:none;
+    border-radius:10px;
+    padding:11px 20px;
+    font-weight:700;
+    font-size:13.5px;
+    box-shadow:0 0 20px rgba(94,234,212,.3);
+    transition:transform .15s,box-shadow .15s;
+  }
+  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 0 28px rgba(94,234,212,.5);}
+  .btn-ghost{
+    background:none;
+    border:1px solid var(--line);
+    color:var(--text-dim);
+    border-radius:10px;
+    padding:10px 16px;
+    font-size:13.5px;
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    transition:border-color .18s,color .18s;
+  }
+  .btn-ghost:hover{border-color:var(--text-dim);color:var(--text);}
+
+  /* build list cards */
+  .build-grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:18px;
+  }
+  .build-card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:22px;
+    cursor:pointer;
+    transition:border-color .2s,transform .2s;
+  }
+  .build-card:hover{border-color:rgba(94,234,212,.4);transform:translateY(-2px);}
+  .bc-tag{
+    display:inline-block;
+    font-family:var(--font-mono);
+    font-size:10.5px;
+    letter-spacing:.06em;
+    padding:4px 10px;
+    border-radius:100px;
+    margin-bottom:14px;
+  }
+  .bc-tag.fair{color:var(--cyan);background:var(--cyan-soft);}
+  .bc-tag.high{color:var(--magenta);background:var(--magenta-soft);}
+  .bc-tag.low{color:var(--amber);background:var(--amber-soft);}
+  .bc-title{font-size:15.5px;font-weight:700;margin-bottom:6px;}
+  .bc-meta{font-family:var(--font-mono);font-size:12px;color:var(--text-faint);margin-bottom:18px;}
+  .bc-price{font-family:var(--font-mono);font-size:21px;font-weight:700;}
+  .bc-price span{font-size:12px;color:var(--text-dim);font-weight:400;margin-left:4px;}
+
+  .build-card.new{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    border-style:dashed;
+    color:var(--text-faint);
+    min-height:158px;
+    gap:10px;
+  }
+  .build-card.new:hover{color:var(--cyan);border-color:rgba(94,234,212,.4);}
+
+  @media(max-width:900px){.build-grid{grid-template-columns:1fr 1fr;}}
+  @media(max-width:600px){.build-grid{grid-template-columns:1fr;}}
+
+  /* build create form */
+  .form-shell{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:32px;
+    max-width:680px;
+  }
+  .field{margin-bottom:22px;}
+  .field label{
+    display:block;
+    font-size:12.5px;
+    color:var(--text-dim);
+    margin-bottom:8px;
+    font-weight:600;
+  }
+  .field input{
+    width:100%;
+    background:var(--bg-alt);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:13px 14px;
+    color:var(--text);
+    font-size:14px;
+    transition:border-color .18s,box-shadow .18s;
+  }
+  .field input:focus{
+    outline:none;
+    border-color:var(--cyan);
+    box-shadow:0 0 0 3px var(--cyan-soft);
+  }
+
+  .part-rows{
+    border:1px solid var(--line);
+    border-radius:12px;
+    overflow:hidden;
+    margin-bottom:26px;
+  }
+  .part-row{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    padding:14px 16px;
+    border-bottom:1px solid var(--line-soft);
+    background:var(--bg-alt);
+  }
+  .part-row:last-child{border-bottom:none;}
+  .part-cat{
+    width:78px;
+    flex-shrink:0;
+    font-family:var(--font-mono);
+    font-size:11px;
+    color:var(--text-faint);
+    letter-spacing:.04em;
+  }
+  .part-input{
+    flex:1;
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:9px 12px;
+    color:var(--text);
+    font-size:13px;
+  }
+  .part-input::placeholder{color:var(--text-faint);}
+  .part-input:focus{outline:none;border-color:var(--cyan);}
+  .part-selected{
+    flex:1;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    background:var(--surface-2);
+    border:1px solid rgba(94,234,212,.3);
+    border-radius:8px;
+    padding:9px 12px;
+    font-size:13px;
+  }
+  .part-selected .nm{color:var(--text);}
+  .part-selected .pr{font-family:var(--font-mono);color:var(--cyan);font-size:12.5px;}
+
+  .form-actions{display:flex;justify-content:flex-end;gap:10px;}
+
+  /* build detail */
+  .detail-head{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    margin-bottom:30px;
+  }
+  .detail-head h2{font-family:var(--font-display);font-size:22px;}
+
+  .verdict{
+    display:grid;
+    grid-template-columns:360px 1fr;
+    gap:40px;
+    align-items:center;
+    margin-bottom:36px;
+  }
+  @media(max-width:880px){.verdict{grid-template-columns:1fr;}}
+
+  .gauge-card{
+    background:radial-gradient(120% 140% at 50% 120%, rgba(94,234,212,.08), transparent 60%), var(--surface);
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:30px 24px 24px;
+    text-align:center;
+  }
+  .needle{
+    transform-origin:170px 170px;
+    animation:sweep 1.4s cubic-bezier(.2,.9,.25,1) forwards;
+    filter:drop-shadow(0 0 6px rgba(94,234,212,.9));
+  }
+  @keyframes sweep{from{transform:rotate(-90deg);}to{transform:rotate(-6deg);}}
+  @media(prefers-reduced-motion:reduce){.needle{animation:none;transform:rotate(-6deg);}}
+  .verdict-tag{
+    display:inline-block;
+    font-family:var(--font-mono);
+    font-size:11.5px;
+    letter-spacing:.08em;
+    color:var(--cyan);
+    background:var(--cyan-soft);
+    border:1px solid rgba(94,234,212,.35);
+    padding:5px 13px;
+    border-radius:100px;
+    margin-bottom:12px;
+  }
+  .gauge-card .price{font-family:var(--font-mono);font-size:30px;font-weight:700;}
+  .gauge-card .price-range{margin-top:6px;font-family:var(--font-mono);font-size:12.5px;color:var(--text-dim);}
+
+  .breakdown{border-radius:18px;overflow:hidden;border:1px solid var(--line);}
+  .b-row{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:14px 20px;border-bottom:1px solid var(--line-soft);
+    background:var(--bg-alt);font-size:14px;
+  }
+  .b-row:last-child{border-bottom:none;}
+  .b-row.total{background:var(--surface-2);font-weight:700;}
+  .b-row .part{color:var(--text-dim);}
+  .b-row .part b{color:var(--text);font-weight:600;}
+  .b-row .val{font-family:var(--font-mono);color:var(--text);}
+  .b-row.total .val{color:var(--cyan);text-shadow:0 0 10px rgba(94,234,212,.5);}
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="side-top">
+      <button class="hamburger" id="hamburgerBtn" aria-label="메뉴 펼치기/접기">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M2.5 5.5h15M2.5 10h15M2.5 14.5h15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </button>
+      <div class="brand-mark"></div>
+    </div>
+
+    <nav class="side-nav">
+      <button class="nav-item active" data-tab="home">
+        <svg viewBox="0 0 20 20" fill="none"><path d="M3 9.5 10 3l7 6.5M4.5 8.5V17h11V8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="label">홈</span>
+      </button>
+      <button class="nav-item" data-tab="search">
+        <svg viewBox="0 0 20 20" fill="none"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="M16.5 16.5 13 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span class="label">검색</span>
+      </button>
+      <button class="nav-item" data-tab="build">
+        <svg viewBox="0 0 20 20" fill="none"><path d="M11.5 3.5 16.5 8.5 8 17H3v-5l8.5-8.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M9.8 5.2 14.8 10.2" stroke="currentColor" stroke-width="1.5"/></svg>
+        <span class="label">빌드</span>
+      </button>
+      <button class="nav-item" data-tab="favorites">
+        <svg viewBox="0 0 20 20" fill="none"><path d="M10 3.6 12.2 8l4.9.7-3.5 3.4.8 4.8L10 14.6l-4.4 2.3.8-4.8L2.9 8.7l4.9-.7L10 3.6Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+        <span class="label">즐겨찾기</span>
+      </button>
+      <button class="nav-item" data-tab="history">
+        <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10.5" r="6.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 7v3.5l2.5 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M6.5 3.5 4 5.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span class="label">최근기록</span>
+      </button>
+      <button class="nav-item" data-tab="stats">
+        <svg viewBox="0 0 20 20" fill="none"><path d="M3.5 16.5v-5M9 16.5V6M14.5 16.5v-8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M2.5 16.5h15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span class="label">통계</span>
+      </button>
+    </nav>
+
+    <div class="side-bottom">
+      <button class="nav-item" data-tab="settings">
+        <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="2.6" stroke="currentColor" stroke-width="1.5"/><path d="M10 3.5v1.6M10 14.9v1.6M16.5 10h-1.6M5.1 10H3.5M14.6 5.4l-1.1 1.1M6.5 13.5l-1.1 1.1M14.6 14.6l-1.1-1.1M6.5 6.5 5.4 5.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span class="label">설정</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ===== MAIN ===== -->
+  <div class="main">
+    <div class="topbar"><h1 id="topbarTitle">홈</h1></div>
+
+    <div class="page">
+
+      <!-- HOME -->
+      <section class="page-section visible" data-page="home">
+        <div class="empty-state">
+          <svg width="40" height="40" viewBox="0 0 20 20" fill="none"><path d="M3 9.5 10 3l7 6.5M4.5 8.5V17h11V8.5" stroke="currentColor" stroke-width="1.3"/></svg>
+          <div class="t">홈 화면 준비 중</div>
+          <div class="d">// TODO: dashboard summary</div>
+        </div>
+      </section>
+
+      <!-- SEARCH -->
+      <section class="page-section" data-page="search">
+        <div class="empty-state">
+          <svg width="40" height="40" viewBox="0 0 20 20" fill="none"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.3"/><path d="M16.5 16.5 13 13" stroke="currentColor" stroke-width="1.3"/></svg>
+          <div class="t">검색 화면 준비 중</div>
+          <div class="d">// TODO: /search endpoint</div>
+        </div>
+      </section>
+
+      <!-- BUILD -->
+      <section class="page-section" data-page="build">
+
+        <!-- list view -->
+        <div class="build-view visible" data-view="list">
+          <div class="build-header">
+            <h2>내 빌드</h2>
+            <button class="btn-primary" data-goto-view="create">+ 새 빌드</button>
+          </div>
+
+          <div class="build-grid">
+            <div class="build-card" data-goto-view="detail">
+              <span class="bc-tag fair">적정가</span>
+              <div class="bc-title">5070 Ti 조합</div>
+              <div class="bc-meta">부품 9종 · 2026.08.01 저장</div>
+              <div class="bc-price">346.4<span>만원</span></div>
+            </div>
+
+            <div class="build-card" data-goto-view="detail">
+              <span class="bc-tag high">고가</span>
+              <div class="bc-title">참쉬운PC 원본 구성</div>
+              <div class="bc-meta">부품 8종 · 2026.07.28 저장</div>
+              <div class="bc-price">384.9<span>만원</span></div>
+            </div>
+
+            <div class="build-card" data-goto-view="detail">
+              <span class="bc-tag low">저가</span>
+              <div class="bc-title">9070 XT 조합</div>
+              <div class="bc-meta">부품 9종 · 2026.07.30 저장</div>
+              <div class="bc-price">332.1<span>만원</span></div>
+            </div>
+
+            <button class="build-card new" data-goto-view="create">
+              <svg width="26" height="26" viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              새 빌드 만들기
+            </button>
+          </div>
+        </div>
+
+        <!-- create view -->
+        <div class="build-view" data-view="create">
+          <div class="detail-head">
+            <button class="btn-ghost" data-goto-view="list">← 목록으로</button>
+          </div>
+
+          <div class="form-shell">
+            <div class="field">
+              <label>빌드 이름</label>
+              <input type="text" placeholder="예: 5070 Ti 조합">
+            </div>
+
+            <div class="field">
+              <label>부품 구성</label>
+              <div class="part-rows">
+                <div class="part-row">
+                  <span class="part-cat">CPU</span>
+                  <div class="part-selected"><span class="nm">라이젠7 9800X3D 멀티팩</span><span class="pr">55.8만원</span></div>
+                </div>
+                <div class="part-row">
+                  <span class="part-cat">GPU</span>
+                  <div class="part-selected"><span class="nm">PALIT RTX 5070 Ti GAMINGPRO OC 16GB</span><span class="pr">128.9만원</span></div>
+                </div>
+                <div class="part-row">
+                  <span class="part-cat">메인보드</span>
+                  <input class="part-input" type="text" placeholder="부품을 검색하세요">
+                </div>
+                <div class="part-row">
+                  <span class="part-cat">RAM</span>
+                  <input class="part-input" type="text" placeholder="부품을 검색하세요">
+                </div>
+                <div class="part-row">
+                  <span class="part-cat">SSD</span>
+                  <input class="part-input" type="text" placeholder="부품을 검색하세요">
+                </div>
+                <div class="part-row">
+                  <span class="part-cat">케이스</span>
+                  <input class="part-input" type="text" placeholder="부품을 검색하세요">
+                </div>
+                <div class="part-row">
+                  <span class="part-cat">파워</span>
+                  <input class="part-input" type="text" placeholder="부품을 검색하세요">
+                </div>
+                <div class="part-row">
+                  <span class="part-cat">쿨러</span>
+                  <input class="part-input" type="text" placeholder="부품을 검색하세요">
+                </div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label>비교할 판매가 (선택)</label>
+              <input type="text" placeholder="예: 3,464,000">
+            </div>
+
+            <div class="form-actions">
+              <button class="btn-ghost" data-goto-view="list">취소</button>
+              <button class="btn-primary" data-goto-view="detail">분석하기</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- detail view -->
+        <div class="build-view" data-view="detail">
+          <div class="detail-head">
+            <button class="btn-ghost" data-goto-view="list">← 목록으로</button>
+            <h2>5070 Ti 조합</h2>
+          </div>
+
+          <div class="verdict">
+            <div class="gauge-card">
+              <svg viewBox="0 0 340 200" width="100%">
+                <path d="M 20 170 A 150 150 0 0 1 121 34" fill="none" stroke="#5eead4" stroke-width="16" stroke-linecap="round" opacity="0.85"/>
+                <path d="M 121 34 A 150 150 0 0 1 219 34" fill="none" stroke="#f2f3f5" stroke-width="16" stroke-linecap="round" opacity="0.5"/>
+                <path d="M 219 34 A 150 150 0 0 1 320 170" fill="none" stroke="#ff3b6e" stroke-width="16" stroke-linecap="round" opacity="0.85"/>
+                <g class="needle">
+                  <line x1="170" y1="170" x2="170" y2="42" stroke="#5eead4" stroke-width="3"/>
+                  <circle cx="170" cy="170" r="9" fill="#5eead4"/>
+                </g>
+                <text x="30" y="196" fill="#8b8f97" font-family="JetBrains Mono" font-size="11">저가</text>
+                <text x="152" y="24" fill="#8b8f97" font-family="JetBrains Mono" font-size="11">적정</text>
+                <text x="284" y="196" fill="#8b8f97" font-family="JetBrains Mono" font-size="11">고가</text>
+              </svg>
+              <div class="verdict-tag">적정가 판정</div>
+              <div class="price">346.4만원</div>
+              <div class="price-range">실측 부품가 339만 ~ 352만원</div>
+            </div>
+
+            <div class="breakdown">
+              <div class="b-row"><span class="part"><b>CPU</b> · 9800X3D</span><span class="val">55.8만원</span></div>
+              <div class="b-row"><span class="part"><b>GPU</b> · RTX 5070 Ti 16GB</span><span class="val">142.9만원</span></div>
+              <div class="b-row"><span class="part"><b>메인보드</b> · B850M DS3H</span><span class="val">23.9만원</span></div>
+              <div class="b-row"><span class="part"><b>RAM</b> · DDR5-5600 32GB</span><span class="val">53.8만원</span></div>
+              <div class="b-row"><span class="part"><b>SSD</b> · Lexar NM790 1TB</span><span class="val">25.9만원</span></div>
+              <div class="b-row"><span class="part"><b>케이스 · 파워</b></span><span class="val">12.6만원</span></div>
+              <div class="b-row"><span class="part"><b>OS</b> · Windows 11 Home</span><span class="val">17.2만원</span></div>
+              <div class="b-row total"><span class="part">실측 합계</span><span class="val">339 ~ 352만원</span></div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- FAVORITES -->
+      <section class="page-section" data-page="favorites">
+        <div class="empty-state">
+          <svg width="40" height="40" viewBox="0 0 20 20" fill="none"><path d="M10 3.6 12.2 8l4.9.7-3.5 3.4.8 4.8L10 14.6l-4.4 2.3.8-4.8L2.9 8.7l4.9-.7L10 3.6Z" stroke="currentColor" stroke-width="1.3"/></svg>
+          <div class="t">즐겨찾기 준비 중</div>
+          <div class="d">// TODO: saved parts list</div>
+        </div>
+      </section>
+
+      <!-- HISTORY -->
+      <section class="page-section" data-page="history">
+        <div class="empty-state">
+          <svg width="40" height="40" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10.5" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M10 7v3.5l2.5 1.5" stroke="currentColor" stroke-width="1.3"/></svg>
+          <div class="t">최근기록 준비 중</div>
+          <div class="d">// TODO: view/search log</div>
+        </div>
+      </section>
+
+      <!-- STATS -->
+      <section class="page-section" data-page="stats">
+        <div class="empty-state">
+          <svg width="40" height="40" viewBox="0 0 20 20" fill="none"><path d="M3.5 16.5v-5M9 16.5V6M14.5 16.5v-8.5" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 16.5h15" stroke="currentColor" stroke-width="1.3"/></svg>
+          <div class="t">통계 준비 중</div>
+          <div class="d">// TODO: price trend dashboard</div>
+        </div>
+      </section>
+
+      <!-- SETTINGS -->
+      <section class="page-section" data-page="settings">
+        <div class="empty-state">
+          <svg width="40" height="40" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="2.6" stroke="currentColor" stroke-width="1.3"/></svg>
+          <div class="t">설정 준비 중</div>
+          <div class="d">// TODO: notifications, account</div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  // sidebar collapse/expand
+  document.getElementById('hamburgerBtn').addEventListener('click', () => {
+    document.getElementById('sidebar').classList.toggle('expanded');
+  });
+
+  // tab switching
+  const navItems = document.querySelectorAll('.nav-item[data-tab]');
+  const pages = document.querySelectorAll('.page-section');
+  const topbarTitle = document.getElementById('topbarTitle');
+  const titles = {home:'홈', search:'검색', build:'빌드', favorites:'즐겨찾기', history:'최근기록', stats:'통계', settings:'설정'};
+
+  navItems.forEach(btn => {
+    btn.addEventListener('click', () => {
+      navItems.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const tab = btn.dataset.tab;
+      pages.forEach(p => p.classList.toggle('visible', p.dataset.page === tab));
+      topbarTitle.textContent = titles[tab];
+    });
+  });
+
+  // build sub-view switching
+  const buildViews = document.querySelectorAll('.build-view');
+  document.querySelectorAll('[data-goto-view]').forEach(el => {
+    el.addEventListener('click', () => {
+      const target = el.dataset.gotoView;
+      buildViews.forEach(v => v.classList.toggle('visible', v.dataset.view === target));
+    });
+  });
+</script>
+
+</body>
+</html>

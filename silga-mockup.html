@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>실가 — 정가 뒤의 진짜 가격</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<style>
+  :root{
+    --bg:#0a0b0d;
+    --bg-alt:#0d0e11;
+    --surface:#16171b;
+    --surface-2:#1c1e23;
+    --line:#2a2d33;
+    --line-soft:#1f2126;
+    --text:#f2f3f5;
+    --text-dim:#8b8f97;
+    --text-faint:#54575f;
+    --cyan:#5eead4;
+    --cyan-soft:rgba(94,234,212,.14);
+    --blue:#4cc9f0;
+    --magenta:#ff3b6e;
+    --magenta-soft:rgba(255,59,110,.14);
+    --amber:#ffb020;
+    --font-display:'Black Han Sans','Pretendard',sans-serif;
+    --font-body:'Pretendard','Inter',-apple-system,sans-serif;
+    --font-mono:'JetBrains Mono',monospace;
+  }
+
+  *{margin:0;padding:0;box-sizing:border-box;}
+
+  html{scroll-behavior:smooth;}
+
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--font-body);
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+
+  a{color:inherit;text-decoration:none;}
+
+  ::selection{background:var(--cyan-soft);color:var(--cyan);}
+
+  :focus-visible{
+    outline:2px solid var(--cyan);
+    outline-offset:3px;
+    border-radius:2px;
+  }
+
+  .wrap{
+    max-width:1180px;
+    margin:0 auto;
+    padding:0 32px;
+  }
+
+  /* ---------- background texture ---------- */
+  .grid-bg{
+    position:absolute;
+    inset:0;
+    background-image:
+      linear-gradient(var(--line-soft) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
+    background-size:56px 56px;
+    mask-image:radial-gradient(ellipse 70% 60% at 50% 20%, black 40%, transparent 85%);
+    opacity:.5;
+    pointer-events:none;
+  }
+
+  /* ---------- nav ---------- */
+  header{
+    position:sticky;
+    top:0;
+    z-index:50;
+    background:rgba(10,11,13,.82);
+    backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line-soft);
+  }
+  nav{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    height:68px;
+  }
+  .logo{
+    font-family:var(--font-display);
+    font-size:22px;
+    letter-spacing:.02em;
+    color:var(--text);
+    text-shadow:0 0 18px rgba(94,234,212,.35);
+  }
+  .logo span{color:var(--cyan);}
+  .nav-links{
+    display:flex;
+    gap:36px;
+    font-size:14px;
+    color:var(--text-dim);
+  }
+  .nav-links a{transition:color .2s;}
+  .nav-links a:hover{color:var(--text);}
+  .nav-right{display:flex;align-items:center;gap:16px;}
+  .badge{
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:.06em;
+    color:var(--cyan);
+    border:1px solid rgba(94,234,212,.35);
+    background:var(--cyan-soft);
+    padding:6px 12px;
+    border-radius:100px;
+  }
+  .badge::before{
+    content:'';
+    display:inline-block;
+    width:6px;height:6px;
+    border-radius:50%;
+    background:var(--cyan);
+    box-shadow:0 0 8px var(--cyan);
+    margin-right:7px;
+    vertical-align:middle;
+  }
+
+  @media (max-width:820px){ .nav-links{display:none;} }
+
+  /* ---------- hero ---------- */
+  .hero{
+    position:relative;
+    padding:120px 0 100px;
+    overflow:hidden;
+  }
+  .eyebrow{
+    font-family:var(--font-mono);
+    font-size:12px;
+    letter-spacing:.22em;
+    color:var(--cyan);
+    text-transform:uppercase;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:22px;
+  }
+  .eyebrow::before{
+    content:'';
+    width:24px;height:1px;
+    background:var(--cyan);
+    box-shadow:0 0 6px var(--cyan);
+  }
+  .hero h1{
+    position:relative;
+    font-family:var(--font-display);
+    font-size:clamp(46px, 8vw, 92px);
+    line-height:1.05;
+    letter-spacing:.01em;
+    max-width:820px;
+  }
+  .hero h1 .glow{
+    color:var(--cyan);
+    text-shadow:
+      0 0 8px rgba(94,234,212,.85),
+      0 0 28px rgba(94,234,212,.55),
+      0 0 70px rgba(94,234,212,.3);
+  }
+  .hero p.sub{
+    margin-top:26px;
+    max-width:560px;
+    font-size:17px;
+    color:var(--text-dim);
+    line-height:1.7;
+  }
+
+  .scan-box{
+    margin-top:44px;
+    max-width:560px;
+    display:flex;
+    gap:10px;
+  }
+  .scan-input{
+    flex:1;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:16px 18px;
+    color:var(--text);
+    font-family:var(--font-mono);
+    font-size:14px;
+    transition:border-color .2s, box-shadow .2s;
+  }
+  .scan-input::placeholder{color:var(--text-faint);}
+  .scan-input:focus{
+    outline:none;
+    border-color:var(--cyan);
+    box-shadow:0 0 0 4px var(--cyan-soft), 0 0 24px rgba(94,234,212,.2);
+  }
+  .scan-btn{
+    background:var(--cyan);
+    color:#06110e;
+    border:none;
+    border-radius:10px;
+    padding:0 26px;
+    font-family:var(--font-body);
+    font-weight:700;
+    font-size:14px;
+    cursor:pointer;
+    box-shadow:0 0 24px rgba(94,234,212,.4);
+    transition:transform .15s, box-shadow .15s;
+  }
+  .scan-btn:hover{transform:translateY(-1px);box-shadow:0 0 32px rgba(94,234,212,.6);}
+
+  .ticker{
+    margin-top:18px;
+    font-family:var(--font-mono);
+    font-size:12.5px;
+    color:var(--text-faint);
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .ticker .dot{
+    width:6px;height:6px;border-radius:50%;
+    background:var(--amber);
+    box-shadow:0 0 8px var(--amber);
+    flex-shrink:0;
+  }
+  .ticker b{color:var(--text-dim);font-weight:500;}
+
+  /* ---------- section shell ---------- */
+  section{
+    padding:96px 0;
+    border-top:1px solid var(--line-soft);
+  }
+  .section-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    flex-wrap:wrap;
+    gap:16px;
+    margin-bottom:52px;
+  }
+  .section-head h2{
+    font-family:var(--font-display);
+    font-size:clamp(28px,4vw,40px);
+    letter-spacing:.01em;
+  }
+  .section-head p{
+    color:var(--text-dim);
+    font-size:15px;
+    max-width:380px;
+  }
+
+  /* ---------- gauge (signature) ---------- */
+  .verdict{
+    display:grid;
+    grid-template-columns:420px 1fr;
+    gap:64px;
+    align-items:center;
+  }
+  @media (max-width:900px){ .verdict{grid-template-columns:1fr;gap:48px;} }
+
+  .gauge-card{
+    background:radial-gradient(120% 140% at 50% 120%, rgba(94,234,212,.08), transparent 60%), var(--surface);
+    border:1px solid var(--line);
+    border-radius:20px;
+    padding:36px 28px 28px;
+    text-align:center;
+  }
+  .gauge-wrap{position:relative;width:100%;max-width:340px;margin:0 auto;}
+  .needle{
+    transform-origin:170px 170px;
+    animation:sweep 1.6s cubic-bezier(.2,.9,.25,1) forwards;
+    filter:drop-shadow(0 0 6px rgba(94,234,212,.9));
+  }
+  @keyframes sweep{
+    from{transform:rotate(-90deg);}
+    to{transform:rotate(-6deg);}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .needle{animation:none;transform:rotate(-6deg);}
+  }
+  .gauge-readout{margin-top:10px;}
+  .gauge-readout .verdict-tag{
+    display:inline-block;
+    font-family:var(--font-mono);
+    font-size:12px;
+    letter-spacing:.1em;
+    color:var(--cyan);
+    background:var(--cyan-soft);
+    border:1px solid rgba(94,234,212,.35);
+    padding:5px 14px;
+    border-radius:100px;
+    margin-bottom:14px;
+  }
+  .gauge-readout .price{
+    font-family:var(--font-mono);
+    font-size:34px;
+    font-weight:700;
+    color:var(--text);
+  }
+  .gauge-readout .price-range{
+    margin-top:6px;
+    font-family:var(--font-mono);
+    font-size:13px;
+    color:var(--text-dim);
+  }
+
+  .breakdown{border-radius:20px;overflow:hidden;border:1px solid var(--line);}
+  .b-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:16px 22px;
+    border-bottom:1px solid var(--line-soft);
+    background:var(--bg-alt);
+    font-size:14.5px;
+  }
+  .b-row:last-child{border-bottom:none;}
+  .b-row.total{
+    background:var(--surface-2);
+    font-weight:700;
+  }
+  .b-row .part{color:var(--text-dim);}
+  .b-row .part b{color:var(--text);font-weight:600;}
+  .b-row .val{font-family:var(--font-mono);color:var(--text);}
+  .b-row.total .val{color:var(--cyan);text-shadow:0 0 12px rgba(94,234,212,.5);}
+
+  /* ---------- product cards ---------- */
+  .card-grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:20px;
+  }
+  @media (max-width:900px){ .card-grid{grid-template-columns:1fr 1fr;} }
+  @media (max-width:600px){ .card-grid{grid-template-columns:1fr;} }
+
+  .p-card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:22px;
+    transition:border-color .25s, transform .25s, box-shadow .25s;
+    position:relative;
+    overflow:hidden;
+  }
+  .p-card::after{
+    content:'';
+    position:absolute;inset:0;
+    background:radial-gradient(120px 90px at 100% 0%, rgba(94,234,212,.14), transparent 70%);
+    opacity:0;
+    transition:opacity .3s;
+  }
+  .p-card:hover{
+    border-color:rgba(94,234,212,.4);
+    transform:translateY(-3px);
+    box-shadow:0 12px 30px rgba(0,0,0,.4);
+  }
+  .p-card:hover::after{opacity:1;}
+  .p-tag{
+    font-family:var(--font-mono);
+    font-size:10.5px;
+    letter-spacing:.08em;
+    color:var(--text-faint);
+    text-transform:uppercase;
+  }
+  .p-title{
+    margin-top:8px;
+    font-size:15px;
+    font-weight:600;
+    line-height:1.4;
+    min-height:44px;
+  }
+  .p-price-row{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    margin-top:18px;
+  }
+  .p-price{
+    font-family:var(--font-mono);
+    font-size:22px;
+    font-weight:700;
+  }
+  .p-delta{
+    font-family:var(--font-mono);
+    font-size:12px;
+    padding:3px 8px;
+    border-radius:6px;
+  }
+  .p-delta.down{color:var(--cyan);background:var(--cyan-soft);}
+  .p-delta.up{color:var(--magenta);background:var(--magenta-soft);}
+  .spark{margin-top:14px;display:block;}
+
+  /* ---------- history chart ---------- */
+  .chart-card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:20px;
+    padding:32px;
+  }
+  .chart-legend{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:24px;
+    flex-wrap:wrap;
+    gap:12px;
+  }
+  .chart-legend .name{font-size:15px;font-weight:600;}
+  .chart-legend .name span{color:var(--text-dim);font-weight:400;font-size:13px;display:block;margin-top:2px;}
+  .chart-stats{display:flex;gap:24px;font-family:var(--font-mono);font-size:13px;}
+  .chart-stats div span{display:block;color:var(--text-faint);font-size:10.5px;letter-spacing:.06em;margin-bottom:3px;}
+  .chart-stats .min{color:var(--cyan);}
+  .chart-stats .max{color:var(--magenta);}
+
+  /* ---------- api section ---------- */
+  .api-grid{
+    display:grid;
+    grid-template-columns:1fr 1.2fr;
+    gap:48px;
+    align-items:center;
+  }
+  @media (max-width:900px){ .api-grid{grid-template-columns:1fr;} }
+  .api-copy h2{margin-bottom:18px;}
+  .api-copy p{color:var(--text-dim);font-size:15px;line-height:1.75;margin-bottom:14px;}
+  .api-copy code{
+    font-family:var(--font-mono);
+    background:var(--surface-2);
+    padding:2px 7px;
+    border-radius:5px;
+    font-size:13px;
+    color:var(--cyan);
+  }
+  .terminal{
+    background:#0d0f12;
+    border:1px solid var(--line);
+    border-radius:14px;
+    overflow:hidden;
+    box-shadow:0 20px 60px rgba(0,0,0,.5);
+  }
+  .term-bar{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    padding:12px 16px;
+    border-bottom:1px solid var(--line-soft);
+  }
+  .term-bar span{width:10px;height:10px;border-radius:50%;background:#33353b;}
+  .term-body{
+    padding:22px 20px;
+    font-family:var(--font-mono);
+    font-size:12.5px;
+    line-height:1.85;
+    overflow-x:auto;
+  }
+  .tk{color:var(--text-dim);}
+  .tk-key{color:var(--cyan);}
+  .tk-str{color:var(--text);}
+  .tk-num{color:var(--amber);}
+  .tk-method{color:var(--magenta);font-weight:700;}
+  .tk-com{color:var(--text-faint);}
+
+  /* ---------- footer ---------- */
+  footer{
+    border-top:1px solid var(--line-soft);
+    padding:48px 0;
+  }
+  .foot-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:16px;
+  }
+  .foot-logo{font-family:var(--font-display);font-size:16px;}
+  .foot-tag{font-family:var(--font-mono);font-size:11.5px;color:var(--text-faint);}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <nav>
+      <div class="logo">실<span>가</span></div>
+      <div class="nav-links">
+        <a href="#scan">스캔</a>
+        <a href="#verdict">판정 게이지</a>
+        <a href="#history">가격 히스토리</a>
+        <a href="#api">API 문서</a>
+      </div>
+      <div class="nav-right">
+        <span class="badge">AI 라우터 연동 가능</span>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+  <!-- HERO -->
+  <section class="hero" id="scan" style="border-top:none;padding-top:110px;">
+    <div class="grid-bg"></div>
+    <div class="wrap">
+      <div class="eyebrow">REAL&#8209;PRICE ENGINE</div>
+      <h1>정가 말고,<br><span class="glow">실가.</span></h1>
+      <p class="sub">다나와 최저가를 실시간으로 추적해서, 조립PC 견적이 부품값 그대로인지 바가지인지 바로 계산합니다. 검색 한 번이면 끝나요.</p>
+
+      <div class="scan-box">
+        <input class="scan-input" type="text" placeholder="예: RTX 5070 Ti 16GB" aria-label="부품 검색">
+        <button class="scan-btn">스캔</button>
+      </div>
+      <div class="ticker">
+        <span class="dot"></span>
+        최근 스캔 <b>PALIT RTX 5070 Ti GAMINGPRO&#8209;S OC · 155.9만원</b> · 3분 전
+      </div>
+    </div>
+  </section>
+
+  <!-- VERDICT GAUGE (signature) -->
+  <section id="verdict">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow" style="margin-bottom:14px;">VERDICT</div>
+          <h2>이 조립PC,<br>사도 될까요?</h2>
+        </div>
+        <p>부품 8종의 실시간 최저가를 합산해서, 판매가와 견주어 저가·적정·고가 구간으로 바로 읽어드려요.</p>
+      </div>
+
+      <div class="verdict">
+        <div class="gauge-card">
+          <div class="gauge-wrap">
+            <svg viewBox="0 0 340 200" width="100%">
+              <path d="M 20 170 A 150 150 0 0 1 121 34" fill="none" stroke="#5eead4" stroke-width="16" stroke-linecap="round" opacity="0.85"/>
+              <path d="M 121 34 A 150 150 0 0 1 219 34" fill="none" stroke="#f2f3f5" stroke-width="16" stroke-linecap="round" opacity="0.5"/>
+              <path d="M 219 34 A 150 150 0 0 1 320 170" fill="none" stroke="#ff3b6e" stroke-width="16" stroke-linecap="round" opacity="0.85"/>
+              <g class="needle">
+                <line x1="170" y1="170" x2="170" y2="42" stroke="#5eead4" stroke-width="3"/>
+                <circle cx="170" cy="170" r="9" fill="#5eead4"/>
+              </g>
+              <text x="30" y="196" fill="#8b8f97" font-family="JetBrains Mono" font-size="11">저가</text>
+              <text x="152" y="24" fill="#8b8f97" font-family="JetBrains Mono" font-size="11">적정</text>
+              <text x="284" y="196" fill="#8b8f97" font-family="JetBrains Mono" font-size="11">고가</text>
+            </svg>
+          </div>
+          <div class="gauge-readout">
+            <div class="verdict-tag">적정가 판정</div>
+            <div class="price">346.4만원</div>
+            <div class="price-range">실측 부품가 339만 ~ 352만원</div>
+          </div>
+        </div>
+
+        <div class="breakdown">
+          <div class="b-row"><span class="part"><b>CPU</b> · 9800X3D</span><span class="val">55.8만원</span></div>
+          <div class="b-row"><span class="part"><b>GPU</b> · RTX 5070 Ti 16GB</span><span class="val">142.9만원</span></div>
+          <div class="b-row"><span class="part"><b>메인보드</b> · B850M DS3H</span><span class="val">23.9만원</span></div>
+          <div class="b-row"><span class="part"><b>RAM</b> · DDR5&#8209;5600 32GB</span><span class="val">53.8만원</span></div>
+          <div class="b-row"><span class="part"><b>SSD</b> · Lexar NM790 1TB</span><span class="val">25.9만원</span></div>
+          <div class="b-row"><span class="part"><b>케이스 · 파워</b></span><span class="val">12.6만원</span></div>
+          <div class="b-row"><span class="part"><b>OS</b> · Windows 11 Home</span><span class="val">17.2만원</span></div>
+          <div class="b-row total"><span class="part">실측 합계</span><span class="val">339 ~ 352만원</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SCAN RESULTS -->
+  <section>
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow" style="margin-bottom:14px;">SCAN RESULTS</div>
+          <h2>지금 담긴 부품들</h2>
+        </div>
+        <p>다나와 최저가 기준, 갱신 시각과 함께 표시돼요.</p>
+      </div>
+
+      <div class="card-grid">
+
+        <div class="p-card">
+          <div class="p-tag">CPU · AMD</div>
+          <div class="p-title">라이젠7 9800X3D (그래니트 릿지) 멀티팩</div>
+          <div class="p-price-row">
+            <div class="p-price">55.8<span style="font-size:13px;color:var(--text-dim);">만원</span></div>
+            <div class="p-delta down">▼ 1.2%</div>
+          </div>
+          <svg class="spark" width="100%" height="34" viewBox="0 0 220 34" preserveAspectRatio="none">
+            <polyline points="0,20 30,22 60,14 90,18 120,10 150,16 180,8 220,12" fill="none" stroke="#5eead4" stroke-width="2" opacity="0.9"/>
+          </svg>
+        </div>
+
+        <div class="p-card">
+          <div class="p-tag">GPU · PALIT</div>
+          <div class="p-title">RTX 5070 Ti GAMINGPRO&#8209;S OC D7 16GB</div>
+          <div class="p-price-row">
+            <div class="p-price">155.9<span style="font-size:13px;color:var(--text-dim);">만원</span></div>
+            <div class="p-delta up">▲ 3.8%</div>
+          </div>
+          <svg class="spark" width="100%" height="34" viewBox="0 0 220 34" preserveAspectRatio="none">
+            <polyline points="0,26 30,20 60,22 90,14 120,16 150,8 180,10 220,4" fill="none" stroke="#ff3b6e" stroke-width="2" opacity="0.9"/>
+          </svg>
+        </div>
+
+        <div class="p-card">
+          <div class="p-tag">RAM · APACER</div>
+          <div class="p-title">DDR5&#8209;5600 CL46 16GB (2개 구성)</div>
+          <div class="p-price-row">
+            <div class="p-price">53.8<span style="font-size:13px;color:var(--text-dim);">만원</span></div>
+            <div class="p-delta up">▲ 0.6%</div>
+          </div>
+          <svg class="spark" width="100%" height="34" viewBox="0 0 220 34" preserveAspectRatio="none">
+            <polyline points="0,30 30,28 60,24 90,20 120,18 150,14 180,12 220,10" fill="none" stroke="#ffb020" stroke-width="2" opacity="0.9"/>
+          </svg>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- PRICE HISTORY -->
+  <section id="history">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow" style="margin-bottom:14px;">PRICE HISTORY</div>
+          <h2>가격은 늘 움직입니다</h2>
+        </div>
+        <p>최근 3개월 추이. 지정가를 걸어두면 그 아래로 떨어질 때 알려드려요.</p>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-legend">
+          <div class="name">PALIT RTX 5070 Ti GAMINGPRO&#8209;S OC D7 16GB
+            <span>2026.05.03 — 2026.08.03</span>
+          </div>
+          <div class="chart-stats">
+            <div><span>최저</span><b class="min">128.4만원</b></div>
+            <div><span>최고</span><b class="max">161.2만원</b></div>
+            <div><span>현재</span><b style="color:var(--text)">155.9만원</b></div>
+          </div>
+        </div>
+
+        <svg viewBox="0 0 1000 260" width="100%" height="260" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="fillGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#5eead4" stop-opacity="0.28"/>
+              <stop offset="100%" stop-color="#5eead4" stop-opacity="0"/>
+            </linearGradient>
+            <filter id="glow">
+              <feGaussianBlur stdDeviation="3" result="blur"/>
+              <feMerge>
+                <feMergeNode in="blur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+          </defs>
+
+          <g stroke="#1f2126" stroke-width="1">
+            <line x1="0" y1="20" x2="1000" y2="20"/>
+            <line x1="0" y1="80" x2="1000" y2="80"/>
+            <line x1="0" y1="140" x2="1000" y2="140"/>
+            <line x1="0" y1="200" x2="1000" y2="200"/>
+          </g>
+
+          <polygon points="0,180 90,150 180,165 270,120 360,140 450,90 540,110 630,60 720,80 810,40 900,70 1000,50 1000,260 0,260"
+                   fill="url(#fillGrad)"/>
+          <polyline points="0,180 90,150 180,165 270,120 360,140 450,90 540,110 630,60 720,80 810,40 900,70 1000,50"
+                     fill="none" stroke="#5eead4" stroke-width="2.5" filter="url(#glow)"/>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- API -->
+  <section id="api">
+    <div class="wrap">
+      <div class="api-grid">
+        <div class="api-copy">
+          <div class="eyebrow" style="margin-bottom:14px;">FOR AI &amp; DEVELOPERS</div>
+          <h2>AI가 바로<br>물어볼 수 있게</h2>
+          <p>Claude 같은 에이전트가 부품명 하나로 실가를 조회하고, 견적 판정까지 한 번의 호출로 받을 수 있어요. 사람이 보는 화면과 같은 데이터를 씁니다.</p>
+          <p>검색은 <code>/search</code>, 상세는 <code>/product/:code</code>, 판정은 <code>/compare</code> 하나로 끝나요.</p>
+        </div>
+
+        <div class="terminal">
+          <div class="term-bar"><span></span><span></span><span></span></div>
+          <div class="term-body"><span class="tk-method">GET</span> <span class="tk">/product/76465883/compare?market_price=3464000</span>
+<span class="tk-com">
+// response</span>
+{
+  <span class="tk-key">"title"</span>: <span class="tk-str">"PALIT RTX 5070 Ti GAMINGPRO OC 16GB"</span>,
+  <span class="tk-key">"lowest_price"</span>: <span class="tk-num">1289500</span>,
+  <span class="tk-key">"estimate_total"</span>: <span class="tk-num">3390000</span>,
+  <span class="tk-key">"market_price"</span>: <span class="tk-num">3464000</span>,
+  <span class="tk-key">"verdict"</span>: <span class="tk-str">"적정가"</span>,
+  <span class="tk-key">"diff_percent"</span>: <span class="tk-num">2.1</span>
+}</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-row">
+      <div class="foot-logo">실가</div>
+      <div class="foot-tag">REAL&#8209;PRICE ENGINE · DANAWA 최저가 기반 · 매일 자동 갱신 · 개인용 목업</div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

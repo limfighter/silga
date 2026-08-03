@@ -1,5 +1,5 @@
 """
-PPE backend — FastAPI 스켈레톤
+실가 backend — FastAPI 스켈레톤
 
 구현된 엔드포인트: /search, /product/{code}, /product/{code}/history,
 /estimate, /product/{code}/compare(단일 상품 기준), /build/compare(빌드 전체
@@ -38,7 +38,7 @@ from app.database import Base, engine, get_db
 from app.models import Product, Build, BuildItem
 from app.timezone_utils import now_kst
 
-app = FastAPI(title="PPE backend", version="0.1.0")
+app = FastAPI(title="실가 backend", version="0.1.0")
 
 
 @app.on_event("startup")
