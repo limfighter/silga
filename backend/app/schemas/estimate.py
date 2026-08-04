@@ -1,5 +1,7 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Literal, Optional, List
+
+from app.schemas.compare import VerdictBasisItem
 
 
 class EstimateItem(BaseModel):
@@ -25,12 +27,18 @@ class EstimateResponse(BaseModel):
 class BuildCompareRequest(BaseModel):
     items: List[EstimateItem]
     market_price: int
+    ma_window: Literal[7, 14, 30] = 14  # 판정 기준 이동평균 기간(일), 2026-08-04 결정
 
 
 class BuildCompareResponse(BaseModel):
-    total_price: int
+    total_price: int              # 즉시가 합계 — 의미 안 바뀜
     total_price_formatted: str
     breakdown: List[BreakdownItem]
+    verdict_basis_price: Optional[int] = None       # 판정에 실제 쓰인 이동평균/fallback 기준가
+    verdict_basis_price_formatted: Optional[str] = None
+    verdict_confidence: Optional[str] = None        # "high" | "low"
+    verdict_basis_breakdown: List[VerdictBasisItem] = []
+    ma_window: int
     market_price: int
-    verdict: str
-    diff_percent: float
+    verdict: Optional[str] = None
+    diff_percent: Optional[float] = None

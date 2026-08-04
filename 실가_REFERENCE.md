@@ -235,15 +235,18 @@ POST /estimate
   body: [{code}, {code}, ...]
   → {total_price, total_price_formatted, breakdown: [{category, title, price}, ...]}
 
-GET  /product/{code}/compare?market_price={n}
-  → {title, lowest_price, estimate_total, market_price, verdict, diff_percent}
+GET  /product/{code}/compare?market_price={n}&ma_window={7|14|30}
+  → {title, lowest_price, estimate_total, verdict_basis_price,
+     verdict_basis_price_formatted, verdict_confidence, verdict_basis_breakdown,
+     ma_window, market_price, verdict, diff_percent}
   verdict ∈ {"저가", "적정가", "고가"} — 판정 게이지(빌드 상세 화면) 구간과 1:1 대응
-  ※ 단일 상품 기준 — estimate_total은 그 상품 하나의 lowest_price와 동일값
+  ※ 단일 상품 기준 — estimate_total(즉시가)은 그 상품 하나의 lowest_price와 동일값
 
 POST /build/compare  (신규, v0.3 — 원 계약에 없었음)
-  body: {items: [{code, category}, ...], market_price}
+  body: {items: [{code, category}, ...], market_price, ma_window?(기본 14)}
   → {total_price, total_price_formatted, breakdown: [...],
-     market_price, verdict, diff_percent}
+     verdict_basis_price, verdict_basis_price_formatted, verdict_confidence,
+     verdict_basis_breakdown, ma_window, market_price, verdict, diff_percent}
   ※ 빌드 전체 기준. /compare 엔드포인트가 "단일상품"인지 "빌드전체"인지 스펙
     불일치가 있었음(silga-mockup.html API 예시 숫자가 빌드전체 기준이었음,
     2026-08-03 발견) → 확인 후 단일상품용(위 GET, 원 계약 유지)과 빌드전체용
@@ -252,29 +255,89 @@ POST /build/compare  (신규, v0.3 — 원 계약에 없었음)
 POST /builds  (신규, v0.3 — 원 계약에 없었음)
   body: {name, market_price?, items: [{category, code}, ...]}
   → BuildSummary {id, name, market_price, created_at, item_count,
-     total_price, total_price_formatted, verdict}
+     total_price, total_price_formatted, verdict, verdict_confidence, ma_window}
   ※ builds/build_items DB 테이블은 있었는데 채워넣는 CRUD가 누락돼 있었음
+  ※ 생성 직후엔 verdict/verdict_confidence/ma_window 전부 null (아직 라이브
+    가격 계산 전) — 목록/상세 조회 시점에 채워짐
 
-GET  /builds  (신규, v0.3)
+GET  /builds?ma_window={7|14|30}  (신규, v0.3)
   → [BuildSummary, ...]  — 저장된 빌드 목록(앱 셸 "내 빌드" 카드 목록)
   ※ 카드에 판정 태그를 보여주려면 라이브 가격 재조회가 필요해서, 목록
     조회 시점에 빌드마다 계산을 다시 돌림 — 개인 프로젝트 규모라 지금은
     그대로 감, 빌드 개수 많아지면 재검토
+  ※ total_price는 즉시가로 매번 새로 조회. verdict는 이동평균 기준가로
+    계산하며 (build_id, ma_window) 단위 5분 메모리 캐시를 씀(아래 "verdict
+    판정 기준가" 항목 참조)
 
-GET  /builds/{id}  (신규, v0.3)
+GET  /builds/{id}?ma_window={7|14|30}  (신규, v0.3)
   → BuildDetail {id, name, market_price, created_at, items: [...],
-     total_price, total_price_formatted, verdict, diff_percent}
+     total_price, total_price_formatted, verdict_basis_price,
+     verdict_basis_price_formatted, verdict_confidence, verdict_basis_breakdown,
+     ma_window, verdict, diff_percent}
+  ※ GET /builds와 같은 verdict 기준가 캐시를 공유 — 목록↔상세 이동 시
+    판정이 서로 다르게 뜨는 걸 방지
 
 verdict 판정 임계값:
-  diff_percent = (market_price - estimate_total) / estimate_total * 100
+  diff_percent = (market_price - basis_price) / basis_price * 100
   diff_percent > +5%  → "고가"
   diff_percent < -5%  → "저가"
   그 외              → "적정가"
   ※ ±5%는 REFERENCE.md에 수치가 없어 2026-08-03 구현 시 임의로 잡은 가정값
-    (backend/app/services/verdict.py 상수로 분리). silga-mockup.html API
-    예시(estimate_total=3390000, market_price=3464000 → diff_percent=2.1,
-    "적정가")로 공식 자체는 검증됐으나 경계값(±5%)은 미확정 — 실사용해보고
-    조정 필요 여부 논의 요망 (실가_인수인계.md "결정 필요" 참조)
+    (backend/app/services/verdict.py::VERDICT_THRESHOLD_PERCENT). silga-mockup.html
+    API 예시(estimate_total=3390000, market_price=3464000 → diff_percent=2.1,
+    "적정가")로 공식 자체는 검증됨. 2026-08-04 재논의 결과 임계값 자체(±5%,
+    대칭)는 그대로 유지하기로 확정 — 대신 아래처럼 basis_price(판정 기준가)
+    계산 방식을 이동평균 도입으로 개선함 (실가_인수인계.md 2026-08-04
+    "결정 완료" 참조)
+
+verdict 판정 기준가(basis_price) — 이동평균 도입 (2026-08-04, v0.4 예정)
+  배경: basis_price로 조회 시점의 순간 스크래핑 값(즉시가)만 쓰면, 부품이
+    일시 특가/재고 급변으로 순간 폭락·폭등할 때 같은 빌드인데도 조회
+    타이밍에 따라 고가↔저가↔적정가로 판정이 오락가락하는 문제가 있음.
+    → estimate_total/total_price(견적가, 화면에 보이는 "총 가격")는 지금처럼
+      즉시가 그대로 유지 — "지금 당장 사면 얼마"라는 의미 보존
+    → verdict 판정에 쓰는 basis_price(verdict_basis_price)만 별도로 부품별
+      이동평균 기준 계산으로 분리
+
+  이동평균 계산 (services/verdict.py::compute_ma_price):
+    - danawa.get_price_variance(code, 3)(3개월치 시계열)을 재사용, 신규
+      스크래핑 함수 없음
+    - ⚠️ 실측 확인(2026-08-04, 로컬 라이브 검증): 다나와는 daily가 아니라
+      **주 단위**로 데이터를 줌(1개월치 조회해도 포인트 4개 안팎, 7일 간격).
+      그래서 by_month=1이 아니라 3을 씀 — 1개월치만으론 window=30일 커버리지
+      체크(아래) 자체가 항상 부족해서 무효 처리만 나옴
+    - N(기간)은 쿼리파라미터/요청필드 ma_window로 선택: 7 | 14 | 30, 기본 14
+      (다만 실제 데이터가 주 단위라 window=7이면 보통 데이터 포인트 1~2개
+      평균이 됨 — "7일선"이라는 이름과 별개로 정밀한 daily 스무딩은 아님)
+    - "엄격" 원칙(v5, 실측 후 재정의): "정확히 N개 항목 존재"가 아니라
+      **날짜 기준으로 최근 N일 이내 데이터를 모아 평균 + 히스토리 자체가
+      N일 전체를 커버해야 유효**(가장 오래된 데이터가 cutoff 이전부터 있어야
+      함). 신상품처럼 히스토리 자체가 N일보다 짧으면 무효(None) — 최초
+      설계(v4)였던 "정확히 N개 daily 항목 필요"는 주 단위 데이터에서 항상
+      실패하는 게 실측으로 확인돼 폐기함 (실가_HISTORY.md 2026-08-04 v4→v5 참조)
+    - 정렬은 리스트 원본 순서를 신뢰하지 않고 매번 full_date를 datetime으로
+      파싱해서 명시 정렬 — full_date 포맷은 "YY-MM-DD"(예: "26-05-12")로
+      실측 확인됨(사전순 정렬이 날짜순과 일치하지만 구간 계산을 위해 명시
+      파싱). full_date 없는 항목이 섞이면 정렬 신뢰 불가로 보고 무효 처리
+
+  이동평균 무효 시 fallback (부품 단위):
+    - 이동평균이 무효인 부품은 그 부품만 즉시가(lowest_price)로 대체해서
+      basis_price 합산을 계속 진행 — 빌드 전체 판정을 null로 날리지 않음
+      (최초 검토안이었던 "부품 하나라도 무효면 전체 null" 원칙을 뒤집음)
+    - 신뢰도를 투명하게 노출: verdict_confidence("high" — 전 부품 이동평균
+      정상 | "low" — 하나 이상 즉시가로 fallback됨)
+    - verdict_basis_breakdown: [{code, price, source: "ma"|"current_fallback"}]
+      부품별로 어떤 값을 썼는지 노출
+
+  GET /builds, GET /builds/{id} 전용 캐시:
+    - 저장된 빌드를 매번 순회 재계산하는 구조라, 이동평균 도입으로 부품당
+      스크래핑이 2배(get_product + get_price_variance)가 되는 부담 +
+      목록↔상세 이동 시 캐시 미스 타이밍 차이로 판정이 다르게 뜨는 문제를
+      막기 위해 (build_id, ma_window) 키로 5분간 프로세스 메모리 캐시
+      (_verdict_basis_cache, main.py) — DB 저장 아님, total_price(즉시가)는
+      캐시 대상 아니고 항상 새로 조회
+    - POST /build/compare(build_id 없음), GET /product/{code}/compare(반복
+      조회 문제 없음)는 이 캐시 대상 아님
 
 /product/{code} 응답 추가 필드 (원 계약 외, 2026-08-03 추가):
   + in_stock: bool
@@ -285,9 +348,10 @@ verdict 판정 임계값:
 설계 원칙:
   - 응답에 사람이 읽는 필드(*_formatted)와 AI/계산용 raw 필드(숫자)를 함께 포함
     → 프론트는 formatted 필드, AI 라우터는 raw 필드 사용. 응답 이원화하지 않음
-  - 실측 합계/판정 계산(estimate, compare)은 항상 다나와 공식 lowest_price
-    단일 필드만 기준으로 삼음. 판매처별 가격 리스트(prices)에서 직접
-    min() 계산해서 최저가로 대체하는 로직은 금지 — 리스트에 다나와가
+  - 실측 합계(estimate_total/total_price)와 판정 기준가(verdict_basis_price)는
+    항상 다나와 공식 lowest_price(즉시가) 또는 그 daily 시계열(이동평균,
+    2026-08-04부터) 기반으로만 계산. 판매처별 가격 리스트(prices)에서
+    직접 min() 계산해서 최저가로 대체하는 로직은 금지 — 리스트에 다나와가
     최저가 산정에서 제외한(안전결제 미지원 등으로 추정) 판매처가 섞여
     있고, 우리가 가져오는 리스트 자체도 상위 일부만 잘려 있어 불완전함
     (2026-08-03 danawa-py 검증 시 실측 확인, 실가_HISTORY.md 참조)

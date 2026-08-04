@@ -190,3 +190,98 @@
     → 저장소 구조 실제 생성(backend/frontend 폴더) →
       danawa_patched.py를 backend/app/services/danawa.py로 편입 →
       FastAPI 스켈레톤 + /search, /product/{code} 구현 순서로 진행
+
+---
+
+### 2026-08-04
+
+#### v4 — verdict 판정 기준가에 이동평균 도입 (백엔드만, 라이브 미검증)
+
+[✓] 배경 논의
+    → verdict가 조회 시점의 순간 스크래핑 값(즉시가) 하나로만 판정돼서,
+      부품이 일시 특가/재고 급변으로 순간 폭락·폭등하면 같은 빌드인데도
+      조회 타이밍에 따라 고가↔저가↔적정가로 판정이 오락가락하는 문제 논의
+    → verdict 임계값(±5%, 대칭) 자체는 그대로 유지하기로 확정 — 비대칭
+      임계값(고가/저가 다르게)도 검토했으나 채택 안 함
+
+[✓] 설계 확정
+    → estimate_total/total_price(견적가)는 즉시가 그대로 유지, verdict
+      판정 기준가(verdict_basis_price)만 부품별 이동평균으로 분리
+    → 이동평균 기간은 ma_window(7/14/30일, 기본 14)로 사용자 선택 —
+      danawa.get_price_variance(code, 1)의 daily 시계열 재사용, 신규
+      스크래핑 함수 없음
+    → "엄격" 원칙: 선택 기간만큼 daily 데이터가 정확히 다 있어야 유효,
+      모자란 부품은 이동평균 무효
+    → 이동평균 무효 부품은 즉시가로 fallback해서 합산 계속 진행 —
+      빌드 전체 판정을 null로 날리지 않고, 대신 verdict_confidence
+      ("high"/"low") + verdict_basis_breakdown(부품별 source: "ma"|
+      "current_fallback")로 신뢰도 투명하게 노출
+    → GET /builds, GET /builds/{id} 전용 (build_id, ma_window) 키 5분
+      프로세스 메모리 캐시 도입 — 목록이 저장된 빌드를 매번 순회
+      재계산하는 구조라 이동평균 도입으로 스크래핑이 부품당 2배(get_product
+      + get_price_variance)가 되는 부담 + 목록↔상세 이동 시 캐시 미스
+      타이밍 차이로 판정이 다르게 뜨는 문제를 함께 완화
+
+[✓] 백엔드 구현 완료
+    → services/verdict.py: compute_ma_price() 신규
+    → main.py: _fetch_ma_price(), _compute_verdict_basis(),
+      _get_cached_verdict_basis() 신규. /product/{code}/compare,
+      /build/compare, GET /builds, GET /builds/{id} 4개 엔드포인트에
+      ma_window + verdict_basis_* 필드 반영
+    → schemas/compare.py: VerdictBasisItem 신규. schemas/estimate.py,
+      build.py에 필드 추가
+    → REFERENCE.md #엔드포인트-설계에 "verdict 판정 기준가(basis_price) —
+      이동평균 도입" 섹션 신설, 4개 엔드포인트 계약 갱신
+
+[!] 개발 중 발견 — Literal 쿼리파라미터 캐스팅 버그
+    → ma_window를 Literal[7,14,30] 타입으로 쿼리파라미터에 바로 선언하면
+      fastapi 0.141.1 / pydantic 2.13.4 조합에서 쿼리스트링("14", str)을
+      int로 캐스팅하지 않고 422 에러를 내버리는 문제 실측 확인 (JSON
+      body의 Literal 필드는 정상 동작 — 쿼리파라미터에서만 발생)
+    → int 타입 + 수동 검증(허용값 아니면 422)으로 변경해서 해결,
+      /product/{code}/history의 months 검증과 동일 패턴으로 통일
+    → FastAPI TestClient + danawa 함수 mock으로 이동평균 정상/fallback/
+      캐시 동작 전부 로컬 검증 완료
+
+[!] 미해결(당시) — 라이브 다나와 검증 안 됨
+    → 이 개발 세션은 네트워크 정책상 danawa.com 접근 자체가 차단돼 있어
+      (prod.danawa.com 프록시 403) get_price_variance()의 실제 응답
+      포맷(특히 prices 리스트의 full_date 필드 존재 여부/포맷, 정렬 순서)을
+      라이브로 확인 못 함
+    → compute_ma_price()는 리스트 원본 순서를 신뢰하지 않고 매번 full_date로
+      명시 정렬하도록 방어적으로 구현했지만, 로컬 환경에서 실제 호출로
+      반드시 재검증 필요 (실가_인수인계.md "결정 완료" 참조)
+    → 사용자가 로컬 환경에서 실측 → 아래 v5 참조, 같은 날 바로 수정
+
+---
+
+#### v5 — compute_ma_price 실측 기반 재설계 (같은 날, 사용자 로컬 라이브 검증 결과 반영)
+
+[✓] 사용자 로컬 실측 결과 (RTX5070Ti, 76465883, get_price_variance(code, 1))
+    → full_date 포맷 확인: "YY-MM-DD"(예: "26-05-12") — 사전순 정렬이
+      날짜순과 일치함(정렬 로직 자체는 문제없었음)
+    → ⚠️ 치명적 발견: 다나와가 daily가 아니라 **주 단위**로 데이터를 줌
+      (1개월치 조회해도 포인트가 4개 안팎, 7일 간격). v4에서 "daily 시계열"
+      이라고 가정하고 짠 "정확히 window개 항목 있어야 유효"(엄격 원칙)가
+      이 주기에서는 항상 실패 — window=7/14/30 뭘 골라도 4개 < window라서
+      MA가 무조건 None(즉시가로만 fallback)이 나오는 걸 실측으로 확인
+      (compute_ma_price([...4개...], 7/14/30) 전부 None으로 재현됨)
+
+[✓] compute_ma_price() 재설계
+    → "정확히 N개 항목" 기준을 폐기하고 "날짜 기준 최근 window일 이내
+      데이터를 모아 평균 + 히스토리 자체가 window일 전체를 커버해야 유효"로
+      "엄격" 원칙 재정의 (가장 오래된 데이터가 cutoff 이전부터 있어야
+      "그 기간 전체를 실제로 관측했다"고 신뢰 가능 — 신상품처럼 히스토리
+      자체가 짧으면 여전히 무효 처리)
+    → full_date를 datetime으로 명시 파싱("%y-%m-%d")해서 날짜 구간 계산
+    → _fetch_ma_price(main.py)가 get_price_variance(code, 1) 대신
+      get_price_variance(code, 3)(3개월치) 호출하도록 변경 — 주 단위
+      데이터라 1개월치(~4개)만으로는 window=30일 커버리지 체크를 통과할
+      데이터 자체가 부족해서, 여유 있게 3개월치를 받아둠
+    → 사용자 실측 데이터 + 신상품(짧은 히스토리) 케이스로 재검증 완료,
+      기존 mock 엔드포인트 테스트도 3개월치 주간 데이터로 다시 돌려 통과 확인
+
+[ ] 다음 세션 시작 시
+    → 프론트 연동(설정 탭 ma_window 드롭다운 + localStorage, Search/
+      BuildCreate/BuildDetail에서 compare 호출 시 값 실어 보내기) 착수
+    → PR #2 draft 해제 검토 (이번 실측 반영 완료 기준)
