@@ -698,3 +698,50 @@
       개별 제거(2개→1개) 확인
     → npm run typecheck, npm run build 통과, python3 -c "import app.main"
       통과
+
+### 2026-08-04 (같은 날, v12 이어서 — Phase 4 마무리 항목)
+
+#### v13 — frontend .env 문서화 보강 + e2e 스모크 테스트 4개 화면 확장
+
+[✓] frontend .env 기반 API_BASE 설정 문서화
+    → 배경: VITE_API_BASE 자체는 이미 frontend/src/lib/api.ts에 구현돼
+      있었고 README.md에도 한 줄 언급은 있었지만, 예시 파일이 없고
+      .gitignore에 .env가 없어 실수로 커밋될 위험이 있었음
+    → .gitignore에 .env, .env.local 추가
+    → frontend/.env.example 신규(VITE_API_BASE=http://localhost:8000 +
+      설명 주석) — 복사해서 .env로 쓰는 흐름 안내
+    → README.md .env 섹션을 .env.example 참조하도록 보강, "현재 구현
+      상태" 표가 2026-08-03 v0.4 시점 그대로 방치돼 있던 걸 발견해서
+      최신화(7탭 전부 연동 완료, favorites 테이블/엔드포인트, verdict
+      이동평균 반영 — 프론트가 "준비 중" 플레이스홀더라고 적혀 있던 게
+      가장 스테일한 부분이었음)
+    → 배포 시 CORS allow_origins 좁히기 항목은 인수인계.md에 "실제 배포
+      계획 생기면 진행"이라고 명시돼 있어 이번엔 보류(변경 없음)
+
+[✓] scripts/e2e_smoke_test.py에 홈/통계/최근기록/즐겨찾기 4개 화면 스텝 추가
+    → 기존 스크립트는 2026-08-03 시점 흐름(검색→빌드생성→상세→목록)만
+      커버 — 그 이후 추가된 4개 화면(2026-08-04, v9~v12)은 세션별 임시
+      mock+Playwright 검증만 해두고 정식 스크립트에는 반영 안 돼 있었음
+    → 추가한 스텝: 홈(최근빌드 카드 클릭→상세 이동), 통계(부품 검색→
+      차트 렌더링→12개월 탭 전환), 최근기록(통계/빌드생성 조회가
+      실제로 계측됐는지 확인→행 클릭 시 통계 탭 즉시 로드), 즐겨찾기
+      (검색→추가→목록 표시→제거→빈 상태)
+    → 셀렉터는 전부 실제 페이지 컴포넌트(StatsPage/HomePage/
+      RecentHistoryPage/FavoritesPage) 소스 확인 후 작성(.chart-card,
+      .month-tab, .recent-row, .stats-picker .part-input 등)
+    → 이 환경은 danawa.com이 막혀 있어 스크립트 자체를 라이브로 못
+      돌림 — 기존 세션들이 써온 패턴대로 danawa.get_product_codes/
+      get_product/get_price_variance를 mock으로 교체한 로컬 백엔드를
+      띄우고, 이 mock 백엔드를 대상으로 확장된 스크립트 전체(기존
+      4스텝 + 신규 8스텝, 총 12스텝)를 실제 Playwright로 끝까지 실행해
+      전부 통과 확인(스크린샷 12장 포함) — 로직 자체가 셀렉터 오탈자나
+      플로우 순서 문제 없이 동작하는 것까지 검증했고, 다나와 실제 HTML
+      구조 대응 자체는 기존 검증된 danawa.py 파싱 로직을 그대로 신뢰
+    → 이 과정에서 mock 스크립트 자체의 버그 2개 발견(실 코드 버그
+      아님, 검증용 mock 데이터 문제) — get_product_codes mock이 반환
+      형식(list[dict])을 안 지켜서 처음에 500 에러, get_price_variance
+      mock의 min/max를 int로 반환해서 PriceHistory 스키마(문자열 필드)
+      검증 실패 — 둘 다 mock을 실제 danawa.py 반환 형식에 맞춰 수정해서
+      해결. 실 백엔드/프론트 코드는 변경 없음
+    → 스크린샷 경로 하드코딩(/home/claude/e2e_*.png) 등 기존 스크립트의
+      다른 특성은 그대로 유지(변경 범위 최소화)

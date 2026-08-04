@@ -24,8 +24,10 @@ cd frontend
 npm install
 npm run dev
 ```
-`http://localhost:5173`. 기본적으로 백엔드를 `http://localhost:8000`으로 호출함
-(다른 주소를 쓰려면 `frontend/.env`에 `VITE_API_BASE=http://...` 설정).
+`http://localhost:5173`. 기본적으로 백엔드를 `http://localhost:8000`으로 호출함.
+다른 주소(다른 포트, 원격 백엔드 등)를 쓰려면 `frontend/.env.example`을
+`frontend/.env`로 복사한 뒤 `VITE_API_BASE` 값을 수정 (`frontend/src/lib/api.ts`
+참조, `.env`는 `.gitignore`에 포함돼 커밋되지 않음).
 
 ### E2E 스모크 테스트 (선택)
 ```bash
@@ -38,9 +40,11 @@ python3 scripts/e2e_smoke_test.py
 
 | 영역 | 상태 |
 |---|---|
-| 백엔드 엔드포인트 | `/search`, `/product/{code}`, `/product/{code}/history`, `/estimate`, `/product/{code}/compare`, `/build/compare`, `/builds`(CRUD) — 전부 라이브 검증 완료 |
-| DB | SQLite(WAL), `products`/`builds`/`build_items` 3테이블 |
-| 프론트 | 검색 탭, 빌드 목록/생성/상세 실데이터 연동 완료. 홈/즐겨찾기/최근기록/통계/설정은 "준비 중" 플레이스홀더 |
-| 미구현 필드 | `/product/{code}` 응답의 `category`, `cash_price` (스크래퍼 미지원) |
+| 백엔드 엔드포인트 | `/search`, `/product/{code}`, `/product/{code}/history`, `/estimate`, `/product/{code}/compare`, `/build/compare`, `/builds`(CRUD), `/favorites`(CRUD) — 전부 라이브 검증 완료 |
+| DB | SQLite(WAL), `products`/`builds`/`build_items`/`favorites` 4테이블 |
+| 프론트 | 사이드바 7탭(홈/검색/빌드/즐겨찾기/최근기록/통계/설정) 전부 실데이터 연동 완료 |
+| verdict 판정 기준가 | 이동평균(7/14/30일 선택, 기본 14일) 기반, 즉시가는 별도 유지 |
 
-자세한 건 `실가_인수인계.md` 참조. **주의: 이 zip 바깥의 실행 환경(컨테이너)은 세션마다 리셋되므로, 작업 이어가려면 매번 이 리포를 다시 업로드해야 함.**
+자세한 건 `실가_인수인계.md` 참조. 이 프로젝트는 git 리포(`limfighter/silga`)로
+관리되므로, 컨테이너 세션이 리셋돼도 커밋+push만 해두면 다음 세션에서 이어받을
+수 있음(zip 업로드 불필요).
