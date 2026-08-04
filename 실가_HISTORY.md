@@ -281,7 +281,276 @@
     → 사용자 실측 데이터 + 신상품(짧은 히스토리) 케이스로 재검증 완료,
       기존 mock 엔드포인트 테스트도 3개월치 주간 데이터로 다시 돌려 통과 확인
 
-[ ] 다음 세션 시작 시
+[✓] 다음 세션 시작 시
     → 프론트 연동(설정 탭 ma_window 드롭다운 + localStorage, Search/
       BuildCreate/BuildDetail에서 compare 호출 시 값 실어 보내기) 착수
-    → PR #2 draft 해제 검토 (이번 실측 반영 완료 기준)
+    → PR #2 draft 해제 검토 (이번 실측 반영 완료 기준) — 완료, main에 머지됨
+    → 아래 v6에서 프론트 연동 진행
+
+---
+
+### 2026-08-04 (같은 날, PR #2 머지 후 이어서)
+
+#### v6 — verdict 이동평균 프론트 연동 (설정 탭 + localStorage + 목록/상세)
+
+[✓] frontend/src/lib/settings.ts 신규
+    → MA_WINDOW_OPTIONS([7,14,30] as const), DEFAULT_MA_WINDOW(14),
+      getStoredMaWindow(), useMaWindow() 훅 — localStorage 키
+      "silga:ma_window"에 저장, 값이 7/14/30 중 하나가 아니면(빈 값/오염된
+      값 포함) 14로 폴백
+    → 페이지 전환마다 useState 초기값을 localStorage에서 새로 읽어오는
+      방식 — 같은 화면 내 실시간 동기화(storage 이벤트 리스너)는 개인용
+      SPA 규모에 과설계라 판단해 넣지 않음(라우트 이동 시 리마운트로 충분)
+
+[✓] frontend/src/pages/SettingsPage.tsx 신규, App.tsx의 /settings 라우트를
+    PlaceholderPage → SettingsPage로 교체
+    → 드롭다운(7일/14일/30일) 하나만 있는 최소 구성, 변경 즉시
+      localStorage 저장(별도 저장 버튼 없음)
+    → "이 기기에만 저장됩니다" 안내 문구로 서버 저장이 아님을 명시
+
+[✓] frontend/src/lib/api.ts 갱신
+    → BuildSummary에 verdict_confidence/ma_window 필드 추가,
+      BuildDetail에 verdict_basis_price(_formatted)/verdict_confidence/
+      verdict_basis_breakdown/ma_window 필드 추가, VerdictBasisItem
+      인터페이스 신규 (backend/app/schemas/build.py, compare.py와 1:1 대응)
+    → listBuilds/getBuild가 ma_window를 필수 인자로 받아 쿼리스트링에 실어
+      보내도록 시그니처 변경(하드코딩된 기본값 14 의존 제거)
+
+[✓] BuildListPage/BuildDetailPage가 useMaWindow() 훅으로 설정값을 읽어
+    listBuilds(maWindow)/getBuild(id, maWindow) 호출 + TanStack Query
+    queryKey에 maWindow 포함(다른 기간 선택 시 새로 fetch, 캐시 안 섞임)
+    → BuildDetailPage에 "판정 기준: N일 이동평균" 안내 텍스트 추가,
+      verdict_confidence가 "low"면 "일부 부품은 데이터 부족으로 즉시가
+      대체" 문구 덧붙여 신뢰도를 화면에서도 투명하게 노출
+      (REFERENCE.md #엔드포인트-설계 verdict_confidence 설계 취지 반영)
+
+[✓] BuildCreatePage
+    → POST /builds는 ma_window를 받지 않음(생성 직후엔 verdict 자체가
+      null — REFERENCE.md 참조), 그래서 API 호출 자체는 변경 없음. 대신
+      "비교할 판매가" 입력란 아래에 "저장 후 판정은 N일 이동평균
+      기준가로 계산됩니다(설정 탭에서 변경 가능)" 안내만 추가 — 저장 직후
+      이동하는 BuildDetailPage가 어차피 설정값을 자동으로 물고 가므로
+      실질적 연동은 이미 BuildDetailPage 쪽에서 끝나 있음
+
+[✓] SearchPage
+    → 확인 결과 /search 엔드포인트 자체가 market_price/ma_window를 받지
+      않고 판정(compare) 기능도 검색 화면에 없어(단순 목록) ma_window와
+      무관 — 인수인계 문서의 "Search 연동"은 검색 결과에서 바로 비교하는
+      기능이 아직 없다는 뜻이었던 것으로 판단, 변경 없음 (향후 검색
+      결과에 "비교" 버튼을 추가하는 게 결정되면 그때 GET
+      /product/{code}/compare?ma_window= 연동 필요)
+
+[✓] 검증
+    → npm run typecheck, npm run build 통과
+    → Playwright로 실브라우저 검증: 설정 탭 드롭다운 선택 → localStorage
+      반영 → 빌드 목록 페이지 이동 시 실제 네트워크 요청이
+      `/builds?ma_window={선택값}`으로 나가는 것 확인, 빌드 상세도
+      `/builds/{id}?ma_window={선택값}` 확인
+    → 이 세션 환경은 프록시가 danawa.com 접근을 막아(실측: ProxyError
+      403) 실제 다나와 데이터로는 검증 불가 → danawa.get_product/
+      get_price_variance를 목(mock)으로 교체해 verdict_confidence="high"/
+      "low", 판정 기준 문구, 게이지 렌더링까지 화면에서 직접 확인함
+
+[발견, 같은 날 이어서 수정] GET /builds, GET /builds/{id}가 danawa 연결
+    자체가 끊겼을 때(requests.RequestException) 처리가 안 돼 있음
+    → main.py::_fetch_lowest_price()가 danawa.get_product() 호출을
+      try/except로 감싸지 않아서, 네트워크 장애 시 CLAUDE.md 원칙(스크래퍼
+      장애→503)을 못 지키고 500으로 죽는 걸 이번 세션에서 실측 확인
+      (GET /product/{code}는 get_product_detail()에서 자체적으로
+      감싸고 있어 이 문제 없음 — _fetch_lowest_price를 공유하는
+      /estimate, /product/{code}/compare, /build/compare, GET /builds,
+      GET /builds/{id} 5곳이 전부 같은 결함 있음)
+    → v6 시점엔 프론트 연동 세션 범위 밖이라 기록만 남기고 미수정 —
+      아래 v7에서 같은 날 이어서 수정
+
+---
+
+### 2026-08-04 (같은 날, v6 이어서)
+
+#### v7 — _fetch_lowest_price() danawa 연결 장애 처리 수정 (v0.4.2)
+
+[✓] 방향 결정: "엔드포인트별 기존 선례 따르기" 채택 (사용자 확인)
+    → 새 정책을 만들지 않고, 저장소에 이미 있던 두 선례를 각 호출부
+      성격에 맞게 그대로 적용
+        - GET /product/{code}(get_product_detail): 연결 장애 → 즉시 503
+        - POST /builds(create_build) / _fetch_ma_price: 부품별로 실패를
+          삼키고 그 부품만 정보 없음 처리, 나머지는 계속 진행
+    → _fetch_lowest_price() 자체는 그대로 두고(예외를 그대로 던짐),
+      호출부 2곳에서 각자 다르게 감싸는 방식으로 구현 — 헬퍼 하나가
+      단일상품/다중부품 두 성격을 동시에 만족시키려던 게 애초 결함의
+      원인이었음
+
+[✓] 구현 (backend/app/main.py)
+    → compare_single_product(GET /product/{code}/compare): 호출부를
+      try/except RequestException으로 감싸 503 반환 — get_product_detail과
+      동일 패턴
+    → _compute_estimate(POST /estimate, POST /build/compare, GET
+      /builds, GET /builds/{id}가 공유): 루프 내부에서 항목별로
+      try/except RequestException → title/price를 (None, None) 처리하고
+      다음 항목 계속 진행 — create_build/_fetch_ma_price와 동일 패턴
+
+[✓] 검증 (이 세션 환경은 프록시가 danawa.com을 막고 있어 실제
+    RequestException이 매 요청마다 자연 발생 — 별도 mock 없이 실측 가능했음)
+    → GET /product/{code}/compare → 503 "데이터 소스(다나와) 연결 실패"
+      확인 (수정 전엔 500 unhandled exception이었음)
+    → GET /builds, GET /builds/{id}, POST /estimate → 200으로 정상
+      응답, 가격 조회 실패한 부품은 title/price null로 표시되고 나머지
+      응답 구조는 정상 (수정 전엔 500으로 전체가 죽었음)
+    → POST /build/compare → 부품 전부 가격 조회 실패 시 기존 로직대로
+      404 "부품 가격을 하나도 찾지 못해 판정 불가" — 이건 total_price==0
+      체크로 원래 있던 정상 분기라 회귀 아님, 확인만 함
+
+---
+
+### 2026-08-04 (같은 날, v7 이어서)
+
+#### v8 — category·cash_price 필드 스크래퍼 구현 (v0.4.3)
+
+[✓] 배경 — 이 세션 환경은 프록시 정책으로 danawa.com 자체가 막혀 있어
+    (WebFetch도 403) 실제 페이지 HTML을 볼 방법이 없었음. 사용자에게
+    로컬 브라우저에서 상품 페이지 소스보기(Ctrl+U) 전체를 복사해서
+    붙여넣어 달라고 요청 → GPU(PALIT RTX5070Ti, pcode=76465883, 일시
+    품절 상태)와 CPU(AMD 라이젠7 9800X3D, pcode=70531547) 두 상품의 실제
+    HTML 원문을 확보해서 그걸로 구현
+
+[✓] category(카테고리 브레드크럼) 구현
+    → 실측 결과: div.location_wrap 안에 중첩된 loca_item 버튼들(각각
+      "컴퓨터/노트북/조립PC", "주요부품", "그래픽카드(GPU)" 등)을 DOM으로
+      직접 조립하는 대신, 페이지 하단 인라인 <script> 안의
+      oGlobalSetting.sUICategoryName 값이 이미 완성된 형태로 있었음:
+      `sUICategoryName: "컴퓨터/노트북/조립PC &gt; 주요부품 &gt; 그래픽카드(GPU)"`
+      (CPU 페이지는 `"... &gt; CPU &gt; AMD"`) — HTML 엔티티(&gt;)만
+      unescape하면 바로 쓸 수 있는 단일 문자열이라 이쪽을 채택
+    → 정규식 `sUICategoryName:\s*"([^"]*)"` + html.unescape()로 파싱,
+      두 샘플 페이지 모두에서 정확히 1회씩만 등장하는 것 육안 확인
+      (다른 곳에 같은 패턴 없어 오탐 위험 낮음)
+
+[✓] cash_price(현금최저가) 구현 — 최초 가정이 틀렸던 걸 실측으로 발견
+    → 최초 가정(TODO 주석에 적혀 있던 것): "카드가/현금가 비교" — 노트북
+      등 일부 카테고리에만 있는 기능일 거라 예상
+    → 실측 결과: GPU 페이지엔 관련 텍스트가 전혀 없었음(해당 상품이
+      일시 품절이라 가격 정보 자체가 없어서였을 수도 있음, 확정 못함).
+      CPU 페이지엔 있었음 — 다만 "카드가 vs 현금가 비교"가 아니라,
+      쇼핑몰별 최저가 목록(list__mall-price) 중 현금결제 전용으로
+      표시된 판매처(span.badge__cash)의 최저가였음. 이 상품은 최저가
+      681,360원과 현금최저가 630,000원이 서로 다른 값으로 확인됨
+    → 파싱 위치: 우리가 이미 스크래핑하는 쇼핑몰별 가격 목록(prices)에서
+      badge__cash 항목을 직접 찾아 최솟값을 구하는 방법도 가능했지만,
+      그 목록 자체가 상위 약 10건만 잘려 있어(REFERENCE.md #엔드포인트
+      -설계 기존 원칙) 절단 구간 밖의 진짜 최저 현금가를 놓칠 위험이
+      있음 → 대신 다나와가 이미 전체 목록 기준으로 계산해서
+      og:description 메타태그에 넣어주는 값(`"최저가 681,360원,
+      현금최저가: 630,000원"`)을 그대로 신뢰하기로 함
+    → 정규식 `현금최저가:\s*([\d,]+)원`으로 파싱, 값 없는 상품(GPU 샘플)은
+      필드 자체 생략 → cash_price=None (파싱 실패 아니라 정상적으로
+      없는 값으로 처리)
+
+[✓] 구현 반영
+    → backend/app/services/danawa.py::get_product(): 위 정규식 2개 추가
+      (import html 추가), 기존 title/spec/price-summary/variants 파싱
+      로직은 손대지 않음
+    → backend/app/main.py::get_product_detail(): category=None,
+      cash_price=None으로 하드코딩돼 있던 부분을 data.get()으로 교체,
+      "미구현" 주석 제거
+    → backend/app/schemas/product.py: category/cash_price 필드의
+      TODO(미구현) 주석을 실제 파싱 방식 설명으로 교체
+
+[✓] 검증
+    → 정규식은 사용자가 준 실제 HTML 조각(sUICategoryName 라인,
+      og:description 메타태그 라인)을 그대로 떼어내 파이썬으로 직접
+      매칭 테스트 — category/cash_price 정상 추출, 값 없는 케이스(GPU
+      og:description)도 None으로 정상 처리 확인
+    → 전체 페이지 단위 왕복 재현(mock 서버로 danawa.get_product 전체
+      플로우 실행)까지는 하지 않음 — 조각 단위 검증 + 패턴이 각 페이지에
+      정확히 1회씩만 등장한다는 것 확인으로 충분하다고 판단. 다른
+      카테고리(RAM/SSD/케이스/파워/쿨러/메인보드)에서의 실측은 아직 안 함
+      — 두 필드 다 없는 상품에서 필드 생략(None)으로 안전하게 폴백되므로
+      당장 깨질 위험은 낮다고 판단, 다만 다른 카테고리 페이지에서 다른
+      구조가 나올 가능성은 남아있는 known gap
+
+---
+
+### 2026-08-04 (같은 날, v8 이어서)
+
+#### v9 — 통계 탭 가격 히스토리 차트 구현 (frontend v0.3)
+
+[✓] 대상 선정 — 홈/즐겨찾기/최근기록/통계 4개 탭 중 통계만 먼저 진행하기로
+    사용자와 합의. 나머지 3개는 스펙 자체가 없거나(즐겨찾기/최근기록) 내용
+    설계가 안 끝나서(홈) 임의로 손대지 않기로 함(실가_인수인계.md 참조)
+
+[✓] 구현
+    → frontend/src/pages/StatsPage.tsx 신규 — PartRow(빌드 생성 화면
+      자동완성과 동일 컴포넌트, category prop만 다르게 줘서 재사용) +
+      1/3/6/12개월 탭 + 오실로스코프풍 SVG 차트
+    → API: lib/api.ts에 PricePoint/PriceHistory 타입, getHistory(code,
+      months) 함수 추가 — GET /product/{code}/history는 이미 백엔드에
+      구현/검증돼 있던 엔드포인트라 새 백엔드 작업 없음
+    → 차트는 silga-mockup.html #history 섹션의 SVG(그래디언트 채움 +
+      glow 필터 + 그리드 라인, 시안 네온)를 그대로 이식하되, 정적
+      좌표 대신 prices 배열 길이/최소/최대에 맞춰 매번 polyline 좌표를
+      계산하도록 동적화(buildPoints 함수)
+    → 통계값 3개: 최저/최고는 응답의 min/max 필드 그대로 사용(별도 계산
+      안 함 — 응답 자체가 이미 다나와 기준 최저/최고), "현재"는 history의
+      마지막 포인트가 아니라 검색 시점에 PartRow가 이미 들고 있는 실측
+      lowest_price 사용 — history가 주 단위 데이터라 마지막 포인트가
+      최대 며칠 전 값일 수 있어(2026-08-04 앞서 발견한 사실) "현재"라고
+      표시하면 오해 소지가 있다고 판단
+
+[✓] 개발 중 발견한 문제 2건, 둘 다 그 자리에서 수정
+    → 날짜 범위 라벨: 처음엔 prices[].date 필드로 "05.12 — 08.04"처럼
+      표시했는데, mock으로 12개월 조회를 테스트하다가 1년 이상 차이나는
+      두 시점이 연도 없이 같은 월.일로 보여서 헷갈리는 걸 발견(예:
+      2025-08-12와 2026-08-04가 "08.12 — 08.04"로 표시돼 마치 최근인
+      것처럼 보임) → full_date 필드("YY-MM-DD", 2026-08-04 앞서 실측
+      확인된 포맷)가 있으면 그걸 우선 써서 "2025.08.12 — 2026.08.04"
+      형태로 연도까지 표시하도록 수정
+    → 자동완성 드롭다운 잘림: 새로 만든 .stats-picker에 다른 카드형
+      컴포넌트들처럼 overflow:hidden을 넣었더니, PartRow의 자동완성
+      목록(position:absolute)이 컨테이너 아래로 잘려서 하단 일부만
+      보이는 문제 발견 → overflow:hidden 제거로 해결. 빌드 생성 화면의
+      .part-rows(여러 행이 이어진 컨테이너)도 구조상 같은 CSS를 쓰고
+      있어 이론적으로 같은 문제가 있을 수 있는데, 거기서는 아래에 다른
+      행들이 있어서 드롭다운이 컨테이너 안쪽에 자연히 들어가 우연히
+      안 드러났던 것으로 추정 — 이번엔 손대지 않음(범위 밖), 다음에
+      비슷한 문제 재현되면 참고할 것
+
+[✓] 검증 — 이 세션 환경은 danawa.com 접근이 막혀 있어 danawa.
+    get_product_codes/get_product/get_price_variance를 mock으로 교체해서
+    검색→선택→차트 렌더링 전체 흐름을 Playwright로 실브라우저 검증
+    → 빈 상태(검색 전), 자동완성, 차트 렌더링(1개월 4포인트/12개월
+      52포인트 등 데이터 개수 다른 케이스), 월 탭 전환 전부 확인
+    → npm run typecheck, npm run build 통과
+
+---
+
+### 2026-08-04 (같은 날, v9 이어서)
+
+#### v10 — 홈 탭 최근빌드 대시보드 구현 (frontend v0.4)
+
+[✓] 범위 결정 — 홈/즐겨찾기/최근기록 3개 탭 중 홈부터 진행하기로 사용자와
+    합의. 홈 탭 내용 후보 2개(최근 빌드 / 관심부품 변동) 중 "관심부품
+    변동"은 즐겨찾기 기능 자체가 아직 스펙조차 없어 보여줄 데이터가 없다는
+    이유로 제외, "최근 빌드 요약 + 빠른 액션"만 채택 — 기존 GET /builds
+    하나로 새 백엔드/DB 작업 없이 끝낼 수 있는 범위
+
+[✓] 구현
+    → frontend/src/pages/HomePage.tsx 신규 — 상단 "새 빌드 만들기"/
+      "부품 검색" 바로가기 버튼 2개(.home-actions, 새 CSS 한 줄만 추가),
+      아래에 최근 빌드 최대 4개를 카드로 표시
+    → GET /builds 응답은 정렬 순서를 보장하지 않아(main.py::list_builds가
+      db.query(Build).all()로 순서 미지정 조회) 프론트에서 created_at
+      기준 내림차순으로 정렬 후 상위 4개만 슬라이스
+    → 빌드가 5개 이상이면 "전체보기" 링크로 /build(전체 목록) 이동,
+      0개면 "새 빌드를 만들어서 가격을 추적해보세요" 빈 상태 표시
+    → BuildListPage의 build-card/bc-tag 스타일을 그대로 재사용(tagClass
+      함수는 3줄짜리라 굳이 공유 유틸로 안 빼고 각 페이지에 복제 —
+      프로젝트 관례대로 과설계 지양)
+
+[✓] 검증 — mock 백엔드로 POST /builds 5회 호출해서 테스트빌드 1~5 생성
+    후 Playwright로 확인
+    → 빈 상태(빌드 0개) 렌더링 확인
+    → 5개 중 최근 4개(5,4,3,2번, created_at 내림차순)만 카드로 나오고
+      "전체보기" 링크가 뜨는 것 확인
+    → 카드 클릭 → /build/{id} 이동, "전체보기" 클릭 → /build 이동 둘 다
+      확인
+    → npm run typecheck, npm run build 통과

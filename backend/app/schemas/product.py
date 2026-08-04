@@ -14,15 +14,17 @@ class ProductDetail(BaseModel):
     code: int
     title: Optional[str] = None
 
-    # TODO(미구현): get_product() 스크래퍼가 아직 카테고리 정보를 파싱하지 않음.
-    # 다나와 상품 상세 페이지의 브레드크럼(예: div.blur_link 또는 유사 경로)에서
-    # 추가 파싱 필요. 인수인계.md "수정 예정 사항"에 등재 예정.
+    # 카테고리 브레드크럼(예: "컴퓨터/노트북/조립PC > 주요부품 > 그래픽카드(GPU)").
+    # get_product()가 페이지 인라인 스크립트의 oGlobalSetting.sUICategoryName에서
+    # 파싱 (2026-08-04 구현, 실가_HISTORY.md 참조)
     category: Optional[str] = None
 
     current_price: Optional[int] = None      # get_product()의 lowest_price를 매핑
 
-    # TODO(미구현): 현금가(무이자 할부 제외 실결제가) 별도 필드가 다나와 페이지
-    # 어디서 오는지 아직 확인 안 됨. get_product()에 파싱 로직 추가 필요.
+    # 현금최저가 — "카드가/현금가 비교"가 아니라 쇼핑몰별 최저가 목록 중
+    # 현금결제 전용으로 표시된 판매처의 최저가(모든 상품에 있는 건 아님).
+    # get_product()가 og:description 메타태그에서 파싱 (2026-08-04 구현,
+    # 실가_HISTORY.md 참조)
     cash_price: Optional[int] = None
 
     spec: Optional[str] = None

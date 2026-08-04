@@ -5,20 +5,23 @@ import BuildListPage from "./pages/BuildListPage";
 import BuildCreatePage from "./pages/BuildCreatePage";
 import BuildDetailPage from "./pages/BuildDetailPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
+import SettingsPage from "./pages/SettingsPage";
+import StatsPage from "./pages/StatsPage";
+import HomePage from "./pages/HomePage";
 
 export default function App() {
   return (
     <Routes>
       <Route element={<AppShell />}>
-        <Route path="/" element={<PlaceholderPage label="홈" todo="dashboard summary" />} />
+        <Route path="/" element={<HomePage />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/build" element={<BuildListPage />} />
         <Route path="/build/new" element={<BuildCreatePage />} />
         <Route path="/build/:id" element={<BuildDetailPage />} />
         <Route path="/favorites" element={<PlaceholderPage label="즐겨찾기" todo="saved parts list" />} />
         <Route path="/history" element={<PlaceholderPage label="최근기록" todo="view/search log" />} />
-        <Route path="/stats" element={<PlaceholderPage label="통계" todo="price trend dashboard" />} />
-        <Route path="/settings" element={<PlaceholderPage label="설정" todo="notifications, account" />} />
+        <Route path="/stats" element={<StatsPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
       </Route>
     </Routes>
   );

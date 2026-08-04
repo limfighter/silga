@@ -1,6 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
+import { useMaWindow } from "../lib/settings";
 
 // 게이지 각도 매핑: diff_percent를 -30%~+30% 구간으로 클램프해서 -80deg~+80deg에 선형 매핑.
 // (임계값과 마찬가지로 REFERENCE.md에 수치가 없어 임의로 잡은 시각화용 가정값)
@@ -19,10 +20,11 @@ function verdictTagClass(verdict: string | null): string {
 export default function BuildDetailPage() {
   const { id } = useParams<{ id: string }>();
   const buildId = Number(id);
+  const [maWindow] = useMaWindow();
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["build", buildId],
-    queryFn: () => api.getBuild(buildId),
+    queryKey: ["build", buildId, maWindow],
+    queryFn: () => api.getBuild(buildId, maWindow),
     enabled: Number.isFinite(buildId),
   });
 
@@ -69,6 +71,12 @@ export default function BuildDetailPage() {
             <div className="price-range">
               판매가 {data.market_price.toLocaleString()}원
               {data.diff_percent != null && ` (${data.diff_percent > 0 ? "+" : ""}${data.diff_percent}%)`}
+            </div>
+          )}
+          {data.ma_window != null && (
+            <div className="verdict-basis-note">
+              판정 기준: {data.ma_window}일 이동평균
+              {data.verdict_confidence === "low" && " · 일부 부품은 데이터 부족으로 즉시가 대체"}
             </div>
           )}
         </div>
