@@ -132,13 +132,15 @@ scripts/             e2e_smoke_test.py (위 참조)
 구현하지 말 것.
 
 ### DB는 구조 저장 전용, 가격 캐시가 아님
-`products`(메타데이터 캐시 — title/spec/img, 가격 필드 없음, 다나와 상품코드가
-PK), `builds`(저장된 빌드: 이름, 비교용 `market_price` 선택 입력),
-`build_items`(빌드↔부품 조인 + category 문자열) 3테이블뿐. `price_history`
+`products`(메타데이터 캐시 — title/category/spec/img, 가격 필드 없음, 다나와
+상품코드가 PK), `builds`(저장된 빌드: 이름, 비교용 `market_price` 선택 입력),
+`build_items`(빌드↔부품 조인 + category 문자열), `favorites`(즐겨찾기 북마크
+— product_code + created_at만, 2026-08-04 추가) 4테이블뿐. `price_history`
 테이블은 의도적으로 없음 — 가격 이력은 로컬에 축적하지 않고 항상
 `danawa.get_price_variance()`를 그때그때 호출해서 계산한다. DB의 역할은
-"빌드가 무엇으로 구성됐는지"를 기억하는 것으로 한정 — 이 결정을 확인하지
-않고 가격 스냅샷 테이블을 추가하지 말 것 (REFERENCE.md #DB-스키마).
+"빌드가 무엇으로 구성됐는지/무엇을 즐겨찾기했는지"를 기억하는 것으로 한정 —
+이 결정을 확인하지 않고 가격 스냅샷 테이블을 추가하지 말 것
+(REFERENCE.md #DB-스키마).
 
 ### API 응답 형태 컨벤션
 가격이 포함된 응답은 항상 raw 숫자 필드 + `*_formatted`(원화 문자열,
@@ -162,6 +164,8 @@ Vite SPA (Next.js/SSR 아님 — 백엔드가 이미 별도 FastAPI 서비스로
 스타일링은 순수 CSS + `styles/global.css`의 디자인 토큰 CSS 변수 사용
 (다크 배경, 시안/마젠타/앰버 accent) — Tailwind, CSS-in-JS 미사용.
 
-사이드바 7탭 중 검색(Search)과 빌드(목록/생성/상세)만 실데이터 연동돼
-있음. 홈/즐겨찾기/최근기록/통계/설정 5탭은 `PlaceholderPage`로만 라우팅된
-상태 — 대응하는 백엔드 엔드포인트가 필요하다고 가정하지 말 것.
+사이드바 7탭 전부 실데이터 연동 완료(2026-08-04) — `PlaceholderPage`
+컴포넌트 자체가 더 이상 안 쓰여서 삭제됨. 최근기록/설정의 이동평균
+기간은 서버 없이 `localStorage`만 쓰고(백엔드 엔드포인트 없음), 나머지는
+전부 대응하는 백엔드 엔드포인트가 있음 — 탭이 존재한다고 새 엔드포인트가
+필요하다고 임의로 가정하지 말고 `lib/api.ts`를 먼저 확인할 것.

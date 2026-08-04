@@ -98,7 +98,7 @@ Phase 5(Flutter 이식) 시점에 flutter/ 추가되어 3개 체제로 전환 �
 
 ---
 
-## DB 스키마 (확정 — 2026-08-03)
+## DB 스키마 (2026-08-03 확정, 2026-08-04 favorites 테이블 추가)
 ```
 products      부품 기본정보 캐시 (code PK, title, category, spec, img, cached_at)
               → 재조회 최소화용 캐시, 실시간 가격은 항상 danawa 재조회
@@ -106,6 +106,11 @@ products      부품 기본정보 캐시 (code PK, title, category, spec, img, c
 builds        저장한 조립샷 (id PK, name, market_price, created_at)
 
 build_items   빌드-부품 연결 (id PK, build_id FK, category, product_code FK)
+
+favorites     즐겨찾기 북마크 (id PK, product_code FK, created_at)
+              → 2026-08-04 신규(즐겨찾기 탭). 가격 저장 안 함(다른 테이블과
+                동일 원칙) — 목록 조회 시 항상 danawa 재조회. product_code에
+                유니크 제약(같은 상품 중복 즐겨찾기 방지)
 
 price_history 테이블 없음 — 의도적 제외 (아래 참조)
 ```
@@ -277,6 +282,24 @@ GET  /builds/{id}?ma_window={7|14|30}  (신규, v0.3)
   ※ GET /builds와 같은 verdict 기준가 캐시를 공유 — 목록↔상세 이동 시
     판정이 서로 다르게 뜨는 걸 방지
 
+POST /favorites  (신규, v0.4.4 — 즐겨찾기 탭 채우는 첫 엔드포인트)
+  body: {code}
+  → FavoriteItem {code, title, price, price_formatted, created_at}
+  ※ 이미 즐겨찾기된 상품이면 새로 추가하지 않고 기존 항목 그대로
+    반환(idempotent) — 중복 추가를 에러로 취급하지 않음
+  ※ 단일 상품 조회라 GET /product/{code}와 동일하게 danawa 연결 장애 시
+    즉시 503 (다중부품 fallback 관례 대상 아님)
+
+GET  /favorites  (신규, v0.4.4)
+  → [FavoriteItem, ...]  — 즐겨찾기 목록(최근 추가순), 상품별 실시간 최저가
+  ※ GET /builds와 동일하게 조회 시점마다 danawa 순차 재조회, 캐시 없음
+  ※ 부품 하나의 연결 장애가 전체 목록을 죽이지 않도록 항목별로 실패를
+    삼키고 계속 진행(POST /builds·_compute_estimate와 동일한 다중부품
+    fallback 관례)
+
+DELETE /favorites/{code}  (신규, v0.4.4)
+  → 204 No Content. 즐겨찾기에 없는 code면 404
+
 verdict 판정 임계값:
   diff_percent = (market_price - basis_price) / basis_price * 100
   diff_percent > +5%  → "고가"
@@ -360,10 +383,12 @@ verdict 판정 기준가(basis_price) — 이동평균 도입 (2026-08-04, v0.4 
 
 ---
 
-## 화면/탭 구조 (app-shell-mockup.html 기준 → frontend/에 실제 구현, 2026-08-03)
+## 화면/탭 구조 (app-shell-mockup.html 기준 → frontend/에 실제 구현, 2026-08-03,
+   2026-08-04 홈/통계/최근기록/설정/즐겨찾기 5개 탭 추가 완료로 갱신)
 ```
 사이드바 (기본 아이콘 레일 72px, 햄버거로 240px 확장)
-├─ 홈       — 준비 중 (플레이스홀더만 라우팅됨)
+├─ 홈       — ✅ 완료, 최근 빌드 4개 카드(GET /builds 재사용) + 빠른 액션
+│              버튼("새 빌드 만들기"/"부품 검색")
 ├─ 검색     — ✅ 완료, /search 실데이터 연동
 ├─ 빌드     — ✅ 완료, 3단계 흐름 전부 실데이터 연동
 │    ├─ 목록   GET /builds 연동, 적정가/고가/저가 태그 + 총액 실시간 계산
@@ -371,13 +396,22 @@ verdict 판정 기준가(basis_price) — 이동평균 도입 (2026-08-04, v0.4 
 │    │        + 비교 판매가 입력 → "분석하기" → 저장 후 상세로 자동 이동
 │    └─ 상세   GET /builds/{id} 연동, 판정 게이지(SVG 반원 다이얼, diff_percent
 │              기반 니들 각도 동적 계산) + 부품별 breakdown + 합계
-├─ 즐겨찾기  — 준비 중 (플레이스홀더만 라우팅됨)
-├─ 최근기록  — 준비 중 (플레이스홀더만 라우팅됨)
-├─ 통계      — 준비 중, 오실로스코프풍 라인차트 이식 예정
-└─ 설정      — 준비 중 (플레이스홀더만 라우팅됨)
+├─ 즐겨찾기  — ✅ 완료, PartRow로 검색→즉시 추가(POST /favorites), 목록
+│              (GET /favorites)에서 클릭 시 통계 탭으로 이동해 가격 히스토리
+│              바로 확인, 개별 제거(DELETE /favorites/{code})
+├─ 최근기록  — ✅ 완료, localStorage 기반 최근 조회 부품(서버 저장 없음),
+│              통계 탭/빌드 생성 화면에서 부품 선택 시 자동 계측
+├─ 통계      — ✅ 완료, 오실로스코프풍 라인차트(GET /product/{code}/history)
+│              + PartRow로 부품 검색 + 1/3/6/12개월 탭
+└─ 설정      — ✅ 완료, verdict 이동평균 기간(ma_window, 7/14/30일)
+              드롭다운 + localStorage 저장
 
 Playwright E2E 스모크 테스트(scripts/e2e_smoke_test.py)로 검색→자동완성→
-빌드생성→상세→목록 전체 흐름 실브라우저 검증 완료.
+빌드생성→상세→목록 전체 흐름 실브라우저 검증 완료(2026-08-03 시점).
+그 이후 추가된 화면(홈/통계/최근기록/즐겨찾기)은 이 스크립트에 아직
+반영 안 됨 — 세션별로 mock 백엔드+Playwright 임시 스크립트로 개별
+검증만 함(실가_HISTORY.md v9~v11 참조), scripts/e2e_smoke_test.py 자체
+갱신은 별도 작업으로 남아있음.
 ```
 
 ---

@@ -35,9 +35,10 @@ from app.schemas.build import (
     BuildDetail,
     BuildItemDetail,
 )
+from app.schemas.favorite import FavoriteCreateRequest, FavoriteItem
 from app.utils import format_won
 from app.database import Base, engine, get_db
-from app.models import Product, Build, BuildItem
+from app.models import Product, Build, BuildItem, Favorite
 from app.timezone_utils import now_kst
 
 def _validate_ma_window(ma_window: int) -> int:
@@ -423,23 +424,33 @@ def compare_build(payload: BuildCompareRequest):
     )
 
 
-def _cache_product(db: Session, code: int, title: Optional[str] = None, spec: Optional[str] = None, img: Optional[str] = None):
+def _cache_product(
+    db: Session,
+    code: int,
+    title: Optional[str] = None,
+    category: Optional[str] = None,
+    spec: Optional[str] = None,
+    img: Optional[str] = None,
+):
     """
     products 테이블은 재조회 최소화용 캐시(가격 제외, REFERENCE.md #DB-스키마
-    참조) — build_item.product_code FK가 가리킬 로우가 있어야 하므로, 빌드
-    저장 시점에 title/spec/img를 upsert 해둠. 가격은 여기 저장하지 않음.
+    참조) — build_item.product_code FK가 가리킬 로우가 있어야 하므로, 빌드/
+    즐겨찾기 저장 시점에 title/category/spec/img를 upsert 해둠. 가격은 여기
+    저장하지 않음.
     """
     existing = db.query(Product).filter(Product.code == code).first()
     if existing:
         if title is not None:
             existing.title = title
+        if category is not None:
+            existing.category = category
         if spec is not None:
             existing.spec = spec
         if img is not None:
             existing.img = img
         existing.cached_at = now_kst()
     else:
-        db.add(Product(code=code, title=title, spec=spec, img=img, cached_at=now_kst()))
+        db.add(Product(code=code, title=title, category=category, spec=spec, img=img, cached_at=now_kst()))
     db.commit()
 
 
@@ -463,7 +474,7 @@ def create_build(payload: BuildCreateRequest, db: Session = Depends(get_db)):
             data = danawa.get_product(item.code)
         except requests.RequestException:
             data = {}
-        _cache_product(db, item.code, title=data.get("title"), spec=data.get("spec"), img=data.get("img"))
+        _cache_product(db, item.code, title=data.get("title"), category=data.get("category"), spec=data.get("spec"), img=data.get("img"))
 
         db.add(BuildItem(build_id=build.id, category=item.category, product_code=item.code))
     db.commit()
@@ -592,6 +603,96 @@ def get_build_detail(
         verdict=verdict,
         diff_percent=diff_percent,
     )
+
+
+@app.post("/favorites", response_model=FavoriteItem, status_code=201)
+def add_favorite(payload: FavoriteCreateRequest, db: Session = Depends(get_db)):
+    """
+    POST /favorites  body: {code} → 즐겨찾기 추가 (2026-08-04 신규 — 즐겨찾기
+    탭 채우는 첫 엔드포인트, DB에 favorites 테이블 신설)
+
+    이미 즐겨찾기된 상품이면 새로 추가하지 않고 기존 항목을 그대로
+    반환(idempotent) — 중복 추가를 에러로 취급하지 않음.
+    danawa.get_product()를 한 번만 호출해서 존재 확인 + products 캐시
+    upsert + 응답용 즉시가까지 한 번에 처리(중복 스크래핑 방지).
+    단일 상품 조회라 GET /product/{code}와 동일하게 연결 장애는 즉시 503.
+    """
+    existing = db.query(Favorite).filter(Favorite.product_code == payload.code).first()
+
+    try:
+        data = danawa.get_product(payload.code)
+    except requests.RequestException:
+        raise HTTPException(status_code=503, detail="데이터 소스(다나와) 연결 실패")
+
+    if not data or "title" not in data:
+        raise HTTPException(status_code=404, detail="상품을 찾을 수 없음")
+
+    lowest_price = data.get("lowest_price")
+    price = None
+    if lowest_price is not None:
+        try:
+            price = int(lowest_price)
+        except (TypeError, ValueError):
+            price = None
+
+    if existing is None:
+        _cache_product(db, payload.code, title=data.get("title"), category=data.get("category"), spec=data.get("spec"), img=data.get("img"))
+        existing = Favorite(product_code=payload.code, created_at=now_kst())
+        db.add(existing)
+        db.commit()
+        db.refresh(existing)
+
+    return FavoriteItem(
+        code=payload.code,
+        title=data.get("title"),
+        price=price,
+        price_formatted=format_won(price) if price is not None else None,
+        created_at=existing.created_at,
+    )
+
+
+@app.get("/favorites", response_model=list[FavoriteItem])
+def list_favorites(db: Session = Depends(get_db)):
+    """
+    GET /favorites → 즐겨찾기 목록, 상품별 실시간 최저가 포함 (2026-08-04 신규)
+
+    GET /builds와 마찬가지로 조회 시점마다 danawa를 순차 재조회(매너 크롤링
+    원칙) — 개인 프로젝트 규모라 캐시 없이 그대로 감. 부품 하나의 연결
+    장애가 전체 목록을 죽이지 않도록 항목별로 실패를 삼키고 계속 진행
+    (POST /builds·_compute_estimate와 동일한 다중 부품 fallback 관례,
+    2026-08-04 결정 — 실가_인수인계.md 참조).
+    """
+    favorites = db.query(Favorite).order_by(Favorite.created_at.desc()).all()
+    results = []
+
+    for fav in favorites:
+        try:
+            title, price = _fetch_lowest_price(fav.product_code)
+        except requests.RequestException:
+            title, price = None, None
+
+        results.append(
+            FavoriteItem(
+                code=fav.product_code,
+                title=title,
+                price=price,
+                price_formatted=format_won(price) if price is not None else None,
+                created_at=fav.created_at,
+            )
+        )
+
+    return results
+
+
+@app.delete("/favorites/{code}", status_code=204)
+def remove_favorite(code: int, db: Session = Depends(get_db)):
+    """DELETE /favorites/{code} → 즐겨찾기 제거 (2026-08-04 신규)"""
+    favorite = db.query(Favorite).filter(Favorite.product_code == code).first()
+    if favorite is None:
+        raise HTTPException(status_code=404, detail="즐겨찾기에 없는 상품")
+
+    db.delete(favorite)
+    db.commit()
 
 
 @app.get("/health")
