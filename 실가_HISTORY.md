@@ -554,3 +554,147 @@
     → 카드 클릭 → /build/{id} 이동, "전체보기" 클릭 → /build 이동 둘 다
       확인
     → npm run typecheck, npm run build 통과
+
+---
+
+### 2026-08-04 (같은 날, v10 이어서 — PR #3 머지 후)
+
+#### v11 — 최근기록 탭 구현 (frontend v0.5)
+
+[✓] 범위 결정 — PR #3 머지 후 남은 즐겨찾기/최근기록 2개 탭 중 최근기록부터
+    진행하기로 사용자와 합의(즐겨찾기는 새 DB 테이블이 필요해 더 무거움).
+    이어서 "최근기록"이 정확히 뭘 기록할지도 결정 필요했음 — 이 앱엔 독립된
+    상품 상세 페이지가 없어서(검색 결과를 클릭해도 어디로도 안 감) "조회"의
+    정의 자체가 모호했음
+    → 최종 채택: "최근 조회한 부품(상품)" — danawa 자체 헤더의 "최근 본
+      상품" 드롭다운과 같은 개념. "최근 검색어"(정보량 적음)와 "최근 조회한
+      빌드"(홈 탭 최근빌드와 사실상 중복)는 기각
+    → 저장은 ma_window 설정과 동일하게 localStorage만 사용
+      (silga:recent_products) — 인증/로그인이 없는 프로젝트라 "이
+      브라우저에서"라는 전제가 항상 있고, 새 DB 테이블/엔드포인트가
+      필요 없다고 판단
+    → "조회" 계측 지점: 이 앱에서 특정 부품을 실제로 들여다보는 곳은
+      (1) 통계 탭 부품 검색(가격 히스토리 조회), (2) 빌드 생성 화면
+      부품 선택 — 둘 다 "조회"로 간주해서 두 군데 다 계측하기로 함
+
+[✓] 구현
+    → frontend/src/lib/recentProducts.ts 신규 — RecentProduct 타입(code,
+      title, priceFormatted, viewedAt), getRecentProducts/addRecentProduct
+      (같은 code 있으면 제거 후 맨 앞에 재삽입 — 최신순 유지)/
+      removeRecentProduct/clearRecentProducts, MAX_RECENT_PRODUCTS=20
+    → StatsPage.tsx: PartRow의 onSelect를 handleSelect로 감싸서
+      addRecentProduct(part) 호출 추가. 추가로 useLocation().state를 초기
+      선택값으로 사용하도록 확장 — RecentHistoryPage에서 넘어올 때 재검색
+      없이 바로 그 부품의 차트가 뜨도록
+    → BuildCreatePage.tsx: PartRow의 onSelect 인라인 콜백에도
+      addRecentProduct(part) 한 줄 추가
+    → frontend/src/pages/RecentHistoryPage.tsx 신규 — 목록(최신순),
+      각 행 클릭 시 /stats로 이동하며 location.state로 {code, title,
+      priceFormatted}를 실어 보냄(재검색 없이 바로 로드), 개별 삭제(×
+      버튼, 클릭 시 Link 네비게이션 막으려고 preventDefault+stopPropagation
+      필요), 전체 지우기, 빈 상태
+    → global.css에 .recent-list/.recent-row 및 하위 요소(.nm/.code/.time/
+      .pr/.remove) 스타일 추가 — 기존 .search-result-row와 비슷한
+      톤이지만 항목 수가 더 많아(이름/코드/시각/가격/삭제버튼) 별도 클래스로
+      분리
+
+[✓] 검증 — 이 세션 환경은 danawa.com이 막혀 있어 mock 백엔드(search가
+    쿼리와 무관하게 고정 2개 반환)로 진행
+    → 통계 탭에서 서로 다른 부품 2개를 순서대로 선택 → 최근기록에
+      최신순(나중에 본 게 위)으로 뜨는 것 확인
+    → 첫 번째 테스트 시도에서 mock의 get_product_codes가 쿼리를 무시하고
+      항상 같은 2개를 반환한다는 걸 놓쳐서 같은 상품을 두 번 선택하는
+      테스트 버그 발생 → 두 번째 검색에서 자동완성 목록의 다른 인덱스를
+      선택하도록 테스트 스크립트 수정해서 재검증
+    → 최근기록 행 클릭 → /stats로 이동 + 해당 부품 차트 즉시 로드(재검색
+      없이) 확인
+    → 개별 삭제(2개 → 1개), 전체 지우기(1개 → 0개, 목록 비면 "전체
+      지우기" 버튼도 같이 사라지는 것) 확인
+    → npm run typecheck, npm run build 통과
+
+---
+
+### 2026-08-04 (같은 날, v11 이어서)
+
+#### v12 — 즐겨찾기 탭 구현 (backend v0.4.4, frontend v0.6) — 사이드바 7탭 전부 완료
+
+[✓] 범위 결정 — 최근기록 다음으로 즐겨찾기 진행. "관심 상품 북마크"로
+    방향은 이미 잡혀있었음(2026-08-04 앞서 결정). 최근기록과 달리 새 DB
+    테이블이 필요한 무거운 쪽이라 뒤로 미뤄뒀던 항목
+
+[✓] 백엔드 구현
+    → backend/app/models/favorite.py 신규 — Favorite 모델(id PK,
+      product_code FK→products.code, created_at KSTDateTime),
+      product_code UniqueConstraint로 중복 즐겨찾기 자체를 DB 레벨에서
+      방지
+    → backend/app/schemas/favorite.py 신규 — FavoriteCreateRequest({code}),
+      FavoriteItem({code, title, price, price_formatted, created_at})
+    → main.py에 3개 엔드포인트 추가:
+      - POST /favorites: 이미 있으면 새로 안 만들고 기존 항목 그대로
+        반환(idempotent, 에러 아님). danawa.get_product()를 한 번만
+        호출해서 존재확인+products 캐시 upsert+응답용 즉시가까지 한
+        번에 처리(중복 스크래핑 방지). 단일상품 조회라 연결 장애 시
+        즉시 503(GET /product/{code}와 동일 패턴)
+      - GET /favorites: 즐겨찾기 목록 + 상품별 실시간 최저가. GET
+        /builds처럼 매번 순차 재조회, 캐시 없음. 항목 하나의 연결
+        장애가 전체 목록을 안 죽이도록 부품별 fallback(2026-08-04
+        앞서 확립한 다중부품 관례 그대로 적용)
+      - DELETE /favorites/{code}: 204, 없으면 404
+    → REFERENCE.md #DB-스키마·#엔드포인트-설계 갱신 완료(API 계약 변경)
+
+[✓] 겸사겸사 발견+수정 — _cache_product()가 category 파라미터를 아예 안
+    받고 있어서, 오늘 앞서 완료한 category 스크래퍼 구현(v0.4.3) 이후에도
+    products 테이블의 category 컬럼은 계속 비어있었던 걸 발견
+    → _cache_product 시그니처에 category: Optional[str] = None 추가,
+      create_build·add_favorite 두 호출부 모두 category=data.get("category")
+      전달하도록 수정
+    → backend/app/models/product.py의 스테일한 TODO 주석("스크래퍼가
+      아직 미제공")도 실제 상태에 맞게 정리
+
+[✓] 프론트 구현
+    → frontend/src/lib/api.ts: FavoriteItem 타입, listFavorites/
+      addFavorite/removeFavorite 함수 추가. request()가 항상 res.json()을
+      호출하고 있어서 DELETE의 204 No Content 응답에서 JSON 파싱 에러가
+      날 뻔한 걸 미리 발견 → status===204면 파싱 없이 반환하도록 수정
+    → frontend/src/pages/FavoritesPage.tsx 신규 — 상단 PartRow로
+      검색→선택 즉시 POST /favorites 호출(추가), 아래 목록은
+      RecentHistoryPage와 같은 .recent-list 스타일 재사용(같은 CSS
+      클래스 그대로 씀, 새 스타일 없음). 각 행 클릭 시 최근기록과 동일한
+      패턴으로 /stats 이동+즉시 로드, 개별 제거(DELETE), 빈 상태
+    → frontend/src/App.tsx: /favorites 라우트를 FavoritesPage로 교체.
+      이걸로 PlaceholderPage를 쓰는 곳이 하나도 안 남아서 컴포넌트 자체
+      삭제(frontend/src/pages/PlaceholderPage.tsx 제거) — 사이드바 7탭
+      전부 실데이터 연동 완료
+
+[✓] 버그 발견+수정 — PartRow 재사용 패턴에서 실제 버그 하나 발견
+    → 증상: FavoritesPage는 "선택 즉시 추가하고 계속 검색 상태 유지"가
+      맞는 UX라서 PartRow에 selected={null}을 항상 고정으로 넘겨 재사용
+      했는데, 첫 상품 선택 후 같은 input에 바로 다음 검색어를 타이핑해도
+      자동완성이 안 뜨는 문제 발견(Playwright 테스트 중 autocomplete 개수
+      0으로 나와서 발견)
+    → 원인: PartRow.handlePick()이 선택 시 setFocused(false)를 호출함.
+      BuildCreatePage/StatsPage는 재검색을 `.part-selected` 클릭으로
+      시작하고 그 onClick 핸들러가 setFocused(true)로 되돌려주는데,
+      FavoritesPage는 selected가 항상 null이라 `.part-selected` 자체가
+      렌더링되지 않아 focused를 되돌릴 경로가 없음. document.activeElement
+      확인 결과 DOM 포커스는 계속 유지되고 있어서 겉보기엔 멀쩡해
+      보이지만, React 내부 focused state가 false로 고정돼 검색
+      쿼리(enabled: debounced.length>1 && focused)가 다시 실행 안 됨
+    → 수정: 공용 컴포넌트 PartRow 자체는 손대지 않고(다른 화면 영향
+      최소화), FavoritesPage에서 선택 성공마다 pickerKey를 증가시켜
+      PartRow를 key로 강제 remount — 내부 상태(focused/input)가 깨끗하게
+      초기화됨
+
+[✓] 검증
+    → 백엔드: curl로 POST(신규/idempotent 재호출 — created_at 안 바뀌는
+      것까지 확인)/GET(정렬 확인)/DELETE(성공+404) 전부 확인
+    → products 테이블에 category가 실제로 채워지는지 sqlite3로 직접 조회
+      (mock 데이터라 category 자체가 없어서 값은 None으로 나왔지만, 로직
+      경로 자체는 정상 동작 확인 — data.get("category")가 없으면 None
+      유지되는 게 맞는 동작)
+    → 프론트: Playwright로 서로 다른 부품 2개 추가 → 목록에 둘 다 표시
+      확인 → 같은 부품 재추가(중복) → 목록 개수 그대로(2개) 확인 →
+      목록 항목 클릭 → /stats 이동 + 해당 부품 차트 즉시 로드 확인 →
+      개별 제거(2개→1개) 확인
+    → npm run typecheck, npm run build 통과, python3 -c "import app.main"
+      통과

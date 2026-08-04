@@ -17,7 +17,7 @@ class Product(Base):
 
     code = Column(Integer, primary_key=True)  # 다나와 상품 코드 그대로 사용
     title = Column(String, nullable=True)
-    category = Column(String, nullable=True)  # TODO: 스크래퍼가 아직 미제공 (실가_인수인계.md 참조)
+    category = Column(String, nullable=True)  # 카테고리 브레드크럼, 2026-08-04부터 실제 값 채워짐
     spec = Column(Text, nullable=True)
     img = Column(String, nullable=True)
     cached_at = Column(KSTDateTime, default=now_kst, nullable=False)

@@ -23,6 +23,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     }
     throw new ApiError(res.status, detail);
   }
+  if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
 
@@ -114,6 +115,14 @@ export interface BuildDetail {
   diff_percent: number | null;
 }
 
+export interface FavoriteItem {
+  code: number;
+  title: string | null;
+  price: number | null;
+  price_formatted: string | null;
+  created_at: string;
+}
+
 // ---- API 함수 ----
 
 export const api = {
@@ -136,4 +145,15 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+
+  listFavorites: () => request<FavoriteItem[]>("/favorites"),
+
+  addFavorite: (code: number) =>
+    request<FavoriteItem>("/favorites", {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    }),
+
+  removeFavorite: (code: number) =>
+    request<void>(`/favorites/${code}`, { method: "DELETE" }),
 };
