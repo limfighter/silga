@@ -281,7 +281,85 @@
     → 사용자 실측 데이터 + 신상품(짧은 히스토리) 케이스로 재검증 완료,
       기존 mock 엔드포인트 테스트도 3개월치 주간 데이터로 다시 돌려 통과 확인
 
-[ ] 다음 세션 시작 시
+[✓] 다음 세션 시작 시
     → 프론트 연동(설정 탭 ma_window 드롭다운 + localStorage, Search/
       BuildCreate/BuildDetail에서 compare 호출 시 값 실어 보내기) 착수
-    → PR #2 draft 해제 검토 (이번 실측 반영 완료 기준)
+    → PR #2 draft 해제 검토 (이번 실측 반영 완료 기준) — 완료, main에 머지됨
+    → 아래 v6에서 프론트 연동 진행
+
+---
+
+### 2026-08-04 (같은 날, PR #2 머지 후 이어서)
+
+#### v6 — verdict 이동평균 프론트 연동 (설정 탭 + localStorage + 목록/상세)
+
+[✓] frontend/src/lib/settings.ts 신규
+    → MA_WINDOW_OPTIONS([7,14,30] as const), DEFAULT_MA_WINDOW(14),
+      getStoredMaWindow(), useMaWindow() 훅 — localStorage 키
+      "silga:ma_window"에 저장, 값이 7/14/30 중 하나가 아니면(빈 값/오염된
+      값 포함) 14로 폴백
+    → 페이지 전환마다 useState 초기값을 localStorage에서 새로 읽어오는
+      방식 — 같은 화면 내 실시간 동기화(storage 이벤트 리스너)는 개인용
+      SPA 규모에 과설계라 판단해 넣지 않음(라우트 이동 시 리마운트로 충분)
+
+[✓] frontend/src/pages/SettingsPage.tsx 신규, App.tsx의 /settings 라우트를
+    PlaceholderPage → SettingsPage로 교체
+    → 드롭다운(7일/14일/30일) 하나만 있는 최소 구성, 변경 즉시
+      localStorage 저장(별도 저장 버튼 없음)
+    → "이 기기에만 저장됩니다" 안내 문구로 서버 저장이 아님을 명시
+
+[✓] frontend/src/lib/api.ts 갱신
+    → BuildSummary에 verdict_confidence/ma_window 필드 추가,
+      BuildDetail에 verdict_basis_price(_formatted)/verdict_confidence/
+      verdict_basis_breakdown/ma_window 필드 추가, VerdictBasisItem
+      인터페이스 신규 (backend/app/schemas/build.py, compare.py와 1:1 대응)
+    → listBuilds/getBuild가 ma_window를 필수 인자로 받아 쿼리스트링에 실어
+      보내도록 시그니처 변경(하드코딩된 기본값 14 의존 제거)
+
+[✓] BuildListPage/BuildDetailPage가 useMaWindow() 훅으로 설정값을 읽어
+    listBuilds(maWindow)/getBuild(id, maWindow) 호출 + TanStack Query
+    queryKey에 maWindow 포함(다른 기간 선택 시 새로 fetch, 캐시 안 섞임)
+    → BuildDetailPage에 "판정 기준: N일 이동평균" 안내 텍스트 추가,
+      verdict_confidence가 "low"면 "일부 부품은 데이터 부족으로 즉시가
+      대체" 문구 덧붙여 신뢰도를 화면에서도 투명하게 노출
+      (REFERENCE.md #엔드포인트-설계 verdict_confidence 설계 취지 반영)
+
+[✓] BuildCreatePage
+    → POST /builds는 ma_window를 받지 않음(생성 직후엔 verdict 자체가
+      null — REFERENCE.md 참조), 그래서 API 호출 자체는 변경 없음. 대신
+      "비교할 판매가" 입력란 아래에 "저장 후 판정은 N일 이동평균
+      기준가로 계산됩니다(설정 탭에서 변경 가능)" 안내만 추가 — 저장 직후
+      이동하는 BuildDetailPage가 어차피 설정값을 자동으로 물고 가므로
+      실질적 연동은 이미 BuildDetailPage 쪽에서 끝나 있음
+
+[✓] SearchPage
+    → 확인 결과 /search 엔드포인트 자체가 market_price/ma_window를 받지
+      않고 판정(compare) 기능도 검색 화면에 없어(단순 목록) ma_window와
+      무관 — 인수인계 문서의 "Search 연동"은 검색 결과에서 바로 비교하는
+      기능이 아직 없다는 뜻이었던 것으로 판단, 변경 없음 (향후 검색
+      결과에 "비교" 버튼을 추가하는 게 결정되면 그때 GET
+      /product/{code}/compare?ma_window= 연동 필요)
+
+[✓] 검증
+    → npm run typecheck, npm run build 통과
+    → Playwright로 실브라우저 검증: 설정 탭 드롭다운 선택 → localStorage
+      반영 → 빌드 목록 페이지 이동 시 실제 네트워크 요청이
+      `/builds?ma_window={선택값}`으로 나가는 것 확인, 빌드 상세도
+      `/builds/{id}?ma_window={선택값}` 확인
+    → 이 세션 환경은 프록시가 danawa.com 접근을 막아(실측: ProxyError
+      403) 실제 다나와 데이터로는 검증 불가 → danawa.get_product/
+      get_price_variance를 목(mock)으로 교체해 verdict_confidence="high"/
+      "low", 판정 기준 문구, 게이지 렌더링까지 화면에서 직접 확인함
+
+[발견, 미수정] GET /builds, GET /builds/{id}가 danawa 연결 자체가
+    끊겼을 때(requests.RequestException) 처리가 안 돼 있음
+    → main.py::_fetch_lowest_price()가 danawa.get_product() 호출을
+      try/except로 감싸지 않아서, 네트워크 장애 시 CLAUDE.md 원칙(스크래퍼
+      장애→503)을 못 지키고 500으로 죽는 걸 이번 세션에서 실측 확인
+      (GET /product/{code}는 get_product_detail()에서 자체적으로
+      감싸고 있어 이 문제 없음 — _fetch_lowest_price를 공유하는
+      /estimate, /product/{code}/compare, /build/compare, GET /builds,
+      GET /builds/{id} 5곳이 전부 같은 결함 있음)
+    → 이번 세션 범위(프론트 연동)를 벗어나는 백엔드 버그라 손대지 않고
+      기록만 남김 — 다음 세션에서 결정 필요 항목으로 남김(아래
+      실가_인수인계.md "수정 예정" 참조)

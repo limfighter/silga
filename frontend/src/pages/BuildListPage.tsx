@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api, type BuildSummary } from "../lib/api";
+import { useMaWindow } from "../lib/settings";
 
 function tagClass(verdict: BuildSummary["verdict"]): string {
   if (verdict === "고가") return "bc-tag high";
@@ -10,9 +11,11 @@ function tagClass(verdict: BuildSummary["verdict"]): string {
 }
 
 export default function BuildListPage() {
+  const [maWindow] = useMaWindow();
+
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["builds"],
-    queryFn: api.listBuilds,
+    queryKey: ["builds", maWindow],
+    queryFn: () => api.listBuilds(maWindow),
   });
 
   return (

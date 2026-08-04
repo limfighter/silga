@@ -3,12 +3,14 @@ import { useNavigate, Link } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import PartRow, { type SelectedPart } from "../components/PartRow";
+import { useMaWindow } from "../lib/settings";
 
 const CATEGORIES = ["CPU", "GPU", "메인보드", "RAM", "SSD", "케이스", "파워", "쿨러"];
 
 export default function BuildCreatePage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [maWindow] = useMaWindow();
 
   const [name, setName] = useState("");
   const [marketPrice, setMarketPrice] = useState("");
@@ -79,6 +81,10 @@ export default function BuildCreatePage() {
             value={marketPrice}
             onChange={(e) => setMarketPrice(e.target.value)}
           />
+          <div className="field-hint">
+            저장 후 판정은 {maWindow}일 이동평균 기준가로 계산됩니다 (설정
+            탭에서 변경 가능).
+          </div>
         </div>
 
         {mutation.isError && (

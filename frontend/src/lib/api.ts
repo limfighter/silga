@@ -68,6 +68,8 @@ export interface BuildSummary {
   total_price: number | null;
   total_price_formatted: string | null;
   verdict: "저가" | "적정가" | "고가" | null;
+  verdict_confidence: "high" | "low" | null;
+  ma_window: number | null;
 }
 
 export interface BuildItemDetail {
@@ -75,6 +77,12 @@ export interface BuildItemDetail {
   code: number;
   title: string | null;
   price: number | null;
+}
+
+export interface VerdictBasisItem {
+  code: number;
+  price: number | null;
+  source: "ma" | "current_fallback";
 }
 
 export interface BuildDetail {
@@ -85,6 +93,11 @@ export interface BuildDetail {
   items: BuildItemDetail[];
   total_price: number;
   total_price_formatted: string;
+  verdict_basis_price: number | null;
+  verdict_basis_price_formatted: string | null;
+  verdict_confidence: "high" | "low" | null;
+  verdict_basis_breakdown: VerdictBasisItem[];
+  ma_window: number | null;
   verdict: "저가" | "적정가" | "고가" | null;
   diff_percent: number | null;
 }
@@ -97,9 +110,11 @@ export const api = {
 
   getProduct: (code: number) => request<ProductDetail>(`/product/${code}`),
 
-  listBuilds: () => request<BuildSummary[]>("/builds"),
+  listBuilds: (maWindow: number) =>
+    request<BuildSummary[]>(`/builds?ma_window=${maWindow}`),
 
-  getBuild: (id: number) => request<BuildDetail>(`/builds/${id}`),
+  getBuild: (id: number, maWindow: number) =>
+    request<BuildDetail>(`/builds/${id}?ma_window=${maWindow}`),
 
   createBuild: (payload: { name: string; market_price?: number; items: BuildItemInput[] }) =>
     request<BuildSummary>("/builds", {

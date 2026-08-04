@@ -5,6 +5,7 @@ import BuildListPage from "./pages/BuildListPage";
 import BuildCreatePage from "./pages/BuildCreatePage";
 import BuildDetailPage from "./pages/BuildDetailPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
+import SettingsPage from "./pages/SettingsPage";
 
 export default function App() {
   return (
@@ -18,7 +19,7 @@ export default function App() {
         <Route path="/favorites" element={<PlaceholderPage label="즐겨찾기" todo="saved parts list" />} />
         <Route path="/history" element={<PlaceholderPage label="최근기록" todo="view/search log" />} />
         <Route path="/stats" element={<PlaceholderPage label="통계" todo="price trend dashboard" />} />
-        <Route path="/settings" element={<PlaceholderPage label="설정" todo="notifications, account" />} />
+        <Route path="/settings" element={<SettingsPage />} />
       </Route>
     </Routes>
   );
