@@ -351,8 +351,8 @@
       get_price_variance를 목(mock)으로 교체해 verdict_confidence="high"/
       "low", 판정 기준 문구, 게이지 렌더링까지 화면에서 직접 확인함
 
-[발견, 미수정] GET /builds, GET /builds/{id}가 danawa 연결 자체가
-    끊겼을 때(requests.RequestException) 처리가 안 돼 있음
+[발견, 같은 날 이어서 수정] GET /builds, GET /builds/{id}가 danawa 연결
+    자체가 끊겼을 때(requests.RequestException) 처리가 안 돼 있음
     → main.py::_fetch_lowest_price()가 danawa.get_product() 호출을
       try/except로 감싸지 않아서, 네트워크 장애 시 CLAUDE.md 원칙(스크래퍼
       장애→503)을 못 지키고 500으로 죽는 걸 이번 세션에서 실측 확인
@@ -360,6 +360,42 @@
       감싸고 있어 이 문제 없음 — _fetch_lowest_price를 공유하는
       /estimate, /product/{code}/compare, /build/compare, GET /builds,
       GET /builds/{id} 5곳이 전부 같은 결함 있음)
-    → 이번 세션 범위(프론트 연동)를 벗어나는 백엔드 버그라 손대지 않고
-      기록만 남김 — 다음 세션에서 결정 필요 항목으로 남김(아래
-      실가_인수인계.md "수정 예정" 참조)
+    → v6 시점엔 프론트 연동 세션 범위 밖이라 기록만 남기고 미수정 —
+      아래 v7에서 같은 날 이어서 수정
+
+---
+
+### 2026-08-04 (같은 날, v6 이어서)
+
+#### v7 — _fetch_lowest_price() danawa 연결 장애 처리 수정 (v0.4.2)
+
+[✓] 방향 결정: "엔드포인트별 기존 선례 따르기" 채택 (사용자 확인)
+    → 새 정책을 만들지 않고, 저장소에 이미 있던 두 선례를 각 호출부
+      성격에 맞게 그대로 적용
+        - GET /product/{code}(get_product_detail): 연결 장애 → 즉시 503
+        - POST /builds(create_build) / _fetch_ma_price: 부품별로 실패를
+          삼키고 그 부품만 정보 없음 처리, 나머지는 계속 진행
+    → _fetch_lowest_price() 자체는 그대로 두고(예외를 그대로 던짐),
+      호출부 2곳에서 각자 다르게 감싸는 방식으로 구현 — 헬퍼 하나가
+      단일상품/다중부품 두 성격을 동시에 만족시키려던 게 애초 결함의
+      원인이었음
+
+[✓] 구현 (backend/app/main.py)
+    → compare_single_product(GET /product/{code}/compare): 호출부를
+      try/except RequestException으로 감싸 503 반환 — get_product_detail과
+      동일 패턴
+    → _compute_estimate(POST /estimate, POST /build/compare, GET
+      /builds, GET /builds/{id}가 공유): 루프 내부에서 항목별로
+      try/except RequestException → title/price를 (None, None) 처리하고
+      다음 항목 계속 진행 — create_build/_fetch_ma_price와 동일 패턴
+
+[✓] 검증 (이 세션 환경은 프록시가 danawa.com을 막고 있어 실제
+    RequestException이 매 요청마다 자연 발생 — 별도 mock 없이 실측 가능했음)
+    → GET /product/{code}/compare → 503 "데이터 소스(다나와) 연결 실패"
+      확인 (수정 전엔 500 unhandled exception이었음)
+    → GET /builds, GET /builds/{id}, POST /estimate → 200으로 정상
+      응답, 가격 조회 실패한 부품은 title/price null로 표시되고 나머지
+      응답 구조는 정상 (수정 전엔 500으로 전체가 죽었음)
+    → POST /build/compare → 부품 전부 가격 조회 실패 시 기존 로직대로
+      404 "부품 가격을 하나도 찾지 못해 판정 불가" — 이건 total_price==0
+      체크로 원래 있던 정상 분기라 회귀 아님, 확인만 함

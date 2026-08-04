@@ -170,12 +170,22 @@ def _compute_estimate(items: list[EstimateItem]):
     (요청 간격 5~10초, 동시 병렬 지양)을 지키려면 부품 수가 많은 빌드일수록
     응답이 느려짐. 개인용 규모라 지금은 별도 스로틀링/캐싱 없이 그대로 감.
     부품 수가 많아져서 체감 지연이 문제되면 그때 재검토.
+
+    부품 하나의 danawa 연결이 끊겨도(requests.RequestException) 전체 요청을
+    실패시키지 않고 그 부품만 가격 정보 없음(title/price=None)으로 처리하고
+    계속 진행 — POST /builds(create_build)·_fetch_ma_price의 기존 부품별
+    fallback 관례를 따름(2026-08-04 결정, 실가_인수인계.md 참조). 단일 상품
+    조회(GET /product/{code}, GET /product/{code}/compare)는 이 관례 대상이
+    아니고 연결 장애 시 즉시 503 처리 유지.
     """
     breakdown = []
     total_price = 0
 
     for item in items:
-        title, price = _fetch_lowest_price(item.code)
+        try:
+            title, price = _fetch_lowest_price(item.code)
+        except requests.RequestException:
+            title, price = None, None
         breakdown.append(
             BreakdownItem(category=item.category, title=title, price=price)
         )
@@ -328,10 +338,18 @@ def compare_single_product(
     (verdict_basis_price)로 계산하고, 이동평균 데이터가 부족하면 즉시가로
     대체(fallback)하면서 verdict_confidence를 "low"로 표시함 (2026-08-04
     결정, 실가_인수인계.md 참조).
+
+    단일 상품 조회라 GET /product/{code}(get_product_detail)와 동일하게
+    danawa 연결 장애(requests.RequestException)는 즉시 503 처리 — 다중
+    부품을 합산하는 /estimate·/build/compare·GET /builds류와 달리 부품별
+    fallback 관례를 적용할 대상이 없음(2026-08-04 결정, 실가_인수인계.md 참조).
     """
     ma_window = _validate_ma_window(ma_window)
 
-    title, lowest_price = _fetch_lowest_price(code)
+    try:
+        title, lowest_price = _fetch_lowest_price(code)
+    except requests.RequestException:
+        raise HTTPException(status_code=503, detail="데이터 소스(다나와) 연결 실패")
     if lowest_price is None:
         raise HTTPException(status_code=404, detail="상품을 찾을 수 없거나 최저가 정보 없음")
 
