@@ -15,6 +15,7 @@ danawa.py — 실가 프로젝트 데이터소스 모듈
     (실가_REFERENCE.md #엔드포인트-설계 설계 원칙 참조).
 """
 
+import html
 import re
 import requests
 from bs4 import BeautifulSoup
@@ -108,6 +109,27 @@ def get_product(product_code: int) -> dict:
     detail_summary = (summary_info or None) and summary_info.select_one("div.detail_summary")
 
     summary = {}
+
+    # 카테고리 브레드크럼: div.location_wrap의 중첩 loca_item 구조를 직접
+    # 파싱하는 대신, 페이지 하단 인라인 <script>의 oGlobalSetting.sUICategoryName
+    # 값을 사용 — 이미 "컴퓨터/노트북/조립PC &gt; 주요부품 &gt; 그래픽카드(GPU)"
+    # 형태로 정리돼 있는 단일 문자열이라 더 안정적 (2026-08-04 실측 확인,
+    # GPU/CPU 두 카테고리 페이지에서 동일 패턴 확인)
+    category_match = re.search(r'sUICategoryName:\s*"([^"]*)"', response.text)
+    if category_match:
+        summary["category"] = html.unescape(category_match.group(1))
+
+    # 현금가(현금최저가): "카드가/현금가 비교"가 아니라 쇼핑몰별 최저가 목록 중
+    # 현금결제 전용(badge__cash)으로 표시된 몰의 최저가 — og:description
+    # 메타태그에 다나와가 이미 계산해 넣어주는 값을 사용. 우리가 스크래핑하는
+    # 쇼핑몰별 가격 목록(prices, 상위 약 10건만 잘림)에서 badge__cash 항목을
+    # 직접 찾아 최솟값을 구하면 절단 구간 밖의 진짜 최저 현금가를 놓칠 수
+    # 있어서, 다나와가 전체 목록 기준으로 계산해준 값을 그대로 신뢰함
+    # (2026-08-04 실측 확인, CPU 카테고리 페이지에서 존재 확인 — GPU 페이지는
+    # 해당 상품이 일시 품절이라 아예 없었음. 값이 없는 상품은 필드 자체 생략)
+    cash_price_match = re.search(r'현금최저가:\s*([\d,]+)원', response.text)
+    if cash_price_match:
+        summary["cash_price"] = int(cash_price_match.group(1).replace(",", ""))
 
     if top_summary is not None:
         title = top_summary.select_one("div.top_summary > h3.prod_tit > span.title")

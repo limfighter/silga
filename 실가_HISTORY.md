@@ -399,3 +399,71 @@
     → POST /build/compare → 부품 전부 가격 조회 실패 시 기존 로직대로
       404 "부품 가격을 하나도 찾지 못해 판정 불가" — 이건 total_price==0
       체크로 원래 있던 정상 분기라 회귀 아님, 확인만 함
+
+---
+
+### 2026-08-04 (같은 날, v7 이어서)
+
+#### v8 — category·cash_price 필드 스크래퍼 구현 (v0.4.3)
+
+[✓] 배경 — 이 세션 환경은 프록시 정책으로 danawa.com 자체가 막혀 있어
+    (WebFetch도 403) 실제 페이지 HTML을 볼 방법이 없었음. 사용자에게
+    로컬 브라우저에서 상품 페이지 소스보기(Ctrl+U) 전체를 복사해서
+    붙여넣어 달라고 요청 → GPU(PALIT RTX5070Ti, pcode=76465883, 일시
+    품절 상태)와 CPU(AMD 라이젠7 9800X3D, pcode=70531547) 두 상품의 실제
+    HTML 원문을 확보해서 그걸로 구현
+
+[✓] category(카테고리 브레드크럼) 구현
+    → 실측 결과: div.location_wrap 안에 중첩된 loca_item 버튼들(각각
+      "컴퓨터/노트북/조립PC", "주요부품", "그래픽카드(GPU)" 등)을 DOM으로
+      직접 조립하는 대신, 페이지 하단 인라인 <script> 안의
+      oGlobalSetting.sUICategoryName 값이 이미 완성된 형태로 있었음:
+      `sUICategoryName: "컴퓨터/노트북/조립PC &gt; 주요부품 &gt; 그래픽카드(GPU)"`
+      (CPU 페이지는 `"... &gt; CPU &gt; AMD"`) — HTML 엔티티(&gt;)만
+      unescape하면 바로 쓸 수 있는 단일 문자열이라 이쪽을 채택
+    → 정규식 `sUICategoryName:\s*"([^"]*)"` + html.unescape()로 파싱,
+      두 샘플 페이지 모두에서 정확히 1회씩만 등장하는 것 육안 확인
+      (다른 곳에 같은 패턴 없어 오탐 위험 낮음)
+
+[✓] cash_price(현금최저가) 구현 — 최초 가정이 틀렸던 걸 실측으로 발견
+    → 최초 가정(TODO 주석에 적혀 있던 것): "카드가/현금가 비교" — 노트북
+      등 일부 카테고리에만 있는 기능일 거라 예상
+    → 실측 결과: GPU 페이지엔 관련 텍스트가 전혀 없었음(해당 상품이
+      일시 품절이라 가격 정보 자체가 없어서였을 수도 있음, 확정 못함).
+      CPU 페이지엔 있었음 — 다만 "카드가 vs 현금가 비교"가 아니라,
+      쇼핑몰별 최저가 목록(list__mall-price) 중 현금결제 전용으로
+      표시된 판매처(span.badge__cash)의 최저가였음. 이 상품은 최저가
+      681,360원과 현금최저가 630,000원이 서로 다른 값으로 확인됨
+    → 파싱 위치: 우리가 이미 스크래핑하는 쇼핑몰별 가격 목록(prices)에서
+      badge__cash 항목을 직접 찾아 최솟값을 구하는 방법도 가능했지만,
+      그 목록 자체가 상위 약 10건만 잘려 있어(REFERENCE.md #엔드포인트
+      -설계 기존 원칙) 절단 구간 밖의 진짜 최저 현금가를 놓칠 위험이
+      있음 → 대신 다나와가 이미 전체 목록 기준으로 계산해서
+      og:description 메타태그에 넣어주는 값(`"최저가 681,360원,
+      현금최저가: 630,000원"`)을 그대로 신뢰하기로 함
+    → 정규식 `현금최저가:\s*([\d,]+)원`으로 파싱, 값 없는 상품(GPU 샘플)은
+      필드 자체 생략 → cash_price=None (파싱 실패 아니라 정상적으로
+      없는 값으로 처리)
+
+[✓] 구현 반영
+    → backend/app/services/danawa.py::get_product(): 위 정규식 2개 추가
+      (import html 추가), 기존 title/spec/price-summary/variants 파싱
+      로직은 손대지 않음
+    → backend/app/main.py::get_product_detail(): category=None,
+      cash_price=None으로 하드코딩돼 있던 부분을 data.get()으로 교체,
+      "미구현" 주석 제거
+    → backend/app/schemas/product.py: category/cash_price 필드의
+      TODO(미구현) 주석을 실제 파싱 방식 설명으로 교체
+
+[✓] 검증
+    → 정규식은 사용자가 준 실제 HTML 조각(sUICategoryName 라인,
+      og:description 메타태그 라인)을 그대로 떼어내 파이썬으로 직접
+      매칭 테스트 — category/cash_price 정상 추출, 값 없는 케이스(GPU
+      og:description)도 None으로 정상 처리 확인
+    → 전체 페이지 단위 왕복 재현(mock 서버로 danawa.get_product 전체
+      플로우 실행)까지는 하지 않음 — 조각 단위 검증 + 패턴이 각 페이지에
+      정확히 1회씩만 등장한다는 것 확인으로 충분하다고 판단. 다른
+      카테고리(RAM/SSD/케이스/파워/쿨러/메인보드)에서의 실측은 아직 안 함
+      — 두 필드 다 없는 상품에서 필드 생략(None)으로 안전하게 폴백되므로
+      당장 깨질 위험은 낮다고 판단, 다만 다른 카테고리 페이지에서 다른
+      구조가 나올 가능성은 남아있는 known gap

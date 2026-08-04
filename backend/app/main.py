@@ -97,10 +97,10 @@ def get_product_detail(code: int):
     GET /product/{code} → {code, title, category, current_price, cash_price,
                             spec, variants: [...]}
 
-    주의 (미구현 필드):
-      - category: 스크래퍼가 아직 파싱하지 않음 → 항상 None
-      - cash_price: 스크래퍼가 아직 파싱하지 않음 → 항상 None
-      (app/schemas/product.py TODO 주석 참조)
+    category(카테고리 브레드크럼)와 cash_price(현금최저가)는 2026-08-04
+    파싱 구현 완료(danawa.py::get_product 참조) — 둘 다 데이터가 없는
+    상품(예: 현금결제 전용 판매처가 없는 상품)에서는 None 그대로 반환됨,
+    파싱 실패가 아니라 정상적으로 없는 값.
     """
     try:
         data = danawa.get_product(code)
@@ -132,9 +132,9 @@ def get_product_detail(code: int):
     return ProductDetail(
         code=code,
         title=data.get("title"),
-        category=None,   # TODO: 미구현
+        category=data.get("category"),
         current_price=current_price,
-        cash_price=None,  # TODO: 미구현
+        cash_price=data.get("cash_price"),
         spec=data.get("spec"),
         variants=variants,
         in_stock=data.get("in_stock"),

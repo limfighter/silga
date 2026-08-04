@@ -71,9 +71,10 @@ python3 scripts/e2e_smoke_test.py
   ("데이터 소스 연결 실패"), 파싱은 됐지만 데이터/상품 없음 → 404, 정상
   품절 상품은 에러가 아니라 `in_stock` 필드로 표현 (PALIT RTX5070Ti 실측
   사례는 `실가_HISTORY.md` 참조).
-- `/product/{code}` 응답의 `category`, `cash_price`는 스크래퍼가 아직 파싱을
-  구현하지 않아 항상 `None` — 인수인계 문서 확인 없이 "버그"로 오인해서
-  고치지 말 것 (알려진 미결 항목).
+- `/product/{code}` 응답의 `category`(브레드크럼), `cash_price`(현금최저가)는
+  2026-08-04 파싱 구현 완료 — 데이터가 없는 상품(예: 현금결제 전용 판매처가
+  없는 상품)에서는 `None`이 정상이며 파싱 실패가 아님 (`실가_HISTORY.md` v8
+  참조). GPU/CPU 두 카테고리 페이지로만 검증됐고 나머지 카테고리는 미검증.
 - 커밋 메시지: `type: 내용 요약` (feat/fix/refactor/docs/chore) 형식.
   버전 규칙(세 번째/두 번째/첫 번째 자리 기준)은 REFERENCE.md
   #버전-관리-규칙 참조.
