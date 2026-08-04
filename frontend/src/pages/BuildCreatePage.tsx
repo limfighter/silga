@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import PartRow, { type SelectedPart } from "../components/PartRow";
 import { useMaWindow } from "../lib/settings";
+import { addRecentProduct } from "../lib/recentProducts";
 
 const CATEGORIES = ["CPU", "GPU", "메인보드", "RAM", "SSD", "케이스", "파워", "쿨러"];
 
@@ -67,7 +68,10 @@ export default function BuildCreatePage() {
                 key={category}
                 category={category}
                 selected={parts[category]}
-                onSelect={(part) => setParts((prev) => ({ ...prev, [category]: part }))}
+                onSelect={(part) => {
+                  setParts((prev) => ({ ...prev, [category]: part }));
+                  if (part) addRecentProduct(part);
+                }}
               />
             ))}
           </div>

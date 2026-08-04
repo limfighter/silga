@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api, type PriceHistory, type PricePoint } from "../lib/api";
 import PartRow, { type SelectedPart } from "../components/PartRow";
+import { addRecentProduct } from "../lib/recentProducts";
 
 const MONTH_OPTIONS = [1, 3, 6, 12] as const;
 type MonthOption = (typeof MONTH_OPTIONS)[number];
@@ -105,8 +107,16 @@ function HistoryChart({ title, selectedPrice, history }: {
 }
 
 export default function StatsPage() {
-  const [selected, setSelected] = useState<SelectedPart | null>(null);
+  const location = useLocation();
+  const initialSelected = (location.state as SelectedPart | null | undefined) ?? null;
+
+  const [selected, setSelected] = useState<SelectedPart | null>(initialSelected);
   const [months, setMonths] = useState<MonthOption>(3);
+
+  const handleSelect = (part: SelectedPart | null) => {
+    setSelected(part);
+    if (part) addRecentProduct(part);
+  };
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["history", selected?.code, months],
@@ -121,7 +131,7 @@ export default function StatsPage() {
       </div>
 
       <div className="stats-picker">
-        <PartRow category="부품" selected={selected} onSelect={setSelected} />
+        <PartRow category="부품" selected={selected} onSelect={handleSelect} />
       </div>
 
       {selected && (

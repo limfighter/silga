@@ -554,3 +554,60 @@
     → 카드 클릭 → /build/{id} 이동, "전체보기" 클릭 → /build 이동 둘 다
       확인
     → npm run typecheck, npm run build 통과
+
+---
+
+### 2026-08-04 (같은 날, v10 이어서 — PR #3 머지 후)
+
+#### v11 — 최근기록 탭 구현 (frontend v0.5)
+
+[✓] 범위 결정 — PR #3 머지 후 남은 즐겨찾기/최근기록 2개 탭 중 최근기록부터
+    진행하기로 사용자와 합의(즐겨찾기는 새 DB 테이블이 필요해 더 무거움).
+    이어서 "최근기록"이 정확히 뭘 기록할지도 결정 필요했음 — 이 앱엔 독립된
+    상품 상세 페이지가 없어서(검색 결과를 클릭해도 어디로도 안 감) "조회"의
+    정의 자체가 모호했음
+    → 최종 채택: "최근 조회한 부품(상품)" — danawa 자체 헤더의 "최근 본
+      상품" 드롭다운과 같은 개념. "최근 검색어"(정보량 적음)와 "최근 조회한
+      빌드"(홈 탭 최근빌드와 사실상 중복)는 기각
+    → 저장은 ma_window 설정과 동일하게 localStorage만 사용
+      (silga:recent_products) — 인증/로그인이 없는 프로젝트라 "이
+      브라우저에서"라는 전제가 항상 있고, 새 DB 테이블/엔드포인트가
+      필요 없다고 판단
+    → "조회" 계측 지점: 이 앱에서 특정 부품을 실제로 들여다보는 곳은
+      (1) 통계 탭 부품 검색(가격 히스토리 조회), (2) 빌드 생성 화면
+      부품 선택 — 둘 다 "조회"로 간주해서 두 군데 다 계측하기로 함
+
+[✓] 구현
+    → frontend/src/lib/recentProducts.ts 신규 — RecentProduct 타입(code,
+      title, priceFormatted, viewedAt), getRecentProducts/addRecentProduct
+      (같은 code 있으면 제거 후 맨 앞에 재삽입 — 최신순 유지)/
+      removeRecentProduct/clearRecentProducts, MAX_RECENT_PRODUCTS=20
+    → StatsPage.tsx: PartRow의 onSelect를 handleSelect로 감싸서
+      addRecentProduct(part) 호출 추가. 추가로 useLocation().state를 초기
+      선택값으로 사용하도록 확장 — RecentHistoryPage에서 넘어올 때 재검색
+      없이 바로 그 부품의 차트가 뜨도록
+    → BuildCreatePage.tsx: PartRow의 onSelect 인라인 콜백에도
+      addRecentProduct(part) 한 줄 추가
+    → frontend/src/pages/RecentHistoryPage.tsx 신규 — 목록(최신순),
+      각 행 클릭 시 /stats로 이동하며 location.state로 {code, title,
+      priceFormatted}를 실어 보냄(재검색 없이 바로 로드), 개별 삭제(×
+      버튼, 클릭 시 Link 네비게이션 막으려고 preventDefault+stopPropagation
+      필요), 전체 지우기, 빈 상태
+    → global.css에 .recent-list/.recent-row 및 하위 요소(.nm/.code/.time/
+      .pr/.remove) 스타일 추가 — 기존 .search-result-row와 비슷한
+      톤이지만 항목 수가 더 많아(이름/코드/시각/가격/삭제버튼) 별도 클래스로
+      분리
+
+[✓] 검증 — 이 세션 환경은 danawa.com이 막혀 있어 mock 백엔드(search가
+    쿼리와 무관하게 고정 2개 반환)로 진행
+    → 통계 탭에서 서로 다른 부품 2개를 순서대로 선택 → 최근기록에
+      최신순(나중에 본 게 위)으로 뜨는 것 확인
+    → 첫 번째 테스트 시도에서 mock의 get_product_codes가 쿼리를 무시하고
+      항상 같은 2개를 반환한다는 걸 놓쳐서 같은 상품을 두 번 선택하는
+      테스트 버그 발생 → 두 번째 검색에서 자동완성 목록의 다른 인덱스를
+      선택하도록 테스트 스크립트 수정해서 재검증
+    → 최근기록 행 클릭 → /stats로 이동 + 해당 부품 차트 즉시 로드(재검색
+      없이) 확인
+    → 개별 삭제(2개 → 1개), 전체 지우기(1개 → 0개, 목록 비면 "전체
+      지우기" 버튼도 같이 사라지는 것) 확인
+    → npm run typecheck, npm run build 통과
