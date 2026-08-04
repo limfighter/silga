@@ -191,14 +191,21 @@ _verdict_basis_cache: dict[tuple[int, int], tuple[float, tuple]] = {}
 
 def _fetch_ma_price(code: int, ma_window: int):
     """
-    최근 ma_window일 이동평균 최저가. get_price_variance(code, 1)(1개월치
-    daily 데이터, 7/14/30일 전부 커버 가능)을 불러서 compute_ma_price()로
-    계산. 히스토리 조회 자체가 실패하거나(장애/데이터 없음) "엄격" 기준
-    (services/verdict.py::compute_ma_price 참조)을 못 채우면 None —
-    호출부에서 즉시가로 fallback 처리.
+    최근 ma_window일 이동평균 최저가. get_price_variance(code, 3)(3개월치)을
+    불러서 compute_ma_price()로 계산.
+
+    by_month=1이 아니라 3을 쓰는 이유(2026-08-04 로컬 라이브 검증으로 발견):
+    다나와는 daily가 아니라 주 단위로 데이터를 줘서 1개월치는 포인트가 4개
+    안팎뿐 — compute_ma_price()의 "엄격" 기준(히스토리가 window일 전체를
+    커버해야 유효, services/verdict.py 참조)을 window=30일 때 만족하기엔
+    범위가 부족함. 3개월치를 받아두면 최근 30일 컷오프보다 훨씬 이전
+    데이터까지 확보돼서 정상 상품이면 세 window(7/14/30) 전부 판단 가능.
+
+    히스토리 조회 자체가 실패하거나(장애/데이터 없음) "엄격" 기준을 못
+    채우면(신상품 등) None — 호출부에서 즉시가로 fallback 처리.
     """
     try:
-        variance = danawa.get_price_variance(code, 1)
+        variance = danawa.get_price_variance(code, 3)
     except (requests.RequestException, TypeError):
         return None
     return compute_ma_price(variance["prices"], ma_window)

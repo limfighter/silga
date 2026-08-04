@@ -9,6 +9,8 @@ market_price=3464000 → diff_percent=2.1)로 역산해보면
 (3464000-3390000)/3390000*100 ≈ 2.18%로 근사 일치 — 이 공식이 맞다는 근거.
 """
 
+from datetime import datetime, timedelta
+
 VERDICT_THRESHOLD_PERCENT = 5.0
 
 # 판정 기준가 계산에 쓰는 이동평균 기간(일) 선택지 — main.py의 ma_window
@@ -43,32 +45,46 @@ def calc_verdict(basis_price: int, market_price: int):
 
 def compute_ma_price(prices: list, window: int):
     """
-    부품 하나의 daily 가격 시계열(danawa.get_price_variance()['prices'] 형식 —
-    [{"date", "price", "full_date"?}, ...])에서 최근 window일 이동평균을 계산.
+    부품 하나의 가격 시계열(danawa.get_price_variance()['prices'] 형식 —
+    [{"date", "price", "full_date"}, ...])에서 최근 window일 이동평균을 계산.
 
-    "엄격" 원칙 (2026-08-04 결정, 실가_인수인계.md 참조): 선택한 기간(window)만큼
-    daily 데이터가 정확히 다 있어야 유효. 데이터가 window개 미만이면 무효(None) —
-    호출부(main.py)가 즉시가로 fallback 처리함.
+    실측 확인(2026-08-04, 로컬 환경 라이브 검증): 다나와는 daily가 아니라
+    **주 단위**로 데이터를 준다 (1개월치 조회해도 포인트가 4개 안팎). 그래서
+    최초 설계였던 "정확히 window개 항목이 있어야 유효"는 폐기함 — window=7을
+    골라도 원본이 4개뿐이라 항상 무효(None) 처리되는 문제가 실측으로 확인됨.
+    대신 "엄격" 원칙을 날짜 기준으로 재정의: 최근 window일 이내 날짜의
+    데이터를 모아 평균 내되, **히스토리 자체가 window일 전체를 커버하는
+    경우에만** 유효로 침(가장 오래된 데이터가 cutoff 이전부터 있어야 함) —
+    신상품이라 히스토리가 window일보다 짧으면 무효(None), 호출부(main.py)가
+    즉시가로 fallback 처리함.
 
-    정렬 관련 주의: 다나와 API가 반환하는 리스트의 실제 정렬 순서(오름차순/
-    내림차순)를 이 프로젝트 개발 환경에서 라이브로 검증하지 못했음(네트워크
-    정책상 danawa.com 접근 차단, 실가_인수인계.md 참조) — 그래서 리스트
-    자체의 순서는 신뢰하지 않고 매번 full_date로 명시 정렬한다. full_date가
-    없는 항목이 하나라도 있으면 정렬을 신뢰할 수 없다고 보고 무효(None) 처리 —
-    순서를 잘못 추정해서 오래된 데이터를 "최근"으로 잘못 평균 내는 것보다
-    안전한 쪽(무효 처리 후 즉시가 fallback)을 택함. 로컬 환경에서 실제 응답의
-    full_date 포맷(예: "20260801")을 반드시 한 번 확인할 것.
+    full_date 포맷은 "YY-MM-DD"(예: "26-05-12")로 실측 확인됨 — datetime으로
+    명시 파싱해서 정렬/구간 계산한다(리스트 원본 순서는 신뢰하지 않음).
     """
-    if len(prices) < window:
+    if not prices or not all(p.get("full_date") for p in prices):
         return None
-
-    if not all(p.get("full_date") for p in prices):
-        return None
-
-    recent = sorted(prices, key=lambda p: p["full_date"])[-window:]
 
     try:
-        values = [int(p["price"]) for p in recent]
+        parsed = sorted(
+            ((datetime.strptime(p["full_date"], "%y-%m-%d"), p["price"]) for p in prices),
+            key=lambda pair: pair[0],
+        )
+    except ValueError:
+        return None
+
+    earliest_date = parsed[0][0]
+    latest_date = parsed[-1][0]
+    cutoff = latest_date - timedelta(days=window)
+
+    if earliest_date > cutoff:
+        return None  # 히스토리 자체가 window일보다 짧음 -> 무효
+
+    in_window = [price for date, price in parsed if date >= cutoff]
+    if not in_window:
+        return None
+
+    try:
+        values = [int(price) for price in in_window]
     except (TypeError, ValueError):
         return None
 
