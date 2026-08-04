@@ -54,6 +54,18 @@ export interface ProductDetail {
   in_stock: boolean | null;
 }
 
+export interface PricePoint {
+  date: string;
+  price: string;
+  full_date: string | null;
+}
+
+export interface PriceHistory {
+  min: string;
+  max: string;
+  prices: PricePoint[];
+}
+
 export interface BuildItemInput {
   category: string;
   code: number;
@@ -109,6 +121,9 @@ export const api = {
     request<SearchResultItem[]>(`/search?q=${encodeURIComponent(q)}`),
 
   getProduct: (code: number) => request<ProductDetail>(`/product/${code}`),
+
+  getHistory: (code: number, months: number) =>
+    request<PriceHistory>(`/product/${code}/history?months=${months}`),
 
   listBuilds: (maWindow: number) =>
     request<BuildSummary[]>(`/builds?ma_window=${maWindow}`),
