@@ -202,6 +202,8 @@ input{font-family:inherit;}
 }
 .btn-ghost:hover{border-color:var(--text-dim);color:var(--text);}
 
+.home-actions{display:flex;gap:12px;}
+
 .build-grid{
   display:grid;
   grid-template-columns:repeat(3,1fr);

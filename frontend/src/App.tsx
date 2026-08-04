@@ -7,12 +7,13 @@ import BuildDetailPage from "./pages/BuildDetailPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import SettingsPage from "./pages/SettingsPage";
 import StatsPage from "./pages/StatsPage";
+import HomePage from "./pages/HomePage";
 
 export default function App() {
   return (
     <Routes>
       <Route element={<AppShell />}>
-        <Route path="/" element={<PlaceholderPage label="홈" todo="dashboard summary" />} />
+        <Route path="/" element={<HomePage />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/build" element={<BuildListPage />} />
         <Route path="/build/new" element={<BuildCreatePage />} />
