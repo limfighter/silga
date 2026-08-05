@@ -126,8 +126,9 @@ export default function StatsPage() {
 
   return (
     <div>
+      <div className="section-label">PRICE HISTORY</div>
       <div className="build-header">
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: 24 }}>가격 히스토리</h2>
+        <h2>가격 히스토리</h2>
       </div>
 
       <div className="stats-picker">

@@ -20,6 +20,7 @@ export default function BuildListPage() {
 
   return (
     <div>
+      <div className="section-label">BUILD MANAGER</div>
       <div className="build-header">
         <h2>내 빌드</h2>
         <Link className="btn-primary" to="/build/new">+ 새 빌드</Link>

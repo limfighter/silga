@@ -45,8 +45,10 @@ export default function BuildCreatePage() {
 
   return (
     <div>
+      <div className="section-label">NEW BUILD</div>
       <div className="detail-head">
         <Link className="btn-ghost" to="/build">← 목록으로</Link>
+        <h2>새 빌드 만들기</h2>
       </div>
 
       <div className="form-shell">
