@@ -1313,3 +1313,94 @@ UI/UX도 리서치로 고도화해서 실제 시중 빌드 웹 디자인처럼" 
     npm run typecheck 통과
 
 [ ] 커밋/push 대기 — 다음 "커밋하자" 지시 대기
+
+---
+
+### 2026-08-05 (같은 날, PR #9 머지 후 이어서)
+
+#### 쿨러 스펙 필터 추가 — 제품 종류 + 지원 소켓 (backend v0.7 / frontend v0.9.1)
+
+[✓] 배경
+    → 스펙 필터 확장의 마지막 남은 카테고리. 8개 카테고리 중 쿨러만
+      카테고리 필터(CATEGORY_LABELS "쿨러/튜닝")만 있고 스펙 필터가 없었음
+    → 다나와 "쿨러/튜닝" 카테고리는 다른 카테고리와 성격이 다름 — CPU 쿨러,
+      케이스팬(시스템 쿨러), 써멀그리스, 조명기기, VGA 지지대, 튜닝 용품이
+      한 카테고리에 다 섞여 있어서 category 필터를 걸어도 CPU 쿨러가
+      안 걸러짐. 제품 종류 필터가 이 카테고리에 특히 필요한 이유
+
+[✓] 실측 — 사용자가 로컬 브라우저에서 "CPU 쿨러" 검색 결과의 #prodArea
+    outerHTML 제공(이 환경은 danawa.com 프록시 차단 지속, search.danawa.com:443
+    CONNECT 403 재확인). 필터 사이드바 + 상품목록 40건이 모두 포함된 형태
+    → 필터 그룹 46개 / attribute 체크박스 480개 파싱. 쿨러 카테고리에서
+      개인 조립PC에 쓸 만한 그룹은 3개:
+        제품 종류(687, -OR) 17종
+        냉각 방식(315758, -OR) 공랭/수랭 2종
+        인텔 소켓(6805, -AND) 15종 / AMD 소켓(6806, -AND) 15종
+      나머지 43개 그룹은 팬 베어링 40종·LCD 해상도 20종·펌프수명·풍압(정압)
+      같은 매니악한 스펙이라 제외
+    → 사용자와 논의해서 제품 종류 + 소켓 2개 채택(select 2개, 기존 GPU·
+      메인보드와 같은 최대치). 냉각 방식은 검색어("수랭"/"공랭")로 대체
+      가능해서 미채택 — 어차피 같은 카테고리 스펙끼리는 상호배타라
+      3개를 넣어도 동시에 못 씀
+
+[✓] 소켓 그룹이 인텔/AMD로 갈려 있는 케이스 — 기존 API 계약 유지 방식 결정
+    → 쿨러는 소켓 필터 그룹이 인텔(6805)/AMD(6806) 둘로 나뉘어 있어서
+      CPU·메인보드와 달리 값에 따라 속성코드 자체가 갈림
+    → 그래도 socket 파라미터 하나 + 기존 4개 값(AM5/AM4/LGA1851/LGA1700)
+      계약을 그대로 유지하려고 두 그룹을 한 딕셔너리로 합침
+      (COOLER_SOCKET_ATTRIBUTES). 프론트도 SOCKET_OPTIONS 상수를 그대로 재사용
+    → 형식이 -OR이 아니라 -AND인 것도 실측값 그대로. 쿨러 하나가 여러 소켓을
+      동시 지원해서 다중선택 결합에 AND를 쓰는 것으로 보이나, 케이스 폼팩터와
+      마찬가지로 단일 값만 지원하는 현재 구현에서는 동작 차이 없음
+    → 카테고리 간 attribute 코드 재사용 불가 원칙이 또 확인됨:
+      AM5가 CPU=41-801631-OR, 메인보드=500-801682-OR, 쿨러=6806-776764-AND로
+      전부 다름
+
+[✓] 채택값 (실측 17종/15종에서 기존 트리밍 원칙대로 축소)
+    → COOLER_TYPE_ATTRIBUTES 5종: CPU 쿨러(687-4015-OR) / 시스템 쿨러
+      (687-4017-OR) / VGA 쿨러(687-4016-OR) / M.2 SSD 쿨러(687-259565-OR) /
+      써멀그리스(687-4023-OR). 제외 12종 — VGA 지지대·가이드·수랭 부속품·
+      RAM/HDD 쿨러·팬컨트롤러·써멀패드·써멀퍼티·조명기기·방열판·팬 부속품·
+      튜닝 용품(개인 조립PC의 부품 견적 범위 밖)
+    → "써멀그리스"는 우리 API 계약 키이고 다나와 원 라벨은
+      "써멀컴파운드(그리스)" — 116px select에 안 들어가서 줄인 것
+    → COOLER_SOCKET_ATTRIBUTES 4종: AM5(6806-776764-AND) /
+      AM4(6806-213365-AND) / LGA1851(6805-906253-AND) /
+      LGA1700(6805-743326-AND). 제외 — LGA1954(미출시 차세대), LGA1200 이하
+      인텔 구형, TR5/SP6/SP5/TR4/sWRX8/sTRX4/SP3(HEDT·서버),
+      FMx/AM2,3·AM1(구형 AMD)
+
+[✓] 구현
+    → backend/app/main.py: COOLER_TYPE_ATTRIBUTES / COOLER_SOCKET_ATTRIBUTES
+      신규, cooler_type 쿼리파라미터 신규, search()에 `elif category == "쿨러"`
+      분기(cooler_type 우선, `A or B` 체이닝은 기존과 동일)
+    → frontend/src/lib/api.ts: SearchSpecParams.coolerType → cooler_type
+    → frontend/src/components/PartRow.tsx: COOLER_TYPE_OPTIONS 상수 +
+      CATEGORY_SPEC_FILTERS.쿨러 항목. 선언적 구조(PR #7 리팩터) 덕에
+      컴포넌트 로직은 한 줄도 안 건드림 — 설정 객체에 항목 하나 추가로 끝
+    → 실가_REFERENCE.md #엔드포인트-설계 표/우선순위 설명 갱신
+
+[✓] 검증
+    ① 오프라인 매핑 테스트 12케이스 전부 통과 (FastAPI TestClient +
+       requests.get mock으로 실제 요청 URL의 attribute= 값 확인):
+       cooler_type 5종/socket 4종 전달, 둘 다 오면 cooler_type 우선,
+       매칭 안 되는 값 무시, category 안 맞으면 무시,
+       그리고 CPU/메인보드/케이스 회귀 3건(쿨러 코드가 다른 카테고리로
+       새지 않는지)
+    ② 사용자가 준 실제 HTML을 fixture로 get_product_codes 실행 —
+       상품 li 40건 전부 "주변기기_쿨러/튜닝"으로, category_label="쿨러/튜닝"
+       필터 40건 통과 / "그래픽카드" 필터 0건. 쿨러 카테고리 사후 필터링도
+       이번에 처음 실제 상품목록으로 재확인됨
+    ③ mock 백엔드(위 fixture 사용) + Vite dev + Playwright로 UI 실조작 —
+       쿨러 행 select 2개/옵션 목록, 종류 선택 시 cooler_type 전달,
+       소켓 선택 시 종류 자동 해제(상호배타) + socket 전달, 부품 선택까지.
+       기존 카테고리 select 개수 회귀(GPU 2/CPU 1/메인보드 2/SSD 1/RAM 1),
+       자동완성 드롭다운이 select를 안 덮는지(PR #7에서 잡았던 겹침 회귀),
+       가장 긴 옵션 "M.2 SSD 쿨러"가 116px select에서 안 잘리는지 전부 확인
+    → npm run typecheck 통과
+
+[✓] 부수 발견 (이번 변경과 무관, 미수정)
+    → 케이스 행 select의 placeholder "지원 폼팩터 전체"가 116px 폭에서
+      "지원 폼팩터 전"으로 잘려 보임(PR #7 때부터 있던 것). 기능 영향 없고
+      이번 작업 범위 밖이라 손대지 않음 — 고치려면 placeholder를 짧게
+      줄이거나(예: "폼팩터 전체") select 폭을 늘리면 됨

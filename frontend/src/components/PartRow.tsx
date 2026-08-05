@@ -27,6 +27,7 @@ const PSU_WATTAGE_OPTIONS = [
   "1000W~1299W",
 ];
 const SSD_INTERFACE_OPTIONS = ["SATA3", "PCIe3.0x4", "PCIe4.0x4", "PCIe5.0x4"];
+const COOLER_TYPE_OPTIONS = ["CPU 쿨러", "시스템 쿨러", "VGA 쿨러", "M.2 SSD 쿨러", "써멀그리스"];
 
 interface SpecFilterDef {
   specKey: keyof SearchSpecParams;
@@ -88,6 +89,24 @@ const CATEGORY_SPEC_FILTERS: Record<string, SpecFilterDef[]> = {
       placeholder: "인터페이스",
       title: "인터페이스로 좁혀서 검색",
       options: SSD_INTERFACE_OPTIONS,
+    },
+  ],
+  // 쿨러는 다나와 "쿨러/튜닝" 카테고리에 CPU 쿨러·케이스팬·써멀그리스·조명기기가
+  // 다 섞여 있어서 제품 종류를 먼저 두고, 소켓은 CPU/메인보드와 같은 파라미터·
+  // 같은 값 목록을 쓰되 다나와 내부 코드만 쿨러 전용으로 따로 실측한 것
+  // (backend/app/main.py::COOLER_SOCKET_ATTRIBUTES 참조)
+  쿨러: [
+    {
+      specKey: "coolerType",
+      placeholder: "종류 전체",
+      title: "제품 종류로 좁혀서 검색",
+      options: COOLER_TYPE_OPTIONS,
+    },
+    {
+      specKey: "socket",
+      placeholder: "소켓 전체",
+      title: "지원하는 CPU 소켓으로 좁혀서 검색",
+      options: SOCKET_OPTIONS,
     },
   ],
 };
