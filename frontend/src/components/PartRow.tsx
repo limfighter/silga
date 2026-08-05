@@ -11,6 +11,8 @@ export interface SelectedPart {
 
 // GPU 메모리 용량(GB) 필터 옵션 — backend/app/main.py::GPU_MEMORY_ATTRIBUTES 키와 일치해야 함
 const GPU_MEMORY_OPTIONS = [4, 6, 8, 10, 11, 12, 16, 20, 24, 32, 48];
+// CPU 소켓 필터 옵션 — backend/app/main.py::CPU_SOCKET_ATTRIBUTES 키와 일치해야 함
+const CPU_SOCKET_OPTIONS = ["AM5", "AM4", "LGA1851", "LGA1700"];
 
 export default function PartRow({
   category,
@@ -25,11 +27,14 @@ export default function PartRow({
   const debounced = useDebouncedValue(input, 500); // 매너 크롤링 — 타건마다 호출 방지
   const [focused, setFocused] = useState(false);
   const [memoryGb, setMemoryGb] = useState<number | undefined>(undefined);
+  const [socket, setSocket] = useState<string | undefined>(undefined);
   const showMemoryFilter = category === "GPU";
+  const showSocketFilter = category === "CPU";
+  const showSpecFilter = showMemoryFilter || showSocketFilter;
 
   const { data, isFetching } = useQuery({
-    queryKey: ["search", debounced, category, memoryGb],
-    queryFn: () => api.search(debounced, category, memoryGb),
+    queryKey: ["search", debounced, category, memoryGb, socket],
+    queryFn: () => api.search(debounced, category, memoryGb, socket),
     enabled: debounced.trim().length > 1 && focused,
   });
 
@@ -72,7 +77,7 @@ export default function PartRow({
           />
           {showMemoryFilter && (
             <select
-              className="part-memory-filter"
+              className="part-spec-filter"
               value={memoryGb ?? ""}
               onChange={(e) => setMemoryGb(e.target.value ? Number(e.target.value) : undefined)}
               title="메모리 용량으로 좁혀서 검색"
@@ -85,11 +90,26 @@ export default function PartRow({
               ))}
             </select>
           )}
+          {showSocketFilter && (
+            <select
+              className="part-spec-filter"
+              value={socket ?? ""}
+              onChange={(e) => setSocket(e.target.value || undefined)}
+              title="소켓으로 좁혀서 검색"
+            >
+              <option value="">소켓 전체</option>
+              {CPU_SOCKET_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          )}
         </>
       )}
 
       {focused && !selected && debounced.trim().length > 1 && (
-        <div className="autocomplete-list">
+        <div className={`autocomplete-list${showSpecFilter ? " autocomplete-list--with-filter" : ""}`}>
           {isFetching && <div className="autocomplete-item" style={{ pointerEvents: "none" }}>검색 중...</div>}
           {!isFetching && data?.length === 0 && (
             <div className="autocomplete-item" style={{ pointerEvents: "none" }}>결과 없음</div>

@@ -952,5 +952,66 @@
     → backend/app/main.py::CATEGORY_LABELS 주석, 실가_REFERENCE.md
       #엔드포인트-설계를 "8개 전부 직접 검증 완료"로 최종 정정
 
-[✓] 오탈자 수정 + 라벨 검증 정정을 한 커밋으로 묶어서 커밋+push 완료
-    (사용자 지시 — "2번 하고 오탈자랑 같이 커밋하면 되지")
+[✓] 오탈자 수정(main.py GPU_MEMORY_ATTRIBUTES 주석 "값 하나만" → "값 하나만
+    허용")
+
+---
+
+### 2026-08-05 (같은 날, PR #6 머지 후 이어서 — 코드리뷰 요청에서 이어짐)
+
+#### 폴리시 2건 + CPU 소켓 스펙 필터 신규
+
+[✓] 배경
+    → 사용자가 머지된 PR #6("지금 작업 어떤거 같아 깔끔해?")에 코드 리뷰를
+      요청 → 리뷰 중 CATEGORY_LABELS 8개 라벨 검증 상태 재확인(위 항목들)
+      + 리뷰에서 나온 두 가지 폴리시 항목 + 다음 스펙 필터로 CPU 소켓 진행
+
+[✓] 폴리시 1 — 자동완성 드롭다운이 GPU 행 메모리 select를 덮던 문제
+    → `.autocomplete-list`가 `right:16px`로 고정돼 있어서 GPU 행에서 select가
+      추가된 뒤에도 여전히 select 영역까지 뒤덮고 있었음(select 자체는 위에
+      떠서 클릭은 되지만 시각적으로 겹침)
+    → PartRow.tsx에서 showSpecFilter(메모리/소켓 select 둘 중 하나라도
+      보이는 행)일 때 `autocomplete-list--with-filter` modifier 클래스를
+      추가로 붙이고, CSS에서 `right:126px`(select 폭 96px + row gap 14px +
+      기존 16px)로 넓힘
+    → Playwright로 재검증: dropdown bounding box(x=244, width=380, 즉 우측
+      끝 624) vs select bounding box(x=638) — 겹침 없음, 14px 갭 확인
+
+[✓] 폴리시 2 — 인수인계.md 스테일 체크리스트 정정
+    → "danawa_patched.py 실가 프로젝트 정식 경로 편입" 항목이 실제로는
+      오래전에 backend/app/services/danawa.py로 편입 완료됐는데 문서
+      체크박스만 `[ ]`로 계속 방치돼 있던 걸 발견 → `[x]`로 정정하고 완료
+      근거(파일 출처 명시된 도크스트링, 이후 세션들의 계속된 패치 이력)
+      덧붙임
+
+[✓] CPU 소켓 스펙 필터 신규 구현 (backend/app/main.py::CPU_SOCKET_ATTRIBUTES)
+    → GPU 메모리 용량과 동일 패턴 재사용(danawa.get_product_codes의 범용
+      attribute 인자를 그대로 씀 — 스크래퍼 코드 변경 없음, 속성코드만
+      41 = 소켓 구분)
+    → 실측: AMD는 이미 확보해둔 "9800X3D" 검색 결과에 필터 사이드바가
+      통째로 포함돼 있어서 추가 자료 없이 바로 AM5/AM4 등 코드 확보.
+      인텔 소켓은 "9800X3D"(AMD 칩) 검색 결과엔 아예 안 나타나서(다나와가
+      현재 결과와 무관한 옵션값은 필터에 안 보여줌) "i5-14600K"로 한 번 더
+      검색해서 LGA1851/LGA1700 등 확보 — 카테고리 필터 라벨 검증 때와
+      달리 이번엔 "검색어에 따라 관련 옵션만 노출된다"는 danawa UI 특성
+      때문에 제조사별로 검색을 나눠야 했던 케이스
+    → 현재 시장에서 신품으로 유통되는 4개(AM5/AM4/LGA1851/LGA1700)만
+      채택 — 워크스테이션/서버/구형 소켓(sWRX8·sTRX4·TR4·sTR5·SP3·FM2·
+      AM3+·AM3, 2066·4677·4189·3647·2011 계열·1366·1150·1155·1156·775·
+      1200·1151v2·1151)은 실측은 됐지만 GPU 메모리 데이터센터 값 제외
+      때와 같은 원칙으로 제외
+    → frontend/src/lib/api.ts::api.search에 socket 파라미터 추가,
+      PartRow.tsx의 select 클래스명을 `.part-memory-filter` →
+      `.part-spec-filter`로 일반화(이제 GPU 메모리/CPU 소켓 두 필터가
+      같은 스타일 공유)
+    → 검증: FastAPI 레벨(category=CPU&socket=AM5 → attribute 정상 전달,
+      category=GPU&socket=AM5 → 무시, 오매칭 소켓 → 무시 3케이스),
+      Playwright 실브라우저(CPU 행에만 소켓 select 노출·옵션 4개 정확,
+      GPU/RAM 행엔 없음, AM5 선택 후 검색 시 실제
+      `category=CPU&socket=AM5` 쿼리로 요청 나가는 것, 필터링된 자동완성
+      결과 표시까지) 둘 다 확인
+
+[ ] 커밋/push 대기 — 위 3건(폴리시 2 + CPU 소켓 필터) + 앞서 완료된
+    오탈자 수정/8개 라벨 검증 정정까지 전부 한 커밋으로 묶어서 커밋+push
+    예정(사용자 지시 — "3번 찾고 1,2 고치자", "한번에 하게"). PR #6은
+    이미 머지·종료라 이번 커밋은 새 PR(#7 예정) 대상

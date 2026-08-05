@@ -84,6 +84,20 @@ GPU_MEMORY_ATTRIBUTES = {
     48: "663-339463-OR",
 }
 
+# /search?socket= 값(CPU 전용, category=CPU일 때만 적용) →
+# danawa.get_product_codes(attribute=...) 전달값 매핑. GPU_MEMORY_ATTRIBUTES와
+# 동일한 방식(속성코드 41 = 소켓 구분). AMD는 "9800X3D", 인텔은 "i5-14600K"
+# 검색으로 각각 실측(실가_HISTORY.md 2026-08-05 참조) — 워크스테이션/서버/구형
+# 소켓(sWRX8·sTRX4·TR4·sTR5·SP3·FM2·AM3+·AM3, 2066·4677·4189·3647·2011 계열·
+# 1366·1150·1155·1156·775, 1200·1151v2·1151)은 현재 시장에서 신품으로 거의
+# 안 팔려서 제외 — 현행 유통 소켓 4개만 채택
+CPU_SOCKET_ATTRIBUTES = {
+    "AM5": "41-801631-OR",
+    "AM4": "41-212331-OR",
+    "LGA1851": "41-906295-OR",
+    "LGA1700": "41-748240-OR",
+}
+
 
 def _validate_ma_window(ma_window: int) -> int:
     """
@@ -127,13 +141,23 @@ def search(
         description="GPU 메모리 용량(GB) 스펙 필터 — category=GPU일 때만 적용, "
                      "그 외에는 무시. GPU_MEMORY_ATTRIBUTES에 없는 값도 무시",
     ),
+    socket: Optional[str] = Query(
+        None,
+        description="CPU 소켓 스펙 필터(AM5/AM4/LGA1851/LGA1700) — category=CPU일 때만 적용, "
+                     "그 외에는 무시. CPU_SOCKET_ATTRIBUTES에 없는 값도 무시",
+    ),
 ):
     """
-    GET /search?q={keyword}&category={CATEGORY_LABELS 키, 선택}&memory_gb={GPU 전용, 선택} →
+    GET /search?q={keyword}&category={CATEGORY_LABELS 키, 선택}&memory_gb={GPU 전용, 선택}&socket={CPU 전용, 선택} →
         [{code, title, price, price_formatted}, ...]
     """
     category_label = CATEGORY_LABELS.get(category) if category else None
-    attribute = GPU_MEMORY_ATTRIBUTES.get(memory_gb) if category == "GPU" and memory_gb else None
+    if category == "GPU" and memory_gb:
+        attribute = GPU_MEMORY_ATTRIBUTES.get(memory_gb)
+    elif category == "CPU" and socket:
+        attribute = CPU_SOCKET_ATTRIBUTES.get(socket)
+    else:
+        attribute = None
     try:
         results = danawa.get_product_codes(q, category_label=category_label, attribute=attribute)
     except requests.RequestException:
