@@ -5,8 +5,9 @@ export default function SettingsPage() {
 
   return (
     <div>
+      <div className="section-label">PREFERENCES</div>
       <div className="build-header">
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: 24 }}>설정</h2>
+        <h2>설정</h2>
       </div>
 
       <div className="form-shell">

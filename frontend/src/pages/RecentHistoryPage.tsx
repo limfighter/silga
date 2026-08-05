@@ -32,8 +32,9 @@ export default function RecentHistoryPage() {
 
   return (
     <div>
+      <div className="section-label">RECENTLY VIEWED</div>
       <div className="build-header">
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: 24 }}>최근기록</h2>
+        <h2>최근기록</h2>
         {items.length > 0 && (
           <button className="btn-ghost" onClick={handleClearAll}>전체 지우기</button>
         )}

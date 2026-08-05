@@ -42,7 +42,10 @@ export default function AppShell() {
               <path d="M2.5 5.5h15M2.5 10h15M2.5 14.5h15" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
           </button>
-          <div className="brand-mark" />
+          <div className="brand">
+            <span className="brand-mark">실</span>
+            <span className="brand-word">실가</span>
+          </div>
         </div>
 
         <nav className="side-nav">
@@ -69,7 +72,9 @@ export default function AppShell() {
 
       <div className="main">
         <div className="topbar">
-          <h1>{titleFor(location.pathname)}</h1>
+          <span className="topbar-kicker">
+            실가<b> / {titleFor(location.pathname)}</b>
+          </span>
         </div>
         <div className="page">
           <Outlet />

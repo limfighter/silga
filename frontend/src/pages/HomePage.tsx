@@ -28,8 +28,9 @@ export default function HomePage() {
 
   return (
     <div>
+      <div className="section-label">DASHBOARD</div>
       <div className="build-header">
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: 24 }}>홈</h2>
+        <h2>홈</h2>
       </div>
 
       <div className="home-actions">
@@ -38,7 +39,7 @@ export default function HomePage() {
       </div>
 
       <div className="build-header" style={{ marginTop: 36 }}>
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: 18 }}>최근 빌드</h2>
+        <h2 style={{ fontSize: 18 }}>최근 빌드</h2>
         {data && data.length > 0 && (
           <Link className="btn-ghost" to="/build">전체보기</Link>
         )}

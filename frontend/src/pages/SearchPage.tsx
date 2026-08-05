@@ -16,8 +16,9 @@ export default function SearchPage() {
 
   return (
     <div>
+      <div className="section-label">REAL-TIME SCAN</div>
       <div className="build-header">
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: 24 }}>부품 검색</h2>
+        <h2>부품 검색</h2>
       </div>
 
       <div className="search-box">

@@ -57,8 +57,9 @@ export default function FavoritesPage() {
 
   return (
     <div>
+      <div className="section-label">SAVED PARTS</div>
       <div className="build-header">
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: 24 }}>즐겨찾기</h2>
+        <h2>즐겨찾기</h2>
       </div>
 
       <div className="stats-picker">
