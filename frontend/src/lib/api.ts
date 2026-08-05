@@ -40,12 +40,13 @@ export interface SearchResultItem {
 // (backend/app/main.py::search()의 category별 분기 참조)
 export interface SearchSpecParams {
   memoryGb?: number; // GPU 전용
-  socket?: string; // CPU/메인보드 전용
+  socket?: string; // CPU/메인보드/쿨러 전용
   chipset?: string; // GPU 전용
   formfactor?: string; // 메인보드/케이스 전용
   ramType?: string; // RAM 전용
   wattage?: string; // 파워 전용
   interface?: string; // SSD 전용
+  coolerType?: string; // 쿨러 전용
 }
 
 export interface ProductVariant {
@@ -148,6 +149,7 @@ export const api = {
     if (spec?.ramType) params.set("ram_type", spec.ramType);
     if (spec?.wattage) params.set("wattage", spec.wattage);
     if (spec?.interface) params.set("interface", spec.interface);
+    if (spec?.coolerType) params.set("cooler_type", spec.coolerType);
     return request<SearchResultItem[]>(`/search?${params.toString()}`);
   },
 

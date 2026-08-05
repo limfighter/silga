@@ -181,6 +181,46 @@ SSD_INTERFACE_ATTRIBUTES = {
     "PCIe5.0x4": "14690-859759-OR",
 }
 
+# /search?cooler_type= 값(쿨러 전용, category=쿨러일 때만 적용) →
+# danawa.get_product_codes(attribute=...) 전달값 매핑(속성코드 687 = 제품 종류,
+# "CPU 쿨러" 검색 결과 필터 사이드바에서 실측). 다나와 "쿨러/튜닝" 카테고리는
+# 다른 카테고리와 달리 성격이 다른 상품이 한 카테고리에 섞여 있어서
+# (CPU 쿨러 + 케이스팬 + 써멀그리스 + 조명기기 + VGA 지지대 …) category
+# 필터만으로는 CPU 쿨러가 안 걸러짐 — 이 카테고리에 제품 종류 필터가 특히
+# 필요한 이유. 실측된 17종 중 VGA 지지대/가이드/수랭 부속품/RAM·HDD 쿨러/
+# 팬컨트롤러/써멀패드·퍼티/조명기기/방열판/팬 부속품/튜닝 용품은 개인 조립
+# PC의 부품 견적 범위 밖이라 기존 트리밍 원칙대로 제외하고 5종만 채택.
+# 키는 우리 API 계약 값이라 다나와 라벨과 꼭 같지는 않음("써멀그리스"의
+# 다나와 원 라벨은 "써멀컴파운드(그리스)") — frontend/src/components/
+# PartRow.tsx의 COOLER_TYPE_OPTIONS와 반드시 키를 맞출 것
+COOLER_TYPE_ATTRIBUTES = {
+    "CPU 쿨러": "687-4015-OR",
+    "시스템 쿨러": "687-4017-OR",
+    "VGA 쿨러": "687-4016-OR",
+    "M.2 SSD 쿨러": "687-259565-OR",
+    "써멀그리스": "687-4023-OR",
+}
+
+# /search?socket= 값(쿨러 전용, category=쿨러일 때만 적용) →
+# danawa.get_product_codes(attribute=...) 전달값 매핑. 쿨러 카테고리는 소켓
+# 필터 그룹이 인텔(속성코드 6805)/AMD(6806) 둘로 나뉘어 있어서 CPU·메인보드와
+# 달리 값에 따라 속성코드 자체가 갈림 — 그래도 우리 API 계약(socket 파라미터,
+# AM5/AM4/LGA1851/LGA1700 4개)은 다른 카테고리와 동일하게 유지하려고 한
+# 딕셔너리로 합쳤음. 형식이 -OR이 아니라 -AND인 것도 실측값 그대로(쿨러
+# 하나가 여러 소켓을 동시 지원해서 다중선택 결합에 AND를 쓰는 것으로 보이나,
+# 케이스 폼팩터와 마찬가지로 단일 값만 지원하는 현재 구현에서는 차이 없음).
+# CPU/메인보드 카테고리와 값 이름은 같지만 코드는 전혀 다름 — 카테고리 간
+# attribute 코드 재사용 불가 원칙이 여기서도 그대로 확인됨.
+# 워크스테이션/서버/구형 소켓(LGA1954는 미출시 차세대, LGA1200 이하 인텔
+# 구형, TR5/SP6/SP5/TR4/sWRX8/sTRX4/SP3 등 HEDT·서버, FMx/AM2,3·AM1 구형
+# AMD)은 CPU_SOCKET_ATTRIBUTES와 동일한 기준으로 제외
+COOLER_SOCKET_ATTRIBUTES = {
+    "AM5": "6806-776764-AND",
+    "AM4": "6806-213365-AND",
+    "LGA1851": "6805-906253-AND",
+    "LGA1700": "6805-743326-AND",
+}
+
 
 def _validate_ma_window(ma_window: int) -> int:
     """
@@ -226,7 +266,7 @@ def search(
     ),
     socket: Optional[str] = Query(
         None,
-        description="소켓 스펙 필터(AM5/AM4/LGA1851/LGA1700) — category=CPU 또는 메인보드일 때만 "
+        description="소켓 스펙 필터(AM5/AM4/LGA1851/LGA1700) — category=CPU/메인보드/쿨러일 때만 "
                      "적용(카테고리별로 다나와 내부 코드가 달라 각각 다른 매핑 사용), 그 외 무시. "
                      "매칭 안 되는 값도 무시",
     ),
@@ -255,11 +295,17 @@ def search(
         description="SSD 인터페이스 스펙 필터(SATA3/PCIe3.0x4/PCIe4.0x4/PCIe5.0x4) — "
                      "category=SSD일 때만 적용, 그 외 무시",
     ),
+    cooler_type: Optional[str] = Query(
+        None,
+        description="쿨러 제품 종류 스펙 필터(CPU 쿨러/시스템 쿨러/VGA 쿨러/M.2 SSD 쿨러/써멀그리스) — "
+                     "category=쿨러일 때만 적용, 그 외 무시. socket과 동시 지정 시 cooler_type 우선 적용",
+    ),
 ):
     """
     GET /search?q={keyword}&category={CATEGORY_LABELS 키, 선택}&memory_gb={GPU 전용}&chipset={GPU 전용}&
-        socket={CPU/메인보드 전용}&formfactor={메인보드/케이스 전용}&ram_type={RAM 전용}&
-        wattage={파워 전용}&interface={SSD 전용} (스펙 파라미터는 전부 선택, category와 안 맞으면 무시) →
+        socket={CPU/메인보드/쿨러 전용}&formfactor={메인보드/케이스 전용}&ram_type={RAM 전용}&
+        wattage={파워 전용}&interface={SSD 전용}&cooler_type={쿨러 전용}
+        (스펙 파라미터는 전부 선택, category와 안 맞으면 무시) →
         [{code, title, price, price_formatted}, ...]
     """
     category_label = CATEGORY_LABELS.get(category) if category else None
@@ -278,6 +324,8 @@ def search(
         attribute = PSU_WATTAGE_ATTRIBUTES.get(wattage)
     elif category == "SSD":
         attribute = SSD_INTERFACE_ATTRIBUTES.get(interface)
+    elif category == "쿨러":
+        attribute = COOLER_TYPE_ATTRIBUTES.get(cooler_type) or COOLER_SOCKET_ATTRIBUTES.get(socket)
     try:
         results = danawa.get_product_codes(q, category_label=category_label, attribute=attribute)
     except requests.RequestException:
