@@ -3,13 +3,21 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useMaWindow } from "../lib/settings";
 
-// 게이지 각도 매핑: diff_percent를 -30%~+30% 구간으로 클램프해서 -80deg~+80deg에 선형 매핑.
-// (임계값과 마찬가지로 REFERENCE.md에 수치가 없어 임의로 잡은 시각화용 가정값)
-function needleAngle(diffPercent: number | null): number {
-  if (diffPercent === null) return -6; // market_price 없을 때 목업 기본값 그대로
-  const clamped = Math.max(-30, Math.min(30, diffPercent));
-  return (clamped / 30) * 80;
+// 게이지 위치 매핑: diff_percent를 -GAUGE_RANGE~+GAUGE_RANGE 구간으로 클램프해서
+// 바 위 0~100% 위치로 선형 매핑 (범위 자체는 REFERENCE.md에 수치가 없어 임의로 잡은
+// 시각화용 가정값). 적정가 음영 구간은 services/verdict.py의 VERDICT_THRESHOLD_PERCENT(±5%)를
+// 그대로 반영.
+const GAUGE_RANGE = 30;
+const VERDICT_THRESHOLD_PERCENT = 5;
+
+function markerPosition(diffPercent: number | null): number {
+  if (diffPercent === null) return 50;
+  const clamped = Math.max(-GAUGE_RANGE, Math.min(GAUGE_RANGE, diffPercent));
+  return ((clamped + GAUGE_RANGE) / (GAUGE_RANGE * 2)) * 100;
 }
+
+const ZONE_LEFT = ((-VERDICT_THRESHOLD_PERCENT + GAUGE_RANGE) / (GAUGE_RANGE * 2)) * 100;
+const ZONE_WIDTH = ((VERDICT_THRESHOLD_PERCENT * 2) / (GAUGE_RANGE * 2)) * 100;
 
 function verdictTagClass(verdict: string | null): string {
   if (verdict === "고가") return "verdict-tag high";
@@ -37,7 +45,7 @@ export default function BuildDetailPage() {
     );
   }
 
-  const angle = needleAngle(data.diff_percent);
+  const markerPos = markerPosition(data.diff_percent);
 
   return (
     <div>
@@ -49,19 +57,6 @@ export default function BuildDetailPage() {
 
       <div className="verdict">
         <div className="gauge-card">
-          <svg viewBox="0 0 340 200" width="100%">
-            <path d="M 20 170 A 150 150 0 0 1 121 34" fill="none" stroke="#5eead4" strokeWidth="16" strokeLinecap="round" opacity="0.85" />
-            <path d="M 121 34 A 150 150 0 0 1 219 34" fill="none" stroke="#f2f3f5" strokeWidth="16" strokeLinecap="round" opacity="0.5" />
-            <path d="M 219 34 A 150 150 0 0 1 320 170" fill="none" stroke="#ff3b6e" strokeWidth="16" strokeLinecap="round" opacity="0.85" />
-            <g className="needle" style={{ transform: `rotate(${angle}deg)`, transition: "transform 1s cubic-bezier(.2,.9,.25,1)" }}>
-              <line x1="170" y1="170" x2="170" y2="42" stroke="#5eead4" strokeWidth="3" />
-              <circle cx="170" cy="170" r="9" fill="#5eead4" />
-            </g>
-            <text x="30" y="196" fill="#8b8f97" fontFamily="JetBrains Mono" fontSize="11">저가</text>
-            <text x="152" y="24" fill="#8b8f97" fontFamily="JetBrains Mono" fontSize="11">적정</text>
-            <text x="284" y="196" fill="#8b8f97" fontFamily="JetBrains Mono" fontSize="11">고가</text>
-          </svg>
-
           {data.verdict ? (
             <div className={verdictTagClass(data.verdict)}>{data.verdict} 판정</div>
           ) : (
@@ -80,6 +75,16 @@ export default function BuildDetailPage() {
               {data.verdict_confidence === "low" && " · 일부 부품은 데이터 부족으로 즉시가 대체"}
             </div>
           )}
+
+          <div className="gauge-track">
+            <div className="gauge-zone" style={{ left: `${ZONE_LEFT}%`, width: `${ZONE_WIDTH}%` }} />
+            <div className="gauge-marker" style={{ left: `${markerPos}%` }} />
+          </div>
+          <div className="gauge-labels">
+            <span>저가</span>
+            <span>적정</span>
+            <span>고가</span>
+          </div>
         </div>
 
         <div className="breakdown">
