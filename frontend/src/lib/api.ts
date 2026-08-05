@@ -126,8 +126,12 @@ export interface FavoriteItem {
 // ---- API 함수 ----
 
 export const api = {
-  search: (q: string) =>
-    request<SearchResultItem[]>(`/search?q=${encodeURIComponent(q)}`),
+  search: (q: string, category?: string, memoryGb?: number) =>
+    request<SearchResultItem[]>(
+      `/search?q=${encodeURIComponent(q)}` +
+        (category ? `&category=${encodeURIComponent(category)}` : "") +
+        (memoryGb ? `&memory_gb=${memoryGb}` : "")
+    ),
 
   getProduct: (code: number) => request<ProductDetail>(`/product/${code}`),
 

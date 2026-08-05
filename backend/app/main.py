@@ -41,6 +41,48 @@ from app.database import Base, engine, get_db
 from app.models import Product, Build, BuildItem, Favorite
 from app.timezone_utils import now_kst
 
+# /search?category= 값 → danawa.get_product_codes(category_label=...) 매핑.
+# 값은 다나와 상품 li의 productItem_categoryInfo_{code} 필드 마지막 조각과
+# 정확히 일치해야 함 — GPU("그래픽카드")만 실제 상품 HTML로 직접 검증됨,
+# 나머지 7개는 검색결과 페이지의 "관련 카테고리" 트리 라벨에서 확보(실가_HISTORY.md
+# 2026-08-05 참조). CATEGORY_LABELS에 없는 category 값은 필터 없이 무시됨
+# (frontend/src/pages/BuildCreatePage.tsx의 CATEGORIES 상수와 키 일치해야 함).
+CATEGORY_LABELS = {
+    "CPU": "CPU",
+    "GPU": "그래픽카드",
+    "메인보드": "메인보드",
+    "RAM": "RAM",
+    "SSD": "SSD",
+    "케이스": "케이스",
+    "파워": "파워",
+    "쿨러": "쿨러/튜닝",
+}
+
+# /search?memory_gb= 값(GPU 전용, category=GPU일 때만 적용) →
+# danawa.get_product_codes(attribute=...) 전달값 매핑. "{속성코드}-{값코드}-OR"
+# 형식은 다나와 상세검색 필터 체크박스 클릭 시 실측 URL에서 그대로 가져온 값
+# (속성코드 663 = GPU 메모리 용량, 실가_HISTORY.md 2026-08-05 참조). 이 필터는
+# category_label과 달리 다나와 서버측 요청 자체를 좁히는 필터라 사후 필터링이
+# 아님 — 다중 선택(예: 12GB+16GB 동시)은 결합 규칙 미검증이라 미지원, 값 하나만
+GPU_MEMORY_ATTRIBUTES = {
+    1: "663-3930-OR",
+    2: "663-41941-OR",
+    3: "663-110065-OR",
+    4: "663-110066-OR",
+    5: "663-214850-OR",
+    6: "663-137546-OR",
+    8: "663-188704-OR",
+    10: "663-693454-OR",
+    11: "663-213321-OR",
+    12: "663-213322-OR",
+    16: "663-188705-OR",
+    20: "663-765568-OR",
+    24: "663-306820-OR",
+    32: "663-306823-OR",
+    48: "663-339463-OR",
+}
+
+
 def _validate_ma_window(ma_window: int) -> int:
     """
     ma_window 쿼리파라미터 검증. Literal[7,14,30] 타입 힌트로 FastAPI가
@@ -71,12 +113,27 @@ app.add_middleware(
 
 
 @app.get("/search", response_model=list[SearchResultItem])
-def search(q: str = Query(..., min_length=1, description="검색 키워드")):
+def search(
+    q: str = Query(..., min_length=1, description="검색 키워드"),
+    category: Optional[str] = Query(
+        None,
+        description="CPU/GPU/메인보드/RAM/SSD/케이스/파워/쿨러 중 하나 — "
+                     "지정 시 해당 카테고리 상품만 반환 (매칭 안 되는 값은 무시)",
+    ),
+    memory_gb: Optional[int] = Query(
+        None,
+        description="GPU 메모리 용량(GB) 스펙 필터 — category=GPU일 때만 적용, "
+                     "그 외에는 무시. GPU_MEMORY_ATTRIBUTES에 없는 값도 무시",
+    ),
+):
     """
-    GET /search?q={keyword} → [{code, title, price, price_formatted}, ...]
+    GET /search?q={keyword}&category={CATEGORY_LABELS 키, 선택}&memory_gb={GPU 전용, 선택} →
+        [{code, title, price, price_formatted}, ...]
     """
+    category_label = CATEGORY_LABELS.get(category) if category else None
+    attribute = GPU_MEMORY_ATTRIBUTES.get(memory_gb) if category == "GPU" and memory_gb else None
     try:
-        results = danawa.get_product_codes(q)
+        results = danawa.get_product_codes(q, category_label=category_label, attribute=attribute)
     except requests.RequestException:
         # 데이터 소스 자체 장애 (다나와 연결 실패) — 상품 없음과 구분
         raise HTTPException(status_code=503, detail="데이터 소스(다나와) 연결 실패")

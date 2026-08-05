@@ -338,6 +338,20 @@ input{font-family:inherit;}
 }
 .part-input::placeholder{color:var(--text-faint);}
 .part-input:focus{outline:none;border-color:var(--cyan);}
+.part-memory-filter{
+  appearance:none;
+  -webkit-appearance:none;
+  flex:0 0 96px;
+  width:96px;
+  min-width:0;
+  background:var(--surface-2);
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:9px 8px;
+  color:var(--text);
+  font-size:12.5px;
+}
+.part-memory-filter:focus{outline:none;border-color:var(--cyan);}
 .part-selected{
   flex:1;
   display:flex;
