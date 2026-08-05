@@ -9,6 +9,9 @@ export interface SelectedPart {
   priceFormatted: string | null;
 }
 
+// GPU 메모리 용량(GB) 필터 옵션 — backend/app/main.py::GPU_MEMORY_ATTRIBUTES 키와 일치해야 함
+const GPU_MEMORY_OPTIONS = [4, 6, 8, 10, 11, 12, 16, 20, 24, 32, 48];
+
 export default function PartRow({
   category,
   selected,
@@ -21,10 +24,12 @@ export default function PartRow({
   const [input, setInput] = useState("");
   const debounced = useDebouncedValue(input, 500); // 매너 크롤링 — 타건마다 호출 방지
   const [focused, setFocused] = useState(false);
+  const [memoryGb, setMemoryGb] = useState<number | undefined>(undefined);
+  const showMemoryFilter = category === "GPU";
 
   const { data, isFetching } = useQuery({
-    queryKey: ["search", debounced, category],
-    queryFn: () => api.search(debounced, category),
+    queryKey: ["search", debounced, category, memoryGb],
+    queryFn: () => api.search(debounced, category, memoryGb),
     enabled: debounced.trim().length > 1 && focused,
   });
 
@@ -55,15 +60,32 @@ export default function PartRow({
           <span className="pr">{selected.priceFormatted ?? "-"}</span>
         </div>
       ) : (
-        <input
-          className="part-input"
-          type="text"
-          placeholder="부품을 검색하세요"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setTimeout(() => setFocused(false), 150)}
-        />
+        <>
+          <input
+            className="part-input"
+            type="text"
+            placeholder="부품을 검색하세요"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setTimeout(() => setFocused(false), 150)}
+          />
+          {showMemoryFilter && (
+            <select
+              className="part-memory-filter"
+              value={memoryGb ?? ""}
+              onChange={(e) => setMemoryGb(e.target.value ? Number(e.target.value) : undefined)}
+              title="메모리 용량으로 좁혀서 검색"
+            >
+              <option value="">용량 전체</option>
+              {GPU_MEMORY_OPTIONS.map((gb) => (
+                <option key={gb} value={gb}>
+                  {gb}GB
+                </option>
+              ))}
+            </select>
+          )}
+        </>
       )}
 
       {focused && !selected && debounced.trim().length > 1 && (

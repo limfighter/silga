@@ -831,3 +831,67 @@
 
 [ ] 커밋/push 대기 — 다음 "커밋 하자" 지시 대기 (브랜치
     claude/danawa-scraper-filters-bryp6q)
+
+---
+
+### 2026-08-05 (같은 날, 이어서)
+
+#### v0.5 이어서 — GPU 메모리 용량 스펙 필터 구현
+
+[✓] 배경
+    → 위 "보류" 항목(스펙 속성 필터)에 대해 사용자가 "GPU 메모리 용량부터"로
+      범위를 지정. 이미 확보해둔 GPU 필터 사이드바 실측 HTML에 메모리 용량
+      그룹(속성코드 663) 체크박스 값이 전부 있어서(라벨: 1GB 미만 ~ 96GB
+      총 19개 값, value 속성 형식 "663-{값코드}-OR") 추가 자료 수집 없이
+      바로 구현. 1GB/3GB/5GB/1GB 미만 및 94/96/80/72GB(데이터센터급)는
+      개인 PC 조립 도구 성격상 제외하고 실사용 범위(4~48GB) 11개만 채택
+
+[✓] backend/app/services/danawa.py::get_product_codes에 attribute 인자 추가
+    → category_label과 다른 성격 — 이건 사후 필터링이 아니라 다나와 요청
+      URL 자체에 attribute={값} 파라미터로 그대로 전달(다나와 상세검색
+      필터 체크박스 클릭 시 실측 URL에서 확인한 형식 그대로 사용, 2026-08-05
+      이전 항목 참조). 값 하나만 지원 — 다중 선택 시 결합 규칙(콤마 구분?
+      반복 파라미터?)이 여전히 미검증이라 리스트 지원은 보류
+    → 검증: requests.get mock으로 호출 URL에 attribute=663-188705-OR가
+      실제로 포함되는지 확인(오프라인, 라이브 호출 불가는 계속 동일)
+
+[✓] backend/app/main.py — GPU_MEMORY_ATTRIBUTES 상수(GB → attribute 코드,
+    11개) + GET /search에 memory_gb 쿼리파라미터 추가
+    → category=GPU일 때만 적용, 그 외에는 무시(다른 카테고리에 메모리
+      용량 개념 자체가 없거나 의미가 달라서 — 예: RAM 용량은 별도 속성
+      코드일 것, 미확보)
+    → FastAPI TestClient로 category=GPU&memory_gb=16 → attribute 정상 전달,
+      category=CPU&memory_gb=16 → attribute 미전달(무시) 두 경우 확인
+
+[✓] 프론트 연동 — frontend/src/lib/api.ts::api.search(q, category?,
+    memoryGb?), frontend/src/components/PartRow.tsx에 GPU 행 전용 메모리
+    용량 select 추가(GPU_MEMORY_OPTIONS 상수 — backend GPU_MEMORY_ATTRIBUTES
+    키와 일치시켜야 함, 값 어긋나면 필터가 조용히 무시되니 주의)
+
+[✓] CLAUDE.md "UI 변경은 브라우저에서 직접 확인 후 완료 보고" 원칙에 따라
+    mock 백엔드(danawa.get_product_codes를 monkeypatch) + 실행 중인 Vite
+    dev 서버를 Playwright(사전 설치된 Chromium, /opt/pw-browsers/chromium)로
+    직접 조작해서 검증 — 이 과정에서 실제 레이아웃 버그 발견+수정:
+    → 증상: GPU 행에서 메모리 용량 select가 폭 96px 지정에도 불구하고
+      580px까지 늘어나고, 옆 텍스트 input이 30px로 찌그러지는 현상을
+      스크린샷+bounding box 실측으로 확인
+    → 원인: `<select>`에 appearance 리셋이 없으면 크롬이 네이티브 컨트롤
+      렌더링을 우선해 명시한 width를 무시하고 옵션 텍스트 폭 기준으로
+      늘어나는 경우가 있음(width:96px가 getComputedStyle에서 580px로
+      나오는 걸 확인 — flex-shrink:0은 정상 적용됐는데 width만 무시되는
+      비일관 현상)
+    → 해결: `.part-memory-filter`에 appearance:none +
+      -webkit-appearance:none + flex:0 0 96px + min-width:0 추가 → 수정
+      후 재실측으로 input 378px / select 96px 정상 분할 확인, 스크린샷
+      재확인(입력값 "RTX 5070 Ti" + "16GB" 선택 시 자동완성이 필터링된
+      1건만 표시되는 것까지 눈으로 확인)
+    → 검증 후 mock 백엔드/Vite dev 서버 프로세스 전부 종료(잔류 프로세스
+      없음 확인)
+
+[ ] 다음에 이어갈 것: 다른 카테고리/스펙(예: CPU 소켓, RAM 규격, 메인보드
+    폼팩터) 확장은 GPU 때와 동일한 절차(다나와 필터 사이드바에서 체크박스
+    클릭 → 바뀐 URL의 attribute= 값 확인) 필요 — 구체적 스펙이 정해지면
+    진행
+
+[ ] 커밋/push 여전히 대기 — 다음 "커밋 하자" 지시 대기 (브랜치
+    claude/danawa-scraper-filters-bryp6q)

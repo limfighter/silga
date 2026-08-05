@@ -31,7 +31,7 @@ def _get_header(host: str, referer: str = None):
     return header
 
 
-def get_product_codes(keyword: str, category_label: str = None) -> list:
+def get_product_codes(keyword: str, category_label: str = None, attribute: str = None) -> list:
     """
     검색어로 상품 코드 목록을 조회한다.
 
@@ -51,10 +51,20 @@ def get_product_codes(keyword: str, category_label: str = None) -> list:
         hidden_cate_sub_c1/c2/c3는 첫 번째 상품에서만 발견돼 상품별 필드가
         아닌 것으로 보여 사용하지 않음 (실가_HISTORY.md 2026-08-05 참조).
         None이면 기존과 동일하게 전체 반환
+      - attribute 인자 신규 추가(2026-08-05): 다나와 상세검색 스펙 필터
+        (제조사 제외 — 메모리 용량/칩셋 등)를 그대로 전달. 다나와 검색 페이지에서
+        필터 체크박스 클릭 시 URL에 그대로 붙는 "{속성코드}-{값코드}-OR" 형식
+        문자열(예: "663-188705-OR" = GPU 메모리 용량 16GB) 하나를 그대로 넘기면
+        요청 URL에 attribute= 파라미터로 포함됨. category_label과 달리 이건
+        요청 자체를 좁히는 다나와 서버측 필터 — 값 하나만 지원(다중 선택 시
+        결합 규칙 미검증이라 리스트/콤마 조합은 아직 지원 안 함). None이면
+        기존과 동일하게 미적용
     """
     from urllib.parse import quote
-    response = requests.get("https://search.danawa.com/dsearch.php?query={}&tab=main".format(quote(keyword)),
-                            headers=_get_header(host="search.danawa.com"))
+    url = "https://search.danawa.com/dsearch.php?query={}&tab=main".format(quote(keyword))
+    if attribute:
+        url += "&attribute={}".format(quote(attribute))
+    response = requests.get(url, headers=_get_header(host="search.danawa.com"))
     if response.status_code != 200:
         response.raise_for_status()
 
