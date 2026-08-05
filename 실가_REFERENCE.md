@@ -455,24 +455,64 @@ Playwright E2E 스모크 테스트(scripts/e2e_smoke_test.py)로 검색→자동
 
 ## 디자인 토큰
 ```
-배경   #0a0b0d (near-black)
-서페이스 #16171b / #1c1e23
-선     #2a2d33 / #1f2126
-텍스트  #f2f3f5 (primary) / #8b8f97 (dim) / #54575f (faint)
+2026-08-05 전면 교체 — 사용자가 제공한 참조 디자인(에디토리얼 빌드 명세서
+HTML, 종이/잉크 톤)을 그대로 실가 전체에 적용. 이전 다크+네온(시안/마젠타/
+앰버) 톤은 폐기. 재적용/확장 시 이 팔레트·규칙을 따를 것 — 채도 있는
+accent color를 추가하지 말 것(모노크롬 원칙, 아래 참조).
 
-accent
-  cyan(적정/좋음)   #5eead4
-  magenta(고가/경고) #ff3b6e
-  amber(변동/주의)   #ffb020
+배경(사이드바·탑바, ink) #0B0B0B / #171716(서페이스) / #2E2E2B(선)
+배경(본문 영역, paper)   #F4F3EF / #E7E5DF(서페이스) / #D2CFC7(선)
+텍스트  ink #0B0B0B (본문 영역 primary) / paper #F4F3EF (사이드바·탑바 primary)
+       mute-dk #8C8A83 (ink 배경 위 보조) / mute-lt #6B6963 (paper 배경 위 보조)
+
+accent — 없음(모노크롬 원칙). 상태 구분은 색이 아니라 기호로:
+  고가 ▲ (ink 배경 채움) / 저가 ▼ / 적정가 — (테두리만, 중립)
+  에러 상태는 색 대신 "!" 접두사 + ink 굵게
 
 폰트
-  디스플레이  Black Han Sans (헤드라인, 절제해서 사용)
-  데이터/코드 JetBrains Mono (가격 숫자, 계기판 라벨, 코드 블록)
-  본문       Pretendard
+  헤드라인/본문 Pretendard Variable (display 항목도 Pretendard 확정, 별도
+                display 서체 없음 — 예전 Black Han Sans는 폐기)
+  데이터/코드   IBM Plex Mono (가격 숫자, kicker 라벨, 코드 블록) — 예전
+                JetBrains Mono에서 교체
+
+레이아웃 규칙
+  border-radius 전면 미사용(카드/버튼/인풋 전부 각짐), box-shadow 글로우
+  전면 미사용 — hairline(1px) 보더로만 위계 표현
+  CSS Grid에 "그리드 라인 트릭"(컨테이너 background + gap:1px) 쓸 때 자식
+  개수가 고정이 아니면 빈 셀에 컨테이너 배경이 그대로 노출되는 버그 발생
+  (build-grid에서 실측 발견) — 아이템 수가 가변인 그리드는 개별 카드에
+  자체 border를 주는 방식 사용, flex-column 리스트(search-results 등)는
+  자식이 항상 꽉 채워지므로 트릭 사용 가능
 
 시그니처 요소
-  판정 게이지 — SVG 반원 다이얼(저가/적정/고가 3구간 색상 arc) + 니들 애니메이션
-  (prefers-reduced-motion 시 애니메이션 생략, 최종 각도로 고정 표시)
+  판정 게이지 — 예전 SVG 반원 다이얼+니들에서 flat 수평 바(.gauge-track/
+  .gauge-zone/.gauge-marker)로 교체. diff_percent를 ±30% 클램프해 바
+  0~100% 위치에 매핑, VERDICT_THRESHOLD_PERCENT(±5%) 구간을 음영(.gauge-zone)
+  으로 표시
+
+스펙시트 컴포넌트 (2026-08-05 2차 — 참조 디자인 요소 추가 이식)
+  .strip/.st        4칸 고정 스탯 스트립(빌드 상세 상단 요약). 셀 수가 항상
+                    4로 고정이라 위의 "빈 셀 노출" 함정에 해당 없음
+  .total-row        큰 총액 숫자 + 우측 메타 블록
+  .confirm-row      견적↔판매가 대비(.confirm-num 2개 + .confirm-arrow),
+                    .diff-badge로 차액·증감률 표기
+  .sec-head         섹션 제목 + 우측 note (하단 1px ink 룰)
+  .grp              부품 그룹 헤더(연산부/그래픽/…), ::after로 우측 채움선
+  .spec-row         부품 행 3열(.spec-cat | .spec-name+.spec-desc | .spec-price)
+  .prop-bar         부품별 총액 비중 바(참조 디자인 .sp-bar)
+  .sum              소계(상단 2px ink 룰)
+  .build-summary    빌드 생성 화면 하단 sticky 러닝 총액 + 진행 틱(.bs-tick)
+  .rv               스크롤/마운트 리빌(prefers-reduced-motion에서 무효화)
+
+숫자 정렬 규칙 (중요)
+  가격이 열로 정렬되려면 자릿수 폭이 같아야 함 — 모노 폰트를 쓰는 클래스는
+  전부 font-variant-numeric:tabular-nums 적용(global.css 상단 셀렉터 목록).
+  새 가격 표시 클래스를 추가하면 그 목록에도 같이 넣을 것
+
+인쇄
+  빌드 상세는 견적서로 출력 가능해야 함 — @page margin 14mm, 사이드바/탑바/
+  버튼/sticky 요약은 @media print에서 숨김, .spec-row/.strip/.sum은
+  break-inside:avoid
 ```
 
 ---

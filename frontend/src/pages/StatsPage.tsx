@@ -80,19 +80,12 @@ function HistoryChart({ title, selectedPrice, history }: {
       <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} width="100%" height="260" preserveAspectRatio="none">
         <defs>
           <linearGradient id="statsFillGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#5eead4" stopOpacity="0.28" />
-            <stop offset="100%" stopColor="#5eead4" stopOpacity="0" />
+            <stop offset="0%" stopColor="#0B0B0B" stopOpacity="0.1" />
+            <stop offset="100%" stopColor="#0B0B0B" stopOpacity="0" />
           </linearGradient>
-          <filter id="statsGlow">
-            <feGaussianBlur stdDeviation="3" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
         </defs>
 
-        <g stroke="#1f2126" strokeWidth="1">
+        <g stroke="#D2CFC7" strokeWidth="1">
           <line x1="0" y1="20" x2={CHART_WIDTH} y2="20" />
           <line x1="0" y1="80" x2={CHART_WIDTH} y2="80" />
           <line x1="0" y1="140" x2={CHART_WIDTH} y2="140" />
@@ -100,7 +93,7 @@ function HistoryChart({ title, selectedPrice, history }: {
         </g>
 
         <polygon points={polygonPoints} fill="url(#statsFillGrad)" />
-        <polyline points={linePoints} fill="none" stroke="#5eead4" strokeWidth="2.5" filter="url(#statsGlow)" />
+        <polyline points={linePoints} fill="none" stroke="#0B0B0B" strokeWidth="2" />
       </svg>
     </div>
   );

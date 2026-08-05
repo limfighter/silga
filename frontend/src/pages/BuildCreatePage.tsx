@@ -27,8 +27,16 @@ export default function BuildCreatePage() {
     },
   });
 
-  const selectedCount = Object.values(parts).filter(Boolean).length;
+  const selectedParts = CATEGORIES.map((c) => parts[c]).filter(
+    (p): p is SelectedPart => p != null
+  );
+  const selectedCount = selectedParts.length;
   const canSubmit = name.trim().length > 0 && selectedCount > 0 && !mutation.isPending;
+
+  // 러닝 총액 — 저장 전에도 "지금 담은 것까지 얼마"를 바로 보여줌.
+  // 가격을 못 가져온 부품(price=null)은 합계에서 빠지므로 개수를 따로 표기.
+  const runningTotal = selectedParts.reduce((sum, p) => sum + (p.price ?? 0), 0);
+  const unpricedCount = selectedParts.filter((p) => p.price == null).length;
 
   const handleSubmit = () => {
     const items = CATEGORIES.filter((c) => parts[c]).map((c) => ({
@@ -104,6 +112,29 @@ export default function BuildCreatePage() {
           <button className="btn-primary" disabled={!canSubmit} onClick={handleSubmit}>
             {mutation.isPending ? "분석 중..." : "분석하기"}
           </button>
+        </div>
+
+        <div className="build-summary">
+          <div className="bs-progress">
+            <span className="bs-k">구성</span>
+            <span className="bs-count">{selectedCount} / {CATEGORIES.length}</span>
+            <span className="bs-ticks">
+              {CATEGORIES.map((c) => (
+                <i key={c} className={`bs-tick${parts[c] ? " on" : ""}`} title={c} />
+              ))}
+            </span>
+          </div>
+          <div className="bs-total">
+            <span className="bs-k">현재 합계</span>
+            <span className="v">
+              {runningTotal > 0 ? `${runningTotal.toLocaleString()}원` : "—"}
+              {unpricedCount > 0 && (
+                <em style={{ fontStyle: "normal", fontSize: 11, color: "var(--mute-dk)", marginLeft: 8 }}>
+                  {unpricedCount}종 가격 미조회
+                </em>
+              )}
+            </span>
+          </div>
         </div>
       </div>
     </div>

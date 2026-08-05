@@ -161,8 +161,13 @@ Vite SPA (Next.js/SSR 아님 — 백엔드가 이미 별도 FastAPI 서비스로
 상태는 TanStack Query로 관리하고 별도 전역 상태 스토어는 없음.
 `lib/api.ts`의 타입은 `backend/app/schemas/*.py`와 1:1 대응하도록 맞춰져
 있음 — Pydantic 스키마를 바꾸면 같은 변경에서 TS 인터페이스도 갱신할 것.
-스타일링은 순수 CSS + `styles/global.css`의 디자인 토큰 CSS 변수 사용
-(다크 배경, 시안/마젠타/앰버 accent) — Tailwind, CSS-in-JS 미사용.
+스타일링은 순수 CSS + `styles/global.css`의 디자인 토큰 CSS 변수 사용 —
+Tailwind, CSS-in-JS 미사용. 2026-08-05 사용자 제공 참조 디자인으로 톤 전면
+교체: 종이/잉크(paper/ink) 에디토리얼, 모노크롬(accent color 없음, 상태는
+▲▼— 기호로 구분), border-radius/box-shadow 글로우 미사용(hairline 보더만).
+Pretendard(본문·헤드라인 전체) + IBM Plex Mono(데이터/코드) — 이전
+Black Han Sans/시안·마젠타·앰버 네온 톤은 폐기. 상세는 REFERENCE.md
+#디자인-토큰 참조.
 
 사이드바 7탭 전부 실데이터 연동 완료(2026-08-04) — `PlaceholderPage`
 컴포넌트 자체가 더 이상 안 쓰여서 삭제됨. 최근기록/설정의 이동평균

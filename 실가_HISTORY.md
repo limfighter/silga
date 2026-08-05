@@ -1187,4 +1187,129 @@
       필터만 값 형식이 "-AND"(나머지 전부 "-OR")인데 라이브 검증 불가라
       단일값 선택에서 -OR와 동일하게 동작하는지 100% 확인은 안 됨
 
-[ ] 커밋/push 대기 — 다음 "커밋하자" 지시 대기. PR #7 아직 미생성
+[✓] 커밋/push 완료(c312020, e686a79) — PR #7로 오픈 후 머지됨(사용자가
+    직접 관리)
+
+---
+
+### 2026-08-05 (같은 날, 이어서 — 프론트 디자인 전면 교체)
+
+[✓] UI 톤 다듬기 1차 — 탑바/제목 중복 제거, section-label(kicker), 빈
+    상태 카드화 (커밋 c312020, 다크네온 톤 유지한 채로 진행)
+
+[✓] 사이드바 접힘 상태 가로 스크롤바 노출 버그 수정 (커밋 e686a79)
+    → nav-item 라벨이 opacity:0으로 숨겨져도 white-space:nowrap 때문에
+      실제 너비를 계속 차지해서, overflow-y:auto인 .side-nav의
+      overflow-x가 암묵적으로 auto로 계산돼 가로 스크롤바가 함께 뜨던
+      문제. overflow-x:hidden 명시로 해결
+
+[✓] 사용자가 첨부한 참조 디자인(에디토리얼 "빌드 명세서" HTML, 종이/잉크
+    톤 — 컴퓨존/다나와 기준 실제 견적서 스타일 문서)을 기준으로 프론트
+    전체 톤 교체 결정 — "전체 테마를 이걸로 교체" 확인받고 진행
+    → 이전 다크+시안/마젠타/앰버 네온(Black Han Sans+JetBrains Mono) 폐기
+    → 신규 팔레트: ink(#0B0B0B)/paper(#F4F3EF) 모노크롬, accent color
+      없음. 상태 구분은 ▲(고가, ink 채움)/▼(저가)/—(적정가, 중립 테두리)
+      기호로. 에러 상태도 색 대신 "!" 접두사+ink 굵게
+    → 폰트 교체: Pretendard(헤드라인 포함 전체) + IBM Plex Mono(데이터).
+      frontend/index.html 구글폰트 링크에서 Black Han Sans 제거,
+      IBM Plex Mono 추가
+    → 레이아웃 규칙 변경: border-radius/box-shadow 글로우 전면 제거,
+      hairline(1px) 보더로만 위계 표현
+    → frontend/src/styles/global.css 전체 재작성(클래스명은 유지 —
+      대부분의 TSX는 className 변경 없이 그대로 재사용됨)
+    → BuildDetailPage.tsx 판정 게이지 재설계: SVG 반원+니들 →
+      flat 수평 바(.gauge-track/.gauge-zone/.gauge-marker).
+      needleAngle() 삭제, markerPosition()으로 교체 — diff_percent를
+      ±GAUGE_RANGE(30)로 클램프해 바 0~100% 위치에 선형 매핑,
+      VERDICT_THRESHOLD_PERCENT(±5%, services/verdict.py와 동일 가정값)
+      구간을 .gauge-zone 음영으로 표시
+    → StatsPage.tsx 가격 히스토리 차트: feGaussianBlur 글로우 필터 +
+      시안 그라디언트 라인 제거, flat ink 라인(#0B0B0B)+옅은 회색
+      fill로 교체
+
+[✓] 실측 버그 발견+수정: build-grid CSS 그리드 "라인 트릭"
+    (컨테이너 background:var(--line-lt) + gap:1px, 자식 카드는
+    background:var(--paper)만) 사용 시, grid-template-columns:repeat(3,1fr)
+    인데 아이템이 3의 배수가 아니면 마지막 행의 빈 셀에 컨테이너
+    배경색이 그대로 노출되는 문제 실측 발견(홈 화면 빌드 1개일 때 옆에
+    베이지색 빈 블록 노출). CSS Grid는 고정 열 트랙을 항상 만들기 때문에
+    빈 셀도 컨테이너 배경이 비쳐 보임 — flex-column 리스트(search-results,
+    recent-list)는 자식이 항상 꽉 채워지는 구조라 같은 트릭을 써도
+    문제없음. build-grid만 개별 카드에 자체 border를 주는 방식(레거시
+    다크테마 방식과 동일)으로 되돌려 수정. REFERENCE.md #디자인-토큰에
+    함정으로 기록
+    → 원인: danawa.com 접근이 프록시로 막혀 있어 실제 danawa 함수를
+      monkeypatch한 mock 백엔드(임시 SQLite) + Playwright로 빌드 1개
+      생성해서 실측 — 빈 데이터 상태만으로는 안 드러나던 버그
+
+[✓] Playwright 실브라우저 검증 — 9개 화면(홈/검색/빌드목록/빌드생성/
+    빌드상세(게이지 포함, mock 빌드 데이터로 고가 판정 케이스 확인)/
+    즐겨찾기/최근기록/통계(mock 가격 히스토리로 차트 렌더링 확인)/설정)
+    전부 확인. npm run typecheck 통과. 검증 후 mock 백엔드 종료하고
+    원래 dev 백엔드로 복귀
+
+[✓] 실가_REFERENCE.md #디자인-토큰, CLAUDE.md, 실가_인수인계.md
+    "확정된 사항" 갱신 완료
+
+[✓] 커밋/push 완료(db61895)
+
+---
+
+### 2026-08-05 (같은 날, 이어서 — 스펙시트 고도화 + UI/UX 리서치 반영)
+
+배경: "종이/잉크 + IBM Plex Mono 에디토리얼 스펙시트 스타일에 맞추되,
+UI/UX도 리서치로 고도화해서 실제 시중 빌드 웹 디자인처럼" 요청.
+1차 교체(db61895)는 색/폰트/보더만 바꿨고 참조 디자인의 구조적 요소
+(그룹 헤더·비중 바·스탯 스트립·소계 규칙·델타 배지)는 대부분 미사용
+상태였음 — 그걸 실제로 이식하고, 빌드 사이트 관례를 얹음.
+
+[✓] 리서치 — PCPartPicker(부품 리스트 UX 표준) 관례 조사. pcpartpicker.com
+    직접 fetch는 403, 다나와는 이 환경 프록시 차단이라 검색 결과 + 도메인
+    지식으로 보완. 채택한 관례:
+    → 빌드 진행률 + 러닝 총액을 항상 눈에 보이게(저장 전에도 "지금까지 얼마")
+    → 카테고리 행은 비어 있어도 항상 자리를 지킴(기존 PartRow가 이미 충족)
+    → 가격 열 정렬 + 총액/소계 행
+    → 미채택: 소비전력 추정(PCPartPicker의 핵심 기능이지만 부품별 TDP
+      데이터가 우리 스크래퍼에 없음 — 백엔드 작업 필요, 이번 범위 밖)
+
+[✓] font-variant-numeric:tabular-nums 전면 적용 — 스펙시트에서 가격이
+    열로 정렬되려면 자릿수 폭이 같아야 함. global.css 상단에 모노 계열
+    클래스 셀렉터를 모아서 일괄 지정
+
+[✓] BuildDetailPage 전면 재구성 — 단순 2단(게이지+breakdown) 레이아웃을
+    실제 견적서 구조로 교체:
+    → .strip 4칸 스탯 스트립(부품 구성/최고가 부품+비중/판정 기준/판정)
+    → .total-row 큰 실측 합계 + 우측 메타(저장일·판정 기준가)
+    → .confirm-row 실측 합계 → 비교 판매가 대비 + .diff-badge(차액·증감률)
+      + 기존 게이지 바(적정 ±5% 구간 라벨 추가)
+    → 부품을 기능 그룹(연산부/그래픽/메모리·저장/섀시·전원)으로 묶어
+      .grp 헤더와 함께 표시. PART_GROUPS에 없는 카테고리는 "기타"로
+      모이게 해서 카테고리가 늘어도 누락되지 않음
+    → 부품별 .spec-row 3열 + 총액 대비 비중(%)과 .prop-bar 시각화
+    → verdict_basis_breakdown의 source를 부품 행에 노출 — 이동평균이 무효라
+      즉시가로 대체된 부품을 행 단위로 표시(기존엔 빌드 전체 신뢰도
+      한 줄로만 알 수 있었음)
+    → .sum 소계로 마감
+    → 데이터 도착 후 마운트되는 BuildDetailView 서브컴포넌트로 분리 —
+      여기서 잡는 mounted 플래그가 곧 "값이 확정된 시점"이라 비중 바/
+      리빌 애니메이션 시작점으로 씀(IntersectionObserver 불필요)
+
+[✓] BuildCreatePage — PCPartPicker식 sticky 요약 바(.build-summary) 추가.
+    "구성 N/8" + 카테고리별 진행 틱 + 현재 합계(러닝 총액). 가격 조회
+    실패한 부품은 합계에서 빠지므로 개수를 따로 표기
+    → 이를 위해 PartRow의 SelectedPart에 raw price 필드 추가
+      (기존엔 priceFormatted 문자열만 들고 있어서 합산 불가).
+      recentProducts/StatsPage/FavoritesPage는 구조적 타이핑이라 무변경
+
+[✓] 인쇄 스타일 추가 — 빌드 상세를 실제 견적서로 출력 가능하게.
+    @page margin 14mm, 사이드바/탑바/버튼/sticky 요약 숨김,
+    .spec-row/.strip/.sum break-inside:avoid. Playwright
+    emulate_media(print)로 A4 1장에 스펙시트가 온전히 떨어지는 것 확인
+
+[✓] 검증 — mock danawa(8종 실제 시세 근사값 + 상품별 주 단위 시계열)로
+    8종 풀 구성 빌드를 만들어서 확인. 빌드 상세(스트립/총액/견적 대비/
+    그룹 4개/비중 바/소계), 인쇄 레이아웃, 빌드 생성 sticky 요약,
+    빌드 목록(▲▼ 배지), 검색 결과 정렬 전부 실브라우저 확인.
+    npm run typecheck 통과
+
+[ ] 커밋/push 대기 — 다음 "커밋하자" 지시 대기

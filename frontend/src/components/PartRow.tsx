@@ -6,6 +6,7 @@ import { useDebouncedValue } from "../lib/useDebouncedValue";
 export interface SelectedPart {
   code: number;
   title: string;
+  price: number | null; // 빌드 생성 화면의 러닝 총액 계산용 raw 값
   priceFormatted: string | null;
 }
 
@@ -124,6 +125,7 @@ export default function PartRow({
     onSelect({
       code: item.code,
       title: item.title ?? `#${item.code}`,
+      price: item.price,
       priceFormatted: item.price_formatted,
     });
     setInput("");
