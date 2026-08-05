@@ -36,6 +36,18 @@ export interface SearchResultItem {
   price_formatted: string | null;
 }
 
+// /search 스펙 필터 파라미터 — 카테고리와 안 맞는 필드는 백엔드가 무시함
+// (backend/app/main.py::search()의 category별 분기 참조)
+export interface SearchSpecParams {
+  memoryGb?: number; // GPU 전용
+  socket?: string; // CPU/메인보드 전용
+  chipset?: string; // GPU 전용
+  formfactor?: string; // 메인보드/케이스 전용
+  ramType?: string; // RAM 전용
+  wattage?: string; // 파워 전용
+  interface?: string; // SSD 전용
+}
+
 export interface ProductVariant {
   type: string | null;
   price: string | null;
@@ -126,12 +138,18 @@ export interface FavoriteItem {
 // ---- API 함수 ----
 
 export const api = {
-  search: (q: string, category?: string, memoryGb?: number) =>
-    request<SearchResultItem[]>(
-      `/search?q=${encodeURIComponent(q)}` +
-        (category ? `&category=${encodeURIComponent(category)}` : "") +
-        (memoryGb ? `&memory_gb=${memoryGb}` : "")
-    ),
+  search: (q: string, category?: string, spec?: SearchSpecParams) => {
+    const params = new URLSearchParams({ q });
+    if (category) params.set("category", category);
+    if (spec?.memoryGb) params.set("memory_gb", String(spec.memoryGb));
+    if (spec?.socket) params.set("socket", spec.socket);
+    if (spec?.chipset) params.set("chipset", spec.chipset);
+    if (spec?.formfactor) params.set("formfactor", spec.formfactor);
+    if (spec?.ramType) params.set("ram_type", spec.ramType);
+    if (spec?.wattage) params.set("wattage", spec.wattage);
+    if (spec?.interface) params.set("interface", spec.interface);
+    return request<SearchResultItem[]>(`/search?${params.toString()}`);
+  },
 
   getProduct: (code: number) => request<ProductDetail>(`/product/${code}`),
 

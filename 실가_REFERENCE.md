@@ -221,26 +221,45 @@ sammy310/Danawa-Crawler (MIT):
 
 ## 엔드포인트 설계 (계약 — app-shell-mockup.html이 이 계약 전제로 만들어짐)
 ```
-GET  /search?q={keyword}&category={선택, CPU|GPU|메인보드|RAM|SSD|케이스|파워|쿨러}&memory_gb={선택, GPU 전용}
+GET  /search?q={keyword}&category={선택}&memory_gb={GPU}&chipset={GPU}&socket={CPU|메인보드}
+     &formfactor={메인보드|케이스}&ram_type={RAM}&wattage={파워}&interface={SSD}
   → [{code, title, price, price_formatted}, ...]
-  ※ category는 v0.5(2026-08-05) 추가 — 검색어가 다른 카테고리 상품과 겹칠 때
-    결과를 좁히는 선택적 필터. 값은 backend/app/main.py의 CATEGORY_LABELS 키와
-    정확히 일치해야 필터가 적용됨(일치 안 하면 무필터, 기존과 동일 동작 — 하위
-    호환). 내부적으로 danawa.get_product_codes(category_label=...)가 각 상품
-    li의 input#productItem_categoryInfo_{code} 값 마지막 "_" 뒤 조각과 비교해서
-    사후 필터링(다나와 요청 URL에 새 파라미터를 추가하는 방식이 아님 — 근거는
-    실가_HISTORY.md 2026-08-05 참조). GPU("그래픽카드")만 실제 상품 HTML로
-    직접 검증됨, 나머지 7개 라벨은 검색결과 페이지 "관련 카테고리" 트리에서
-    확보(간접 검증)
-  ※ memory_gb도 v0.5(2026-08-05) 추가 — GPU 메모리 용량(GB) 스펙 필터,
-    category=GPU일 때만 적용(그 외 무시). category와 달리 이건 다나와
-    서버측 요청 자체를 좁히는 필터 — danawa.get_product_codes(attribute=...)로
-    "{속성코드}-{값코드}-OR" 형식 문자열(예: 663-188705-OR)을 다나와 요청
-    URL에 그대로 전달(다나와 상세검색 필터 체크박스 클릭 시 실측 URL에서
-    확인한 형식). backend/app/main.py::GPU_MEMORY_ATTRIBUTES에 없는 값은
-    무시. 다중 값(예: 12GB+16GB 동시) 조합 규칙은 미검증이라 값 하나만 지원 —
-    다른 카테고리/스펙(CPU 소켓 등)으로 확장하려면 같은 패턴(체크박스 클릭 →
-    URL의 attribute= 값 확인)으로 코드를 먼저 확보해야 함
+  ※ category(v0.5, 2026-08-05 추가) — 검색어가 다른 카테고리 상품과 겹칠 때
+    결과를 좁히는 선택적 필터. 값은 backend/app/main.py의 CATEGORY_LABELS 키
+    (CPU/GPU/메인보드/RAM/SSD/케이스/파워/쿨러)와 정확히 일치해야 적용됨
+    (안 맞으면 무필터, 하위 호환). danawa.get_product_codes(category_label=...)가
+    각 상품 li의 input#productItem_categoryInfo_{code} 값 마지막 "_" 뒤 조각과
+    비교해서 사후 필터링(요청 URL에 새 파라미터를 추가하는 방식이 아님) — 8개
+    전부 실제 상품 li HTML로 직접 검증 완료(실가_HISTORY.md 2026-08-05 참조)
+  ※ 스펙 파라미터(memory_gb/chipset/socket/formfactor/ram_type/wattage/
+    interface, 전부 v0.5 추가) — category와 달리 다나와 서버측 요청 자체를
+    좁히는 필터. danawa.get_product_codes(attribute=...)로 "{속성코드}-
+    {값코드}-OR"(또는 케이스만 -AND, 동작상 차이 없음) 형식 문자열을 다나와
+    요청 URL에 그대로 전달(다나와 상세검색 필터 체크박스 클릭 시 실측 URL에서
+    확인한 형식, 실가_HISTORY.md 2026-08-05 참조). 각 파라미터는 정해진
+    category일 때만 적용되고 그 외엔 무시:
+
+    | 파라미터    | 적용 category | 값 예시               | 매핑 딕셔너리(main.py)         |
+    |-------------|---------------|------------------------|----------------------------------|
+    | memory_gb   | GPU           | 16 (GB)                | GPU_MEMORY_ATTRIBUTES            |
+    | chipset     | GPU           | NVIDIA/AMD/Intel        | GPU_CHIPSET_ATTRIBUTES           |
+    | socket      | CPU, 메인보드 | AM5/AM4/LGA1851/LGA1700| CPU_SOCKET_ATTRIBUTES / MAINBOARD_SOCKET_ATTRIBUTES (카테고리마다 다나와 내부 코드 자체가 달라 값도 다름 — 절대 재사용 불가) |
+    | formfactor  | 메인보드, 케이스 | ATX/M-ATX/ITX/E-ATX | MAINBOARD_FORMFACTOR_ATTRIBUTES / CASE_FORMFACTOR_ATTRIBUTES (메인보드=자기 크기, 케이스=장착 가능한 보드 크기 — 의미가 다름) |
+    | ram_type    | RAM           | DDR5/DDR4               | RAM_TYPE_ATTRIBUTES              |
+    | wattage     | 파워          | "800W~899W" 등          | PSU_WATTAGE_ATTRIBUTES           |
+    | interface   | SSD           | SATA3/PCIe3.0x4/PCIe4.0x4/PCIe5.0x4 | SSD_INTERFACE_ATTRIBUTES |
+
+    **같은 category 안에 스펙 파라미터가 2개 있는 경우(GPU: memory_gb+chipset,
+    메인보드: socket+formfactor) 동시에 못 씀** — attribute 인자가 값 하나만
+    받을 수 있어서(다중 attribute 결합 규칙 미검증) chipset/socket이 우선
+    적용되고 나머지는 무시됨(main.py::search()의 `A or B` 체이닝 참조). 프론트
+    (PartRow)는 이 제약을 반영해 같은 카테고리의 스펙 select를 상호 배타로
+    구현(하나 고르면 다른 하나 자동 해제) — API를 직접 호출하는 쪽(AI 라우터
+    등)도 이 우선순위를 알아야 함
+  ※ 다른 카테고리/스펙으로 더 확장하려면 매번 그 카테고리 자체의 필터
+    사이드바에서 다시 확보해야 함(체크박스 클릭 → 바뀐 URL의 attribute= 값
+    확인) — 카테고리 간 attribute 코드는 절대 재사용 불가로 확인됨(예: CPU
+    소켓 AM5=41-801631-OR, 메인보드 소켓 AM5=500-801682-OR로 서로 다름)
 
 GET  /product/{code}
   → {code, title, category, current_price, cash_price, spec,

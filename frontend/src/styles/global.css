@@ -338,11 +338,11 @@ input{font-family:inherit;}
 }
 .part-input::placeholder{color:var(--text-faint);}
 .part-input:focus{outline:none;border-color:var(--cyan);}
-.part-memory-filter{
+.part-spec-filter{
   appearance:none;
   -webkit-appearance:none;
-  flex:0 0 96px;
-  width:96px;
+  flex:0 0 116px;
+  width:116px;
   min-width:0;
   background:var(--surface-2);
   border:1px solid var(--line);
@@ -351,7 +351,7 @@ input{font-family:inherit;}
   color:var(--text);
   font-size:12.5px;
 }
-.part-memory-filter:focus{outline:none;border-color:var(--cyan);}
+.part-spec-filter:focus{outline:none;border-color:var(--cyan);}
 .part-selected{
   flex:1;
   display:flex;

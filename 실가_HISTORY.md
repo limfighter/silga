@@ -895,3 +895,296 @@
 
 [ ] 커밋/push 여전히 대기 — 다음 "커밋 하자" 지시 대기 (브랜치
     claude/danawa-scraper-filters-bryp6q)
+
+---
+
+### 2026-08-05 (같은 날, PR #6 머지 후 이어서)
+
+#### CATEGORY_LABELS 간접검증 라벨 직접검증 (5/7 완료)
+
+[✓] 배경
+    → PR #6(카테고리 필터 + GPU 메모리 용량 필터) 머지 후 코드 리뷰 요청을
+      받아 다시 살펴보다가, CATEGORY_LABELS 8개 중 GPU만 실제 상품 li
+      HTML로 직접 검증됐고 나머지 7개(CPU/메인보드/RAM/SSD/케이스/파워/
+      쿨러)는 "관련 카테고리" 트리에서 가져온 간접 검증 상태라는 걸
+      다시 짚었고, 사용자가 이어서 검증 진행을 요청
+
+[✓] 상품목록 HTML 5건 실측 검증 (CPU/메인보드/RAM/SSD/케이스)
+    → 사용자가 각 카테고리 대표 검색어(9800X3D/B650/DDR5 32GB/NVMe 2TB/
+      미들타워)로 검색한 결과의 #prodArea(상품목록 포함) outerHTML을
+      제공(이전 CPU/SSD/쿨러 시도 때는 필터 사이드바만 있어서 상품 li가
+      없었던 것과 달리 이번엔 상품목록까지 포함됨)
+    → input#productItem_categoryInfo_{code} 값을 직접 집계해서 예상 라벨과
+      대조:
+        메인보드: 40/40 "PC 주요 부품_메인보드" — 정확히 일치
+        RAM: 40/40 "PC 주요 부품_RAM" — 정확히 일치
+        케이스: 40/40 "PC 주요 부품_케이스" — 정확히 일치
+        SSD: 37/40 "PC 주요 부품_SSD", 3/40 "주변기기_외장HDD/SSD" —
+          "SSD" 라벨 정확, 나머지 3건(외장 SSD)은 다른 카테고리라 필터가
+          걸러내는 게 맞는 동작
+        CPU: 1/40만 "PC 주요 부품_CPU", 나머지 39/40은 "디지털
+          완제품_데스크탑" — "9800X3D" 검색 결과 대부분이 그 CPU가 장착된
+          완제품 PC였고 실제 CPU 단품은 1건(AMD 라이젠7-6세대9800X3D)뿐.
+          category_label="CPU" 필터가 정확히 그 39건을 걸러내고 단품
+          1건만 남기는 것까지 danawa.get_product_codes 오프라인 fixture
+          테스트로 확인 — 처음 카테고리 필터를 만든 이유(관련없는 상품
+          섞임)가 실제로 발생한 걸 실측으로 처음 확인한 사례
+    → 5건 전부 danawa.get_product_codes(category_label=...) mock 테스트로
+      기대 건수와 정확히 일치 확인(오프라인, 라이브 danawa 호출은 이
+      환경에서 여전히 불가능)
+
+[✓] backend/app/main.py::CATEGORY_LABELS 위 주석 갱신 — "GPU만 직접검증"
+    → "GPU/CPU/메인보드/RAM/SSD/케이스 6개 직접검증, 파워/쿨러만 간접"으로
+      정정. 실가_REFERENCE.md #엔드포인트-설계도 동일하게 갱신
+
+[✓] 오탈자 수정 — main.py GPU_MEMORY_ATTRIBUTES 위 주석이 "값 하나만"에서
+    문장이 끊겨 있던 것을 "값 하나만 허용"으로 완성 (코드 리뷰 중 발견)
+
+[✓] 파워/쿨러 2개도 이어서 검증 완료(업로드 5개 제한 때문에 CPU/메인보드/
+    RAM/SSD/케이스 5개 먼저 받고, 이어서 파워/쿨러 2개 추가로 받음)
+    → 파워: 40/40 "PC 주요 부품_파워" — 정확히 일치
+    → 쿨러: 40/40 "주변기기_쿨러/튜닝" — 정확히 일치(주변기기 카테고리
+      소속이라 이전에 걱정했던 대로 861 PC 주요 부품 트리 밖에 있었지만
+      라벨 자체는 예상대로였음)
+    → 이걸로 CATEGORY_LABELS 8개 전부(GPU/CPU/메인보드/RAM/SSD/케이스/
+      파워/쿨러) 실제 상품 li HTML 직접 검증 완료 — 간접 검증 상태로 남은
+      라벨 없음
+    → backend/app/main.py::CATEGORY_LABELS 주석, 실가_REFERENCE.md
+      #엔드포인트-설계를 "8개 전부 직접 검증 완료"로 최종 정정
+
+[✓] 오탈자 수정(main.py GPU_MEMORY_ATTRIBUTES 주석 "값 하나만" → "값 하나만
+    허용")
+
+---
+
+### 2026-08-05 (같은 날, PR #6 머지 후 이어서 — 코드리뷰 요청에서 이어짐)
+
+#### 폴리시 2건 + CPU 소켓 스펙 필터 신규
+
+[✓] 배경
+    → 사용자가 머지된 PR #6("지금 작업 어떤거 같아 깔끔해?")에 코드 리뷰를
+      요청 → 리뷰 중 CATEGORY_LABELS 8개 라벨 검증 상태 재확인(위 항목들)
+      + 리뷰에서 나온 두 가지 폴리시 항목 + 다음 스펙 필터로 CPU 소켓 진행
+
+[✓] 폴리시 1 — 자동완성 드롭다운이 GPU 행 메모리 select를 덮던 문제
+    → `.autocomplete-list`가 `right:16px`로 고정돼 있어서 GPU 행에서 select가
+      추가된 뒤에도 여전히 select 영역까지 뒤덮고 있었음(select 자체는 위에
+      떠서 클릭은 되지만 시각적으로 겹침)
+    → PartRow.tsx에서 showSpecFilter(메모리/소켓 select 둘 중 하나라도
+      보이는 행)일 때 `autocomplete-list--with-filter` modifier 클래스를
+      추가로 붙이고, CSS에서 `right:126px`(select 폭 96px + row gap 14px +
+      기존 16px)로 넓힘
+    → Playwright로 재검증: dropdown bounding box(x=244, width=380, 즉 우측
+      끝 624) vs select bounding box(x=638) — 겹침 없음, 14px 갭 확인
+
+[✓] 폴리시 2 — 인수인계.md 스테일 체크리스트 정정
+    → "danawa_patched.py 실가 프로젝트 정식 경로 편입" 항목이 실제로는
+      오래전에 backend/app/services/danawa.py로 편입 완료됐는데 문서
+      체크박스만 `[ ]`로 계속 방치돼 있던 걸 발견 → `[x]`로 정정하고 완료
+      근거(파일 출처 명시된 도크스트링, 이후 세션들의 계속된 패치 이력)
+      덧붙임
+
+[✓] CPU 소켓 스펙 필터 신규 구현 (backend/app/main.py::CPU_SOCKET_ATTRIBUTES)
+    → GPU 메모리 용량과 동일 패턴 재사용(danawa.get_product_codes의 범용
+      attribute 인자를 그대로 씀 — 스크래퍼 코드 변경 없음, 속성코드만
+      41 = 소켓 구분)
+    → 실측: AMD는 이미 확보해둔 "9800X3D" 검색 결과에 필터 사이드바가
+      통째로 포함돼 있어서 추가 자료 없이 바로 AM5/AM4 등 코드 확보.
+      인텔 소켓은 "9800X3D"(AMD 칩) 검색 결과엔 아예 안 나타나서(다나와가
+      현재 결과와 무관한 옵션값은 필터에 안 보여줌) "i5-14600K"로 한 번 더
+      검색해서 LGA1851/LGA1700 등 확보 — 카테고리 필터 라벨 검증 때와
+      달리 이번엔 "검색어에 따라 관련 옵션만 노출된다"는 danawa UI 특성
+      때문에 제조사별로 검색을 나눠야 했던 케이스
+    → 현재 시장에서 신품으로 유통되는 4개(AM5/AM4/LGA1851/LGA1700)만
+      채택 — 워크스테이션/서버/구형 소켓(sWRX8·sTRX4·TR4·sTR5·SP3·FM2·
+      AM3+·AM3, 2066·4677·4189·3647·2011 계열·1366·1150·1155·1156·775·
+      1200·1151v2·1151)은 실측은 됐지만 GPU 메모리 데이터센터 값 제외
+      때와 같은 원칙으로 제외
+    → frontend/src/lib/api.ts::api.search에 socket 파라미터 추가,
+      PartRow.tsx의 select 클래스명을 `.part-memory-filter` →
+      `.part-spec-filter`로 일반화(이제 GPU 메모리/CPU 소켓 두 필터가
+      같은 스타일 공유)
+    → 검증: FastAPI 레벨(category=CPU&socket=AM5 → attribute 정상 전달,
+      category=GPU&socket=AM5 → 무시, 오매칭 소켓 → 무시 3케이스),
+      Playwright 실브라우저(CPU 행에만 소켓 select 노출·옵션 4개 정확,
+      GPU/RAM 행엔 없음, AM5 선택 후 검색 시 실제
+      `category=CPU&socket=AM5` 쿼리로 요청 나가는 것, 필터링된 자동완성
+      결과 표시까지) 둘 다 확인
+
+[✓] 커밋/push 완료(16e5ef5) — 위 3건(폴리시 2 + CPU 소켓 필터) + 앞서
+    완료된 오탈자 수정/8개 라벨 검증 정정까지 전부 한 커밋으로 묶음
+    (사용자 지시 — "3번 찾고 1,2 고치자", "한번에 하게"). PR #6은
+    이미 머지·종료라 이번 커밋은 새 PR(#7 예정) 대상, 아직 PR은 안 만듦
+
+---
+
+### 2026-08-05 (같은 날, 이어서 — 사용자가 리뷰 후 "나머지도 할까" 제안)
+
+#### GPU 칩셋 제조사(NVIDIA/AMD/Intel) 스펙 필터 신규
+
+[✓] 배경
+    → 사용자가 "cpu말고도 gpu는 라이젠것도 있고" — GPU에도 칩셋 제조사별
+      필터가 있으면 좋겠다는 취지로 확인(AskUserQuestion으로 "칩셋
+      제조사(NVIDIA/AMD/인텔)"가 맞는지 명확화)
+    → 처음 GPU 필터 사이드바를 실측했을 때(2026-08-05 최초 세션) 이미
+      "칩셋 제조사" 그룹(속성코드 654: NVIDIA/AMD(ATi)/Intel/FuriosaAI)
+      데이터를 받아뒀던 상태라 추가 자료 수집 없이 바로 구현 가능했음
+
+[✓] backend/app/main.py::GPU_CHIPSET_ATTRIBUTES 신규
+    → NVIDIA(654-3518-OR)/AMD(654-3517-OR)/Intel(654-805627-OR) 3개 채택,
+      FuriosaAI(654-981322-OR, AI 가속기 칩 제조사)는 일반 소비자용
+      그래픽카드가 아니라서 제외(GPU 메모리 데이터센터 용량, CPU
+      워크스테이션 소켓 제외 때와 같은 원칙)
+    → /search에 chipset 쿼리파라미터 추가, category=GPU일 때만 적용
+
+[✓] memory_gb·chipset 동시 지정 처리 — chipset 우선 + 폴백
+    → danawa.get_product_codes의 attribute 인자가 값 하나만 받을 수 있어서
+      (다중 attribute 결합 규칙 여전히 미검증) 같은 GPU 카테고리 안의
+      스펙 필터 두 개를 동시에 적용할 방법이 없음
+    → `attribute = GPU_CHIPSET_ATTRIBUTES.get(chipset) or
+      GPU_MEMORY_ATTRIBUTES.get(memory_gb)` — chipset이 유효하면 그걸
+      쓰고, chipset이 없거나 오매칭이면 memory_gb로 자연스럽게 폴백.
+      처음엔 `if chipset: ... elif memory_gb: ...` 형태로 짰다가, 이
+      방식이면 chipset에 오매칭 값이 들어왔을 때 memory_gb가 유효해도
+      같이 무시돼버리는 버그가 있어서(첫 if 분기가 이미 선택됨) or
+      체이닝으로 수정 — FastAPI TestClient로 "오매칭 chipset + 유효
+      memory_gb → memory_gb 폴백" 케이스까지 포함해서 5가지 조합 검증
+    → 프론트(PartRow)도 동일한 제약을 반영해 두 select를 상호 배타로
+      구현 — 하나 선택하면 다른 하나 자동으로 빈 값(전체)으로 리셋
+
+[✓] GPU 행 select가 최대 2개(칩셋 제조사 + 메모리 용량)까지 늘어나면서
+    자동완성 드롭다운 겹침 방지 로직 일반화
+    → 직전 커밋에서 추가한 `.autocomplete-list--with-filter`(고정
+      right:126px, select 1개 기준)로는 select 2개인 GPU 행을 못 커버해서
+      폐기하고, `specFilterCount`(그 행에 실제로 보이는 select 개수: GPU는
+      칩셋+메모리 2개, CPU는 소켓 1개, 나머지는 0개) 기반 인라인 스타일
+      계산으로 교체 — `right: 16 + specFilterCount * 110`(110 = select
+      폭 96px + row gap 14px)
+    → Playwright로 재검증: GPU 행(select 2개) dropdown 우측 끝(x=514)이
+      첫 번째 select 시작(x=528)보다 작아 겹침 없음 확인. CPU 행(select
+      1개)도 기존과 동일하게 겹침 없음 유지 확인
+
+[✓] 검증
+    → FastAPI TestClient: chipset 단독 지정/memory_gb 단독 지정/둘 다
+      지정(chipset 우선)/오매칭 chipset+유효 memory_gb(폴백)/CPU
+      카테고리에서 chipset 지정(무시) — 5가지 케이스 전부 기대한
+      attribute 값과 일치
+    → Playwright 실브라우저(mock 백엔드): GPU 행 select 2개 존재·칩셋
+      옵션 4개(제조사 전체/NVIDIA/AMD/Intel) 정확, 메모리 용량 선택 후
+      칩셋 선택하면 메모리 선택이 자동으로 풀리는 것, 실제 검색 시
+      `category=GPU&chipset=NVIDIA` 쿼리로 요청 나가고 memory_gb는
+      파라미터에서 빠지는 것, 필터링된 자동완성 결과(NVIDIA 카드만)
+      표시까지 확인. mock 백엔드/Vite dev 서버 프로세스 전부 종료 확인
+
+[✓] 커밋/push 완료(1624454)
+
+---
+
+### 2026-08-05 (같은 날, 이어서 — "추가로 이런거 할만한 부품 있나" 이후)
+
+#### 메인보드 소켓/폼팩터 · RAM 규격 · 케이스 폼팩터 · 파워 출력 · SSD 인터페이스
+
+[✓] 배경
+    → GPU 칩셋 필터 완료 후 사용자가 "추가로 이런거 할만한 부품 있나"로
+      확장 후보를 물어봄 → 호환성이 가장 치명적인 순서로 4순위 제안
+      (①메인보드 소켓 ②RAM 규격 ③메인보드/케이스 폼팩터 ④파워 출력/SSD
+      인터페이스) → 사용자가 "1~4까지 자동진행, 선택/정보 필요하면 요청"
+      으로 승인 → 필요한 데이터가 이미 확보해둔 category 라벨 검증용
+      상품목록 HTML(메인보드/RAM/케이스/파워/SSD 5개 파일)에 필터
+      사이드바까지 통째로 포함돼 있었던 걸 발견해서 추가 자료 수집 없이
+      전부 바로 진행
+
+[✓] 실측 데이터로 확인된 중요 사실 — **카테고리 간 attribute 코드는
+    절대 재사용 불가**
+    → 메인보드 "CPU 소켓" 필터가 CPU 카테고리의 "소켓 구분" 필터와 같은
+      물리적 스펙(AM5 등)을 다루는데도 다나와 내부 속성코드/값코드가
+      완전히 다름을 발견: CPU 카테고리 AM5="41-801631-OR" vs 메인보드
+      카테고리 AM5="500-801682-OR". 처음엔 재사용 가능할 거라 예상했던
+      가설이 실측으로 틀렸다는 게 확인된 것 — 앞으로 새 카테고리로
+      확장할 때마다 절대 다른 카테고리 코드를 재사용하지 말고 매번 그
+      카테고리 자신의 필터 사이드바에서 다시 확보해야 함이 명문화됨
+    → 메인보드 필터 사이드바 하나에서 "CPU 소켓"(속성코드 500)과
+      "폼팩터"(속성코드 506) 둘 다 확보. RAM 파일에서 "메모리 규격"이
+      DDR4/DDR5가 아니라 DIMM/SO-DIMM/RDIMM 등 물리 폼팩터를 뜻한다는
+      걸 발견(예상과 다름) — DDR4/DDR5는 "제품 분류"(속성코드 277) 쪽에
+      있었음. 케이스의 "지원보드규격"은 다른 필터들과 달리 값 형식이
+      "-AND"(다른 건 전부 "-OR") — 케이스 하나가 여러 폼팩터를 동시
+      지원할 수 있어서로 추정되나, 단일값 선택만 하는 현재 구현에서는
+      동작 차이 없어서 그대로 채택
+
+[✓] backend/app/main.py 신규 딕셔너리 6개 + /search 파라미터 5개 추가
+    → MAINBOARD_SOCKET_ATTRIBUTES(AM5/AM4/LGA1851/LGA1700, 값은 CPU와
+      다름), MAINBOARD_FORMFACTOR_ATTRIBUTES·CASE_FORMFACTOR_ATTRIBUTES
+      (ATX/M-ATX/ITX/E-ATX, 메인보드=자기 크기 vs 케이스=장착 가능한
+      보드 크기라 의미가 다름), RAM_TYPE_ATTRIBUTES(DDR5/DDR4),
+      PSU_WATTAGE_ATTRIBUTES(450W~499W ~ 1000W~1299W 7구간, 저사양/
+      익스트림 구간 제외), SSD_INTERFACE_ATTRIBUTES(SATA3/PCIe3.0x4/
+      PCIe4.0x4/PCIe5.0x4, x8 레인·U.2 등 엔터프라이즈용 제외)
+    → /search에 socket(CPU/메인보드 공용, 카테고리별로 다른 딕셔너리),
+      formfactor(메인보드/케이스 공용), ram_type, wattage, interface
+      쿼리파라미터 추가. category 분기를 elif 체인으로 정리
+      (GPU/CPU/메인보드/케이스/RAM/파워/SSD 7가지, 메인보드는
+      socket 우선 + formfactor 폴백으로 GPU의 chipset/memory_gb
+      패턴 재사용)
+    → 검증: FastAPI TestClient로 9가지 조합(메인보드 socket 단독/
+      formfactor 단독/둘 다 지정 시 socket 우선, 케이스 formfactor,
+      RAM ram_type, 파워 wattage, SSD interface, CPU에 formfactor
+      지정 시 무시, 쿨러에 socket 지정 시 무시) 전부 기대값과 일치
+
+[✓] 프론트 리팩터 — CATEGORY_SPEC_FILTERS 설정 객체 도입
+    → 카테고리가 늘면서(GPU/CPU/메인보드/RAM/SSD/케이스/파워, 7개 중
+      6개가 스펙 select를 가짐) 이전처럼 `{showXFilter && <select>...}`를
+      매번 손으로 반복하면 중복이 심해질 상황이라, 카테고리→스펙필터
+      목록(specKey/placeholder/title/options) 선언적 배열로 정리하고
+      `.map()`으로 렌더링하도록 리팩터
+    → 상호배타 로직도 단순화됨 — 기존엔 카테고리마다 "다른 state 지우기"
+      onChange 콜백을 따로 썼는데, 이번엔 아예 `specValue: {key, value} |
+      null` 단일 상태 하나로 바꿔서 자연히 하나만 선택 가능해짐(새 값
+      설정이 곧 이전 값 대체)
+    → frontend/src/lib/api.ts::api.search(q, category?, spec?) —
+      SearchSpecParams 객체 + URLSearchParams로 재작성. 포지셔널 인자가
+      (q, category, memoryGb, socket, chipset, ...)로 계속 늘어나는 걸
+      막으려고 이번에 리팩터함(파라미터 늘어날 때마다 호출부 다 고쳐야
+      하는 문제 해결)
+    → CSS 폴리시: `.part-spec-filter` 폭을 96px→116px로 넓힘("800W~899W"
+      같은 긴 라벨이 잘리는 걸 Playwright 스크린샷으로 발견), SSD
+      "인터페이스 전체" placeholder도 "인터페이스"로 줄임(96px 시절
+      폭 기준으로 넉넉했던 문자열이 새 레이아웃에서도 여전히 타이트해서
+      한 번 더 줄임). 자동완성 드롭다운 우측 여백도 select 개수 기반
+      계산식의 슬롯폭을 110→130(116+14)으로 맞춰 갱신
+
+[✓] Playwright 실브라우저 검증 — 8개 카테고리 전부
+    → select 개수 기대값과 실제값 일치(CPU 1/GPU 2/메인보드 2/RAM 1/
+      SSD 1/케이스 1/파워 1/쿨러 0), 메인보드 소켓↔폼팩터 상호배타
+      동작, 각 카테고리 실제 검색 시 올바른 쿼리파라미터로 요청 나가고
+      mock 백엔드가 필터링된 결과만 돌려주는 것, 전체 화면 스크린샷으로
+      레이아웃 깨짐 없음(긴 라벨 잘림 2건 발견해서 그 자리에서 수정)
+      확인. mock 백엔드/Vite dev 서버 프로세스 정리 확인
+
+[✓] 실가_인수인계.md "오늘 세션 마무리" 섹션 대대적으로 압축 — 하루 동안
+    여러 차례 이어진 작업(카테고리 필터→GPU 메모리→라벨 검증→CPU
+    소켓→GPU 칩셋→이번 6종)이 순차 append로 쌓이면서 다음 세션이 읽기
+    부담스러울 정도로 길어져서, 최종 상태 중심의 요약으로 재작성함
+    (인수인계.md는 append-only가 아니라 "현재 상태" 문서라는 원래
+    성격에 맞춤 — 상세 이력은 이 파일(HISTORY.md)에 그대로 남아있음)
+
+[✓] 커밋/push 완료(ab60a3e)
+
+---
+
+### 2026-08-05 (같은 날, 이어서 — "문제점 있어?" 코드 리뷰)
+
+[✓] GPU_MEMORY_ATTRIBUTES/GPU_MEMORY_OPTIONS 불일치 발견+수정
+    → 백엔드-프론트 스펙 딕셔너리 8쌍을 전부 스크립트로 대조 검증하다가
+      GPU_MEMORY_ATTRIBUTES(backend)에만 1/2/3/5GB가 남아있고
+      GPU_MEMORY_OPTIONS(frontend)엔 4GB부터만 있는 걸 발견 — UI로는
+      절대 선택 못 하는 죽은 딕셔너리 항목이었음. 나머지 7쌍(칩셋/소켓
+      2종/폼팩터 2종/RAM/파워/SSD)은 전부 정확히 일치 확인
+    → backend/app/main.py::GPU_MEMORY_ATTRIBUTES에서 1/2/3/5GB 제거해서
+      11개(4~48GB)로 프론트와 맞춤. FastAPI TestClient로 memory_gb=1(제거된
+      값 → 무필터)/memory_gb=16(정상) 재확인
+    → 잔여 리스크로 기록만 해둠(수정 안 함, 검증 불가): 케이스 폼팩터
+      필터만 값 형식이 "-AND"(나머지 전부 "-OR")인데 라이브 검증 불가라
+      단일값 선택에서 -OR와 동일하게 동작하는지 100% 확인은 안 됨
+
+[ ] 커밋/push 대기 — 다음 "커밋하자" 지시 대기. PR #7 아직 미생성
