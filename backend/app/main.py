@@ -43,10 +43,12 @@ from app.timezone_utils import now_kst
 
 # /search?category= 값 → danawa.get_product_codes(category_label=...) 매핑.
 # 값은 다나와 상품 li의 productItem_categoryInfo_{code} 필드 마지막 조각과
-# 정확히 일치해야 함 — GPU("그래픽카드")만 실제 상품 HTML로 직접 검증됨,
-# 나머지 7개는 검색결과 페이지의 "관련 카테고리" 트리 라벨에서 확보(실가_HISTORY.md
-# 2026-08-05 참조). CATEGORY_LABELS에 없는 category 값은 필터 없이 무시됨
-# (frontend/src/pages/BuildCreatePage.tsx의 CATEGORIES 상수와 키 일치해야 함).
+# 정확히 일치해야 함 — 8개 전부 실제 상품 li HTML로 직접 검증 완료
+# (실가_HISTORY.md 2026-08-05 참조. CPU는 "9800X3D" 검색 40건 중 완제품 PC
+# 39건을 걸러내고 CPU 단품 1건만 남기는 것까지 실측 확인 — 필터가 실제로
+# 필요한 이유를 보여주는 사례). CATEGORY_LABELS에 없는 category 값은 필터
+# 없이 무시됨(frontend/src/pages/BuildCreatePage.tsx의 CATEGORIES 상수와
+# 키 일치해야 함).
 CATEGORY_LABELS = {
     "CPU": "CPU",
     "GPU": "그래픽카드",
@@ -63,7 +65,7 @@ CATEGORY_LABELS = {
 # 형식은 다나와 상세검색 필터 체크박스 클릭 시 실측 URL에서 그대로 가져온 값
 # (속성코드 663 = GPU 메모리 용량, 실가_HISTORY.md 2026-08-05 참조). 이 필터는
 # category_label과 달리 다나와 서버측 요청 자체를 좁히는 필터라 사후 필터링이
-# 아님 — 다중 선택(예: 12GB+16GB 동시)은 결합 규칙 미검증이라 미지원, 값 하나만
+# 아님 — 다중 선택(예: 12GB+16GB 동시)은 결합 규칙 미검증이라 미지원, 값 하나만 허용
 GPU_MEMORY_ATTRIBUTES = {
     1: "663-3930-OR",
     2: "663-41941-OR",
