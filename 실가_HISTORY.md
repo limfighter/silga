@@ -1076,4 +1076,96 @@
       파라미터에서 빠지는 것, 필터링된 자동완성 결과(NVIDIA 카드만)
       표시까지 확인. mock 백엔드/Vite dev 서버 프로세스 전부 종료 확인
 
-[ ] 커밋/push 대기 — 다음 지시 대기
+[✓] 커밋/push 완료(1624454)
+
+---
+
+### 2026-08-05 (같은 날, 이어서 — "추가로 이런거 할만한 부품 있나" 이후)
+
+#### 메인보드 소켓/폼팩터 · RAM 규격 · 케이스 폼팩터 · 파워 출력 · SSD 인터페이스
+
+[✓] 배경
+    → GPU 칩셋 필터 완료 후 사용자가 "추가로 이런거 할만한 부품 있나"로
+      확장 후보를 물어봄 → 호환성이 가장 치명적인 순서로 4순위 제안
+      (①메인보드 소켓 ②RAM 규격 ③메인보드/케이스 폼팩터 ④파워 출력/SSD
+      인터페이스) → 사용자가 "1~4까지 자동진행, 선택/정보 필요하면 요청"
+      으로 승인 → 필요한 데이터가 이미 확보해둔 category 라벨 검증용
+      상품목록 HTML(메인보드/RAM/케이스/파워/SSD 5개 파일)에 필터
+      사이드바까지 통째로 포함돼 있었던 걸 발견해서 추가 자료 수집 없이
+      전부 바로 진행
+
+[✓] 실측 데이터로 확인된 중요 사실 — **카테고리 간 attribute 코드는
+    절대 재사용 불가**
+    → 메인보드 "CPU 소켓" 필터가 CPU 카테고리의 "소켓 구분" 필터와 같은
+      물리적 스펙(AM5 등)을 다루는데도 다나와 내부 속성코드/값코드가
+      완전히 다름을 발견: CPU 카테고리 AM5="41-801631-OR" vs 메인보드
+      카테고리 AM5="500-801682-OR". 처음엔 재사용 가능할 거라 예상했던
+      가설이 실측으로 틀렸다는 게 확인된 것 — 앞으로 새 카테고리로
+      확장할 때마다 절대 다른 카테고리 코드를 재사용하지 말고 매번 그
+      카테고리 자신의 필터 사이드바에서 다시 확보해야 함이 명문화됨
+    → 메인보드 필터 사이드바 하나에서 "CPU 소켓"(속성코드 500)과
+      "폼팩터"(속성코드 506) 둘 다 확보. RAM 파일에서 "메모리 규격"이
+      DDR4/DDR5가 아니라 DIMM/SO-DIMM/RDIMM 등 물리 폼팩터를 뜻한다는
+      걸 발견(예상과 다름) — DDR4/DDR5는 "제품 분류"(속성코드 277) 쪽에
+      있었음. 케이스의 "지원보드규격"은 다른 필터들과 달리 값 형식이
+      "-AND"(다른 건 전부 "-OR") — 케이스 하나가 여러 폼팩터를 동시
+      지원할 수 있어서로 추정되나, 단일값 선택만 하는 현재 구현에서는
+      동작 차이 없어서 그대로 채택
+
+[✓] backend/app/main.py 신규 딕셔너리 6개 + /search 파라미터 5개 추가
+    → MAINBOARD_SOCKET_ATTRIBUTES(AM5/AM4/LGA1851/LGA1700, 값은 CPU와
+      다름), MAINBOARD_FORMFACTOR_ATTRIBUTES·CASE_FORMFACTOR_ATTRIBUTES
+      (ATX/M-ATX/ITX/E-ATX, 메인보드=자기 크기 vs 케이스=장착 가능한
+      보드 크기라 의미가 다름), RAM_TYPE_ATTRIBUTES(DDR5/DDR4),
+      PSU_WATTAGE_ATTRIBUTES(450W~499W ~ 1000W~1299W 7구간, 저사양/
+      익스트림 구간 제외), SSD_INTERFACE_ATTRIBUTES(SATA3/PCIe3.0x4/
+      PCIe4.0x4/PCIe5.0x4, x8 레인·U.2 등 엔터프라이즈용 제외)
+    → /search에 socket(CPU/메인보드 공용, 카테고리별로 다른 딕셔너리),
+      formfactor(메인보드/케이스 공용), ram_type, wattage, interface
+      쿼리파라미터 추가. category 분기를 elif 체인으로 정리
+      (GPU/CPU/메인보드/케이스/RAM/파워/SSD 7가지, 메인보드는
+      socket 우선 + formfactor 폴백으로 GPU의 chipset/memory_gb
+      패턴 재사용)
+    → 검증: FastAPI TestClient로 9가지 조합(메인보드 socket 단독/
+      formfactor 단독/둘 다 지정 시 socket 우선, 케이스 formfactor,
+      RAM ram_type, 파워 wattage, SSD interface, CPU에 formfactor
+      지정 시 무시, 쿨러에 socket 지정 시 무시) 전부 기대값과 일치
+
+[✓] 프론트 리팩터 — CATEGORY_SPEC_FILTERS 설정 객체 도입
+    → 카테고리가 늘면서(GPU/CPU/메인보드/RAM/SSD/케이스/파워, 7개 중
+      6개가 스펙 select를 가짐) 이전처럼 `{showXFilter && <select>...}`를
+      매번 손으로 반복하면 중복이 심해질 상황이라, 카테고리→스펙필터
+      목록(specKey/placeholder/title/options) 선언적 배열로 정리하고
+      `.map()`으로 렌더링하도록 리팩터
+    → 상호배타 로직도 단순화됨 — 기존엔 카테고리마다 "다른 state 지우기"
+      onChange 콜백을 따로 썼는데, 이번엔 아예 `specValue: {key, value} |
+      null` 단일 상태 하나로 바꿔서 자연히 하나만 선택 가능해짐(새 값
+      설정이 곧 이전 값 대체)
+    → frontend/src/lib/api.ts::api.search(q, category?, spec?) —
+      SearchSpecParams 객체 + URLSearchParams로 재작성. 포지셔널 인자가
+      (q, category, memoryGb, socket, chipset, ...)로 계속 늘어나는 걸
+      막으려고 이번에 리팩터함(파라미터 늘어날 때마다 호출부 다 고쳐야
+      하는 문제 해결)
+    → CSS 폴리시: `.part-spec-filter` 폭을 96px→116px로 넓힘("800W~899W"
+      같은 긴 라벨이 잘리는 걸 Playwright 스크린샷으로 발견), SSD
+      "인터페이스 전체" placeholder도 "인터페이스"로 줄임(96px 시절
+      폭 기준으로 넉넉했던 문자열이 새 레이아웃에서도 여전히 타이트해서
+      한 번 더 줄임). 자동완성 드롭다운 우측 여백도 select 개수 기반
+      계산식의 슬롯폭을 110→130(116+14)으로 맞춰 갱신
+
+[✓] Playwright 실브라우저 검증 — 8개 카테고리 전부
+    → select 개수 기대값과 실제값 일치(CPU 1/GPU 2/메인보드 2/RAM 1/
+      SSD 1/케이스 1/파워 1/쿨러 0), 메인보드 소켓↔폼팩터 상호배타
+      동작, 각 카테고리 실제 검색 시 올바른 쿼리파라미터로 요청 나가고
+      mock 백엔드가 필터링된 결과만 돌려주는 것, 전체 화면 스크린샷으로
+      레이아웃 깨짐 없음(긴 라벨 잘림 2건 발견해서 그 자리에서 수정)
+      확인. mock 백엔드/Vite dev 서버 프로세스 정리 확인
+
+[✓] 실가_인수인계.md "오늘 세션 마무리" 섹션 대대적으로 압축 — 하루 동안
+    여러 차례 이어진 작업(카테고리 필터→GPU 메모리→라벨 검증→CPU
+    소켓→GPU 칩셋→이번 6종)이 순차 append로 쌓이면서 다음 세션이 읽기
+    부담스러울 정도로 길어져서, 최종 상태 중심의 요약으로 재작성함
+    (인수인계.md는 append-only가 아니라 "현재 상태" 문서라는 원래
+    성격에 맞춤 — 상세 이력은 이 파일(HISTORY.md)에 그대로 남아있음)
+
+[ ] 커밋/push 대기 — 다음 "커밋하자" 지시 대기. PR #7 아직 미생성

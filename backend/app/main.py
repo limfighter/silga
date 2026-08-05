@@ -111,6 +111,76 @@ GPU_CHIPSET_ATTRIBUTES = {
     "Intel": "654-805627-OR",
 }
 
+# /search?socket= 값(메인보드 전용, category=메인보드일 때만 적용) →
+# danawa.get_product_codes(attribute=...) 전달값 매핑(속성코드 500 = CPU 소켓,
+# "B650" 검색 결과 필터 사이드바에서 실측). CPU_SOCKET_ATTRIBUTES와 값 이름은
+# 같지만(AM5/AM4/LGA1851/LGA1700) 다나와 내부 코드 자체가 카테고리마다
+# 별도라 값이 다름(예: CPU 카테고리 AM5=41-801631-OR, 메인보드 카테고리
+# AM5=500-801682-OR) — 카테고리 간 attribute 코드는 절대 재사용 불가,
+# 매번 그 카테고리 자체의 필터 사이드바에서 다시 확보해야 함 확인됨
+MAINBOARD_SOCKET_ATTRIBUTES = {
+    "AM5": "500-801682-OR",
+    "AM4": "500-212831-OR",
+    "LGA1851": "500-987856-OR",
+    "LGA1700": "500-748870-OR",
+}
+
+# /search?formfactor= 값(메인보드/케이스 공용 파라미터, category=메인보드
+# 또는 케이스일 때만 적용) → 카테고리별로 다른 딕셔너리(아래 참조)를 거쳐
+# danawa.get_product_codes(attribute=...)에 전달. 메인보드는 "자기 자신의
+# 크기"(속성코드 506), 케이스는 "장착 가능한 보드 크기"(속성코드 6196,
+# 값 형식이 -AND — 케이스 하나가 여러 폼팩터를 동시에 지원할 수 있어서
+# 다중선택 결합에 AND를 쓰는 것으로 보이나, 단일 값 선택만 지원하는 현재
+# 구현에서는 -OR와 동작상 차이 없음)로 의미가 다름 — 같은 파라미터명이지만
+# 백엔드에서 카테고리별로 분리해서 처리(아래 search() 참조).
+# 후면커넥터형(BTF류)·SSI-CEB/EEB·M-DTX 등은 소수 규격이라 제외, 4개만 채택
+MAINBOARD_FORMFACTOR_ATTRIBUTES = {
+    "ATX": "506-2459-OR",
+    "M-ATX": "506-2460-OR",
+    "ITX": "506-2464-OR",
+    "E-ATX": "506-2461-OR",
+}
+CASE_FORMFACTOR_ATTRIBUTES = {
+    "ATX": "6196-22391-AND",
+    "M-ATX": "6196-22392-AND",
+    "ITX": "6196-22398-AND",
+    "E-ATX": "6196-22394-AND",
+}
+
+# /search?ram_type= 값(RAM 전용, category=RAM일 때만 적용) →
+# danawa.get_product_codes(attribute=...) 전달값 매핑(속성코드 277 = 제품
+# 분류, "DDR5 32GB" 검색 결과 필터 사이드바에서 실측). DDR3/DDR2(구형),
+# LPDDR 계열(노트북용)은 제외 — 데스크탑 신규 조립 기준 DDR5/DDR4만 채택
+RAM_TYPE_ATTRIBUTES = {
+    "DDR5": "277-748099-OR",
+    "DDR4": "277-164333-OR",
+}
+
+# /search?wattage= 값(파워 전용, category=파워일 때만 적용) →
+# danawa.get_product_codes(attribute=...) 전달값 매핑(속성코드 1088 = 정격출력,
+# "850W" 검색 결과 필터 사이드바에서 실측). 250W 미만~400W(저사양 사무용)와
+# 1300W 이상(익스트림 워크스테이션)은 일반 게이밍/조립 PC 범위 밖이라 제외
+PSU_WATTAGE_ATTRIBUTES = {
+    "450W~499W": "1088-5555-OR",
+    "500W~599W": "1088-5556-OR",
+    "600W~699W": "1088-5558-OR",
+    "700W~799W": "1088-173072-OR",
+    "800W~899W": "1088-173073-OR",
+    "900W~999W": "1088-173074-OR",
+    "1000W~1299W": "1088-976690-OR",
+}
+
+# /search?interface= 값(SSD 전용, category=SSD일 때만 적용) →
+# danawa.get_product_codes(attribute=...) 전달값 매핑(속성코드 14690 = 인터페이스,
+# "NVMe 2TB" 검색 결과 필터 사이드바에서 실측). PCIe x8 레인/U.2/기타(서버·
+# 엔터프라이즈용)는 제외 — 일반 소비자용 M.2/SATA 조합 4개만 채택
+SSD_INTERFACE_ATTRIBUTES = {
+    "SATA3": "14690-88980-OR",
+    "PCIe3.0x4": "14690-213230-OR",
+    "PCIe4.0x4": "14690-402191-OR",
+    "PCIe5.0x4": "14690-859759-OR",
+}
+
 
 def _validate_ma_window(ma_window: int) -> int:
     """
@@ -156,17 +226,40 @@ def search(
     ),
     socket: Optional[str] = Query(
         None,
-        description="CPU 소켓 스펙 필터(AM5/AM4/LGA1851/LGA1700) — category=CPU일 때만 적용, "
-                     "그 외에는 무시. CPU_SOCKET_ATTRIBUTES에 없는 값도 무시",
+        description="소켓 스펙 필터(AM5/AM4/LGA1851/LGA1700) — category=CPU 또는 메인보드일 때만 "
+                     "적용(카테고리별로 다나와 내부 코드가 달라 각각 다른 매핑 사용), 그 외 무시. "
+                     "매칭 안 되는 값도 무시",
     ),
     chipset: Optional[str] = Query(
         None,
         description="GPU 칩셋 제조사 스펙 필터(NVIDIA/AMD/Intel) — category=GPU일 때만 적용, "
                      "그 외에는 무시. memory_gb와 동시 지정 시 chipset 우선 적용",
     ),
+    formfactor: Optional[str] = Query(
+        None,
+        description="폼팩터 스펙 필터(ATX/M-ATX/ITX/E-ATX) — category=메인보드 또는 케이스일 때만 "
+                     "적용(메인보드=자기 크기, 케이스=장착 가능한 보드 크기), 그 외 무시. "
+                     "메인보드는 socket과 동시 지정 시 socket 우선 적용",
+    ),
+    ram_type: Optional[str] = Query(
+        None,
+        description="RAM 규격 스펙 필터(DDR5/DDR4) — category=RAM일 때만 적용, 그 외 무시",
+    ),
+    wattage: Optional[str] = Query(
+        None,
+        description="파워 정격출력 스펙 필터(예: 800W~899W) — category=파워일 때만 적용, "
+                     "PSU_WATTAGE_ATTRIBUTES 키와 정확히 일치해야 함, 그 외 무시",
+    ),
+    interface: Optional[str] = Query(
+        None,
+        description="SSD 인터페이스 스펙 필터(SATA3/PCIe3.0x4/PCIe4.0x4/PCIe5.0x4) — "
+                     "category=SSD일 때만 적용, 그 외 무시",
+    ),
 ):
     """
-    GET /search?q={keyword}&category={CATEGORY_LABELS 키, 선택}&memory_gb={GPU 전용, 선택}&socket={CPU 전용, 선택}&chipset={GPU 전용, 선택} →
+    GET /search?q={keyword}&category={CATEGORY_LABELS 키, 선택}&memory_gb={GPU 전용}&chipset={GPU 전용}&
+        socket={CPU/메인보드 전용}&formfactor={메인보드/케이스 전용}&ram_type={RAM 전용}&
+        wattage={파워 전용}&interface={SSD 전용} (스펙 파라미터는 전부 선택, category와 안 맞으면 무시) →
         [{code, title, price, price_formatted}, ...]
     """
     category_label = CATEGORY_LABELS.get(category) if category else None
@@ -175,6 +268,16 @@ def search(
         attribute = GPU_CHIPSET_ATTRIBUTES.get(chipset) or GPU_MEMORY_ATTRIBUTES.get(memory_gb)
     elif category == "CPU":
         attribute = CPU_SOCKET_ATTRIBUTES.get(socket)
+    elif category == "메인보드":
+        attribute = MAINBOARD_SOCKET_ATTRIBUTES.get(socket) or MAINBOARD_FORMFACTOR_ATTRIBUTES.get(formfactor)
+    elif category == "케이스":
+        attribute = CASE_FORMFACTOR_ATTRIBUTES.get(formfactor)
+    elif category == "RAM":
+        attribute = RAM_TYPE_ATTRIBUTES.get(ram_type)
+    elif category == "파워":
+        attribute = PSU_WATTAGE_ATTRIBUTES.get(wattage)
+    elif category == "SSD":
+        attribute = SSD_INTERFACE_ATTRIBUTES.get(interface)
     try:
         results = danawa.get_product_codes(q, category_label=category_label, attribute=attribute)
     except requests.RequestException:

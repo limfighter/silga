@@ -341,8 +341,8 @@ input{font-family:inherit;}
 .part-spec-filter{
   appearance:none;
   -webkit-appearance:none;
-  flex:0 0 96px;
-  width:96px;
+  flex:0 0 116px;
+  width:116px;
   min-width:0;
   background:var(--surface-2);
   border:1px solid var(--line);
