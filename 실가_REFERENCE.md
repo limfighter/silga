@@ -221,8 +221,17 @@ sammy310/Danawa-Crawler (MIT):
 
 ## 엔드포인트 설계 (계약 — app-shell-mockup.html이 이 계약 전제로 만들어짐)
 ```
-GET  /search?q={keyword}
+GET  /search?q={keyword}&category={선택, CPU|GPU|메인보드|RAM|SSD|케이스|파워|쿨러}
   → [{code, title, price, price_formatted}, ...]
+  ※ category는 v0.5(2026-08-05) 추가 — 검색어가 다른 카테고리 상품과 겹칠 때
+    결과를 좁히는 선택적 필터. 값은 backend/app/main.py의 CATEGORY_LABELS 키와
+    정확히 일치해야 필터가 적용됨(일치 안 하면 무필터, 기존과 동일 동작 — 하위
+    호환). 내부적으로 danawa.get_product_codes(category_label=...)가 각 상품
+    li의 input#productItem_categoryInfo_{code} 값 마지막 "_" 뒤 조각과 비교해서
+    사후 필터링(다나와 요청 URL에 새 파라미터를 추가하는 방식이 아님 — 근거는
+    실가_HISTORY.md 2026-08-05 참조). GPU("그래픽카드")만 실제 상품 HTML로
+    직접 검증됨, 나머지 7개 라벨은 검색결과 페이지 "관련 카테고리" 트리에서
+    확보(간접 검증)
 
 GET  /product/{code}
   → {code, title, category, current_price, cash_price, spec,

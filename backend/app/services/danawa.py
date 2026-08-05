@@ -31,7 +31,7 @@ def _get_header(host: str, referer: str = None):
     return header
 
 
-def get_product_codes(keyword: str) -> list:
+def get_product_codes(keyword: str, category_label: str = None) -> list:
     """
     검색어로 상품 코드 목록을 조회한다.
 
@@ -41,6 +41,16 @@ def get_product_codes(keyword: str) -> list:
       - li 태그 클래스 매칭을 "prod_item 포함 여부"로 완화 (원본은
         "prod_item width_change" 고정 셀렉터라 GPU 카테고리만 우연히 매칭되고
         CPU/RAM/SSD 등은 전부 0건 반환하는 문제가 있었음)
+      - category_label 인자 신규 추가(2026-08-05): 검색어가 다른 카테고리
+        상품과 겹칠 때(예: 그래픽카드 이름이 마우스/키보드 상품 설명에도 걸리는
+        경우) 결과를 좁히는 용도. 다나와 요청 URL에 새 파라미터를 추측해서
+        붙이는 대신, 각 상품 li에 이미 박혀 있는
+        input#productItem_categoryInfo_{code}의 value(예: "PC 주요 부품_그래픽카드")
+        마지막 "_" 뒤 조각으로 사후 필터링 — 이 필드는 40개 상품 전체에서
+        존재/일관성 확인됨(GPU 실측). 참고로 같은 li 안의
+        hidden_cate_sub_c1/c2/c3는 첫 번째 상품에서만 발견돼 상품별 필드가
+        아닌 것으로 보여 사용하지 않음 (실가_HISTORY.md 2026-08-05 참조).
+        None이면 기존과 동일하게 전체 반환
     """
     from urllib.parse import quote
     response = requests.get("https://search.danawa.com/dsearch.php?query={}&tab=main".format(quote(keyword)),
@@ -66,6 +76,14 @@ def get_product_codes(keyword: str) -> list:
         if code2 is None or not code2.isdigit():
             continue
         code3 = int(code2)
+
+        if category_label is not None:
+            cate_input = product.find(
+                "input", {"id": lambda x: x and x.startswith("productItem_categoryInfo_")}
+            )
+            cate_value = (cate_input or None) and cate_input.get("value")
+            if cate_value is None or cate_value.rsplit("_", 1)[-1] != category_label:
+                continue
 
         price1 = product.find_next("input", {"id": "min_price_{}".format(code3)})
         price2 = (price1 or None) and price1.get("value")

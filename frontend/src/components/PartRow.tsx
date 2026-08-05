@@ -23,8 +23,8 @@ export default function PartRow({
   const [focused, setFocused] = useState(false);
 
   const { data, isFetching } = useQuery({
-    queryKey: ["search", debounced],
-    queryFn: () => api.search(debounced),
+    queryKey: ["search", debounced, category],
+    queryFn: () => api.search(debounced, category),
     enabled: debounced.trim().length > 1 && focused,
   });
 

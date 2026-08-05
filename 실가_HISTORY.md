@@ -745,3 +745,89 @@
       해결. 실 백엔드/프론트 코드는 변경 없음
     → 스크린샷 경로 하드코딩(/home/claude/e2e_*.png) 등 기존 스크립트의
       다른 특성은 그대로 유지(변경 범위 최소화)
+
+---
+
+### 2026-08-05
+
+#### v0.5 — /search 카테고리 필터 구현 (danawa-scraper-filters)
+
+[✓] 배경
+    → 인수인계 문서에 "검색어가 다른 카테고리 상품과 섞일 수 있음"이라는
+      이론적 우려가 남아 있었음(실측 버그로 확인된 적은 없음). 사용자가
+      danawa 검색결과 페이지의 상세검색 필터 사이드바 실측을 도와줘서
+      (이 환경은 danawa.com 프록시 차단 지속 — 사용자가 로컬 브라우저
+      F12로 HTML 복사해서 전달하는 방식으로 진행, 기존 세션들과 동일 패턴)
+      카테고리 필터를 실제로 구현함
+
+[✓] 다나와 상세검색 필터 사이드바 구조 실측(GPU 검색 "RTX 5070 Ti" 기준)
+    → 필터 그룹 39개 확인(제조사/칩셋/클럭/메모리/전원/크기 등), 체크박스
+      803개
+    → 필터 체크박스 클릭 시 별도 XHR 없이 URL 쿼리스트링이 통째로 바뀌는
+      풀 페이지 재요청 방식 확인. 새로 붙는 파라미터는
+      attribute={속성코드}-{값코드}-{연산자}(예: 658-1018240-OR) 형태 —
+      스펙 속성(메모리용량 등) 필터용으로 보이나, 다중 선택 시 결합 규칙
+      (콤마 구분? 반복 파라미터?)은 미검증이라 이번엔 채택 안 함
+    → 검색결과 페이지 자체에 "이 검색어와 관련된 다른 카테고리" 트리가
+      categorycode 속성과 함께 내려오는 걸 발견 — 카테고리 코드 확보에 활용
+    → 상품 목록 li(class="prod_item") 안에서 카테고리 필터링에 쓸 수 있는
+      필드 2종 발견:
+        1) input#hidden_cate_sub_c1/c2/c3 — 숫자 카테고리 코드지만 실측
+           결과 40개 상품 중 첫 번째 상품에만 존재(상품별 필드 아닌 것으로
+           보임, 다른 위젯의 잔재로 추정) → 채택 안 함. 처음엔 이걸로
+           구현했다가(hidden_cate_sub_c2 == 876 매칭) GPU 필터 결과가
+           40건 중 1건만 나오는 걸 오프라인 fixture 테스트로 발견하고
+           바로 폐기
+        2) input#productItem_categoryInfo_{code}(값 예: "PC 주요
+           부품_그래픽카드") — 40개 상품 전체에서 일관되게 존재/값 일치
+           확인 → 이걸로 최종 구현
+
+[✓] backend/app/services/danawa.py::get_product_codes 시그니처 변경
+    → category_label: str = None 인자 추가(하위 호환, 기본값 None=기존과
+      동일하게 전체 반환)
+    → 상품 li별로 input#productItem_categoryInfo_{code} 값을 찾아 마지막
+      "_" 뒤 조각이 category_label과 다르면 결과에서 제외
+    → 검증: 사용자가 제공한 실제 GPU 검색결과 HTML을 requests.get mock
+      응답으로 고정해서 오프라인 테스트 — 무필터 40건, category_label=
+      "그래픽카드" 40/40건, category_label="CPU" 0/40건 확인
+
+[✓] backend/app/main.py — CATEGORY_LABELS 상수 신규 + GET /search에
+    category 쿼리파라미터(선택) 추가
+    → CATEGORY_LABELS = {CPU, GPU→그래픽카드, 메인보드, RAM, SSD, 케이스,
+      파워, 쿨러→쿨러/튜닝} 8개
+    → GPU("그래픽카드")만 실제 상품 li HTML로 직접 검증됨. 나머지 7개
+      라벨(CPU/메인보드/RAM/SSD/케이스/파워/쿨러)은 danawa 검색결과
+      페이지의 "관련 카테고리" 트리 라벨 텍스트에서 확보 — 사용자가
+      "CPU"(→메인보드 코드까지 덤으로 확보), "SSD", "쿨러" 3개 검색어로
+      필터 사이드바 HTML을 순차로 제공해서 8개 카테고리 코드/라벨 전부
+      모음. 다만 이 7개는 상품 li 안의 실제 categoryInfo 값으로 직접
+      대조 검증된 건 아니라서(간접 검증), 실사용 중 특정 카테고리 필터가
+      0건만 반환하면 라벨 문자열 불일치를 의심할 것
+    → CATEGORY_LABELS에 없는 category 값(예: FavoritesPage/StatsPage의
+      PartRow가 쓰는 "검색"/"부품")은 필터 없이 무시 — 기존 동작 그대로
+      유지, 하위 호환
+    → FastAPI TestClient로 /search?category= 정상/오매칭/None 3가지
+      케이스 확인
+
+[✓] 프론트 연동
+    → frontend/src/lib/api.ts::api.search(q, category?) — category 있으면
+      쿼리파라미터로 전달
+    → frontend/src/components/PartRow.tsx — 기존엔 category prop을 화면
+      표시용 라벨로만 쓰고 검색 호출엔 반영 안 하고 있었음(useQuery
+      queryKey/queryFn 둘 다 q만 사용) → category도 queryKey/queryFn에
+      포함시켜서 실제 검색 필터링에 반영되도록 수정
+    → BuildCreatePage.tsx의 CATEGORIES 상수(CPU/GPU/메인보드/RAM/SSD/
+      케이스/파워/쿨러)가 CATEGORY_LABELS 키와 이미 1:1 일치해서 별도
+      프론트 코드 변경 없이 자동으로 필터 적용됨
+    → npm run typecheck 통과 확인(노드모듈 최초 설치 필요했음 —
+      환경 초기 상태라 react 타입 선언 자체가 없어서 나던 에러였고
+      실 코드 문제 아니었음)
+
+[ ] 보류 — 스펙 속성 필터(attribute=코드-값-OR)
+    → 다중 선택 결합 규칙 미검증 + 카테고리별 스펙 코드 카탈로그(예: GPU
+      메모리 용량, CPU 소켓 등) 구축이 필요해 범위가 큼. 구체적으로 어떤
+      스펙에 UI가 필요한지 정해지면 이어서 진행 (실가_인수인계.md
+      "다음 세션 시작 지점" 참조)
+
+[ ] 커밋/push 대기 — 다음 "커밋 하자" 지시 대기 (브랜치
+    claude/danawa-scraper-filters-bryp6q)
