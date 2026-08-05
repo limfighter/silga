@@ -13,6 +13,12 @@ export interface SelectedPart {
 const GPU_MEMORY_OPTIONS = [4, 6, 8, 10, 11, 12, 16, 20, 24, 32, 48];
 // CPU 소켓 필터 옵션 — backend/app/main.py::CPU_SOCKET_ATTRIBUTES 키와 일치해야 함
 const CPU_SOCKET_OPTIONS = ["AM5", "AM4", "LGA1851", "LGA1700"];
+// GPU 칩셋 제조사 필터 옵션 — backend/app/main.py::GPU_CHIPSET_ATTRIBUTES 키와 일치해야 함
+const GPU_CHIPSET_OPTIONS = ["NVIDIA", "AMD", "Intel"];
+
+// .part-spec-filter 폭(96px) + .part-row gap(14px) — 오른쪽에 붙는 select
+// 개수만큼 자동완성 드롭다운 오른쪽 여백을 늘리는 데 씀
+const SPEC_FILTER_SLOT_WIDTH = 110;
 
 export default function PartRow({
   category,
@@ -28,13 +34,17 @@ export default function PartRow({
   const [focused, setFocused] = useState(false);
   const [memoryGb, setMemoryGb] = useState<number | undefined>(undefined);
   const [socket, setSocket] = useState<string | undefined>(undefined);
+  const [chipset, setChipset] = useState<string | undefined>(undefined);
   const showMemoryFilter = category === "GPU";
+  const showChipsetFilter = category === "GPU";
   const showSocketFilter = category === "CPU";
-  const showSpecFilter = showMemoryFilter || showSocketFilter;
+  const specFilterCount = Number(showMemoryFilter) + Number(showChipsetFilter) + Number(showSocketFilter);
 
   const { data, isFetching } = useQuery({
-    queryKey: ["search", debounced, category, memoryGb, socket],
-    queryFn: () => api.search(debounced, category, memoryGb, socket),
+    // chipset과 memory_gb는 백엔드에서 chipset 우선(동시 결합 미지원)이므로
+    // 검색 결과에 실제 영향을 주는 순서 그대로 쿼리키에 반영
+    queryKey: ["search", debounced, category, chipset, memoryGb, socket],
+    queryFn: () => api.search(debounced, category, memoryGb, socket, chipset),
     enabled: debounced.trim().length > 1 && focused,
   });
 
@@ -75,12 +85,33 @@ export default function PartRow({
             onFocus={() => setFocused(true)}
             onBlur={() => setTimeout(() => setFocused(false), 150)}
           />
+          {showChipsetFilter && (
+            <select
+              className="part-spec-filter"
+              value={chipset ?? ""}
+              onChange={(e) => {
+                setChipset(e.target.value || undefined);
+                setMemoryGb(undefined); // 백엔드가 attribute 1개만 지원(동시 결합 미지원) — chipset 우선
+              }}
+              title="칩셋 제조사로 좁혀서 검색 (메모리 용량과 동시 선택 불가)"
+            >
+              <option value="">제조사 전체</option>
+              {GPU_CHIPSET_OPTIONS.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          )}
           {showMemoryFilter && (
             <select
               className="part-spec-filter"
               value={memoryGb ?? ""}
-              onChange={(e) => setMemoryGb(e.target.value ? Number(e.target.value) : undefined)}
-              title="메모리 용량으로 좁혀서 검색"
+              onChange={(e) => {
+                setMemoryGb(e.target.value ? Number(e.target.value) : undefined);
+                setChipset(undefined); // 위와 동일한 이유로 상호 배타
+              }}
+              title="메모리 용량으로 좁혀서 검색 (칩셋 제조사와 동시 선택 불가)"
             >
               <option value="">용량 전체</option>
               {GPU_MEMORY_OPTIONS.map((gb) => (
@@ -109,7 +140,10 @@ export default function PartRow({
       )}
 
       {focused && !selected && debounced.trim().length > 1 && (
-        <div className={`autocomplete-list${showSpecFilter ? " autocomplete-list--with-filter" : ""}`}>
+        <div
+          className="autocomplete-list"
+          style={specFilterCount > 0 ? { right: 16 + specFilterCount * SPEC_FILTER_SLOT_WIDTH } : undefined}
+        >
           {isFetching && <div className="autocomplete-item" style={{ pointerEvents: "none" }}>검색 중...</div>}
           {!isFetching && data?.length === 0 && (
             <div className="autocomplete-item" style={{ pointerEvents: "none" }}>결과 없음</div>

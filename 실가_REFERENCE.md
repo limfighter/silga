@@ -221,7 +221,7 @@ sammy310/Danawa-Crawler (MIT):
 
 ## 엔드포인트 설계 (계약 — app-shell-mockup.html이 이 계약 전제로 만들어짐)
 ```
-GET  /search?q={keyword}&category={선택, CPU|GPU|메인보드|RAM|SSD|케이스|파워|쿨러}&memory_gb={선택, GPU 전용}&socket={선택, CPU 전용}
+GET  /search?q={keyword}&category={선택, CPU|GPU|메인보드|RAM|SSD|케이스|파워|쿨러}&memory_gb={선택, GPU 전용}&socket={선택, CPU 전용}&chipset={선택, GPU 전용}
   → [{code, title, price, price_formatted}, ...]
   ※ category는 v0.5(2026-08-05) 추가 — 검색어가 다른 카테고리 상품과 겹칠 때
     결과를 좁히는 선택적 필터. 값은 backend/app/main.py의 CATEGORY_LABELS 키와
@@ -245,6 +245,16 @@ GET  /search?q={keyword}&category={선택, CPU|GPU|메인보드|RAM|SSD|케이�
     구형 소켓(sWRX8·sTRX4·TR4·sTR5·SP3·FM2·AM3+·AM3, 2066·4677·4189·3647·
     2011 계열·1366·1150·1155·1156·775·1200·1151v2·1151)은 실측은 했지만
     현행 유통 소켓 4개만 채택
+  ※ chipset도 v0.5(2026-08-05) 추가 — GPU 칩셋 제조사(NVIDIA/AMD/Intel)
+    스펙 필터, category=GPU일 때만 적용(그 외 무시, 속성코드 654 = 칩셋
+    제조사). backend/app/main.py::GPU_CHIPSET_ATTRIBUTES에 없는 값은 무시.
+    FuriosaAI(AI 가속기 칩 제조사)는 실측은 됐지만 일반 소비자용 그래픽카드가
+    아니라서 제외. **memory_gb와 동시에 지정하면 chipset이 우선 적용되고
+    memory_gb는 무시됨** — get_product_codes의 attribute 인자가 값 하나만
+    받을 수 있어서(다중 attribute 결합 규칙 미검증) 같은 GPU 카테고리 안의
+    스펙 필터 두 개를 동시에 적용할 수 없음. 프론트(PartRow)는 이 제약을
+    반영해 두 select를 상호 배타로 구현(하나 선택 시 다른 하나 자동 해제) —
+    API를 직접 호출하는 쪽(AI 라우터 등)도 이 우선순위를 알아야 함
   ※ 다른 카테고리/스펙(RAM 규격, 메인보드 폼팩터 등)으로 확장하려면 같은
     패턴(다나와 필터 사이드바에서 체크박스 클릭 → 바뀐 URL의 attribute= 값
     확인)으로 코드를 먼저 확보해야 함

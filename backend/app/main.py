@@ -98,6 +98,19 @@ CPU_SOCKET_ATTRIBUTES = {
     "LGA1700": "41-748240-OR",
 }
 
+# /search?chipset= 값(GPU 전용, category=GPU일 때만 적용) →
+# danawa.get_product_codes(attribute=...) 전달값 매핑(속성코드 654 = 칩셋
+# 제조사). "RTX 5070 Ti" 검색 결과 필터 사이드바에서 실측(실가_HISTORY.md
+# 2026-08-05 참조) — FuriosaAI(AI 가속기 칩 제조사, 일반 소비자용
+# 그래픽카드 아님)는 제외하고 실제 소비자용 그래픽카드 제조사 3개만 채택.
+# memory_gb와 동시 지정 시 다중 attribute 결합 규칙이 미검증이라 둘 다
+# 적용하지 않고 chipset을 우선 적용(아래 search() 참조)
+GPU_CHIPSET_ATTRIBUTES = {
+    "NVIDIA": "654-3518-OR",
+    "AMD": "654-3517-OR",
+    "Intel": "654-805627-OR",
+}
+
 
 def _validate_ma_window(ma_window: int) -> int:
     """
@@ -146,18 +159,22 @@ def search(
         description="CPU 소켓 스펙 필터(AM5/AM4/LGA1851/LGA1700) — category=CPU일 때만 적용, "
                      "그 외에는 무시. CPU_SOCKET_ATTRIBUTES에 없는 값도 무시",
     ),
+    chipset: Optional[str] = Query(
+        None,
+        description="GPU 칩셋 제조사 스펙 필터(NVIDIA/AMD/Intel) — category=GPU일 때만 적용, "
+                     "그 외에는 무시. memory_gb와 동시 지정 시 chipset 우선 적용",
+    ),
 ):
     """
-    GET /search?q={keyword}&category={CATEGORY_LABELS 키, 선택}&memory_gb={GPU 전용, 선택}&socket={CPU 전용, 선택} →
+    GET /search?q={keyword}&category={CATEGORY_LABELS 키, 선택}&memory_gb={GPU 전용, 선택}&socket={CPU 전용, 선택}&chipset={GPU 전용, 선택} →
         [{code, title, price, price_formatted}, ...]
     """
     category_label = CATEGORY_LABELS.get(category) if category else None
-    if category == "GPU" and memory_gb:
-        attribute = GPU_MEMORY_ATTRIBUTES.get(memory_gb)
-    elif category == "CPU" and socket:
+    attribute = None
+    if category == "GPU":
+        attribute = GPU_CHIPSET_ATTRIBUTES.get(chipset) or GPU_MEMORY_ATTRIBUTES.get(memory_gb)
+    elif category == "CPU":
         attribute = CPU_SOCKET_ATTRIBUTES.get(socket)
-    else:
-        attribute = None
     try:
         results = danawa.get_product_codes(q, category_label=category_label, attribute=attribute)
     except requests.RequestException:

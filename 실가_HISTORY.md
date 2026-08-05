@@ -1011,7 +1011,69 @@
       `category=CPU&socket=AM5` 쿼리로 요청 나가는 것, 필터링된 자동완성
       결과 표시까지) 둘 다 확인
 
-[ ] 커밋/push 대기 — 위 3건(폴리시 2 + CPU 소켓 필터) + 앞서 완료된
-    오탈자 수정/8개 라벨 검증 정정까지 전부 한 커밋으로 묶어서 커밋+push
-    예정(사용자 지시 — "3번 찾고 1,2 고치자", "한번에 하게"). PR #6은
-    이미 머지·종료라 이번 커밋은 새 PR(#7 예정) 대상
+[✓] 커밋/push 완료(16e5ef5) — 위 3건(폴리시 2 + CPU 소켓 필터) + 앞서
+    완료된 오탈자 수정/8개 라벨 검증 정정까지 전부 한 커밋으로 묶음
+    (사용자 지시 — "3번 찾고 1,2 고치자", "한번에 하게"). PR #6은
+    이미 머지·종료라 이번 커밋은 새 PR(#7 예정) 대상, 아직 PR은 안 만듦
+
+---
+
+### 2026-08-05 (같은 날, 이어서 — 사용자가 리뷰 후 "나머지도 할까" 제안)
+
+#### GPU 칩셋 제조사(NVIDIA/AMD/Intel) 스펙 필터 신규
+
+[✓] 배경
+    → 사용자가 "cpu말고도 gpu는 라이젠것도 있고" — GPU에도 칩셋 제조사별
+      필터가 있으면 좋겠다는 취지로 확인(AskUserQuestion으로 "칩셋
+      제조사(NVIDIA/AMD/인텔)"가 맞는지 명확화)
+    → 처음 GPU 필터 사이드바를 실측했을 때(2026-08-05 최초 세션) 이미
+      "칩셋 제조사" 그룹(속성코드 654: NVIDIA/AMD(ATi)/Intel/FuriosaAI)
+      데이터를 받아뒀던 상태라 추가 자료 수집 없이 바로 구현 가능했음
+
+[✓] backend/app/main.py::GPU_CHIPSET_ATTRIBUTES 신규
+    → NVIDIA(654-3518-OR)/AMD(654-3517-OR)/Intel(654-805627-OR) 3개 채택,
+      FuriosaAI(654-981322-OR, AI 가속기 칩 제조사)는 일반 소비자용
+      그래픽카드가 아니라서 제외(GPU 메모리 데이터센터 용량, CPU
+      워크스테이션 소켓 제외 때와 같은 원칙)
+    → /search에 chipset 쿼리파라미터 추가, category=GPU일 때만 적용
+
+[✓] memory_gb·chipset 동시 지정 처리 — chipset 우선 + 폴백
+    → danawa.get_product_codes의 attribute 인자가 값 하나만 받을 수 있어서
+      (다중 attribute 결합 규칙 여전히 미검증) 같은 GPU 카테고리 안의
+      스펙 필터 두 개를 동시에 적용할 방법이 없음
+    → `attribute = GPU_CHIPSET_ATTRIBUTES.get(chipset) or
+      GPU_MEMORY_ATTRIBUTES.get(memory_gb)` — chipset이 유효하면 그걸
+      쓰고, chipset이 없거나 오매칭이면 memory_gb로 자연스럽게 폴백.
+      처음엔 `if chipset: ... elif memory_gb: ...` 형태로 짰다가, 이
+      방식이면 chipset에 오매칭 값이 들어왔을 때 memory_gb가 유효해도
+      같이 무시돼버리는 버그가 있어서(첫 if 분기가 이미 선택됨) or
+      체이닝으로 수정 — FastAPI TestClient로 "오매칭 chipset + 유효
+      memory_gb → memory_gb 폴백" 케이스까지 포함해서 5가지 조합 검증
+    → 프론트(PartRow)도 동일한 제약을 반영해 두 select를 상호 배타로
+      구현 — 하나 선택하면 다른 하나 자동으로 빈 값(전체)으로 리셋
+
+[✓] GPU 행 select가 최대 2개(칩셋 제조사 + 메모리 용량)까지 늘어나면서
+    자동완성 드롭다운 겹침 방지 로직 일반화
+    → 직전 커밋에서 추가한 `.autocomplete-list--with-filter`(고정
+      right:126px, select 1개 기준)로는 select 2개인 GPU 행을 못 커버해서
+      폐기하고, `specFilterCount`(그 행에 실제로 보이는 select 개수: GPU는
+      칩셋+메모리 2개, CPU는 소켓 1개, 나머지는 0개) 기반 인라인 스타일
+      계산으로 교체 — `right: 16 + specFilterCount * 110`(110 = select
+      폭 96px + row gap 14px)
+    → Playwright로 재검증: GPU 행(select 2개) dropdown 우측 끝(x=514)이
+      첫 번째 select 시작(x=528)보다 작아 겹침 없음 확인. CPU 행(select
+      1개)도 기존과 동일하게 겹침 없음 유지 확인
+
+[✓] 검증
+    → FastAPI TestClient: chipset 단독 지정/memory_gb 단독 지정/둘 다
+      지정(chipset 우선)/오매칭 chipset+유효 memory_gb(폴백)/CPU
+      카테고리에서 chipset 지정(무시) — 5가지 케이스 전부 기대한
+      attribute 값과 일치
+    → Playwright 실브라우저(mock 백엔드): GPU 행 select 2개 존재·칩셋
+      옵션 4개(제조사 전체/NVIDIA/AMD/Intel) 정확, 메모리 용량 선택 후
+      칩셋 선택하면 메모리 선택이 자동으로 풀리는 것, 실제 검색 시
+      `category=GPU&chipset=NVIDIA` 쿼리로 요청 나가고 memory_gb는
+      파라미터에서 빠지는 것, 필터링된 자동완성 결과(NVIDIA 카드만)
+      표시까지 확인. mock 백엔드/Vite dev 서버 프로세스 전부 종료 확인
+
+[ ] 커밋/push 대기 — 다음 지시 대기
