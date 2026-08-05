@@ -1312,4 +1312,22 @@ UI/UX도 리서치로 고도화해서 실제 시중 빌드 웹 디자인처럼" 
     빌드 목록(▲▼ 배지), 검색 결과 정렬 전부 실브라우저 확인.
     npm run typecheck 통과
 
-[ ] 커밋/push 대기 — 다음 "커밋하자" 지시 대기
+[✓] 커밋/push 완료(9c0a24e)
+
+---
+
+### 2026-08-05 (같은 날, 이어서 — PR #9 오픈)
+
+[✓] "pr 할까?" 확인 중 PR #8이 이미 머지돼 있는 걸 발견(main에 c312020
+    반영됨) — 머지된 PR 브랜치라 재사용 불가. 브랜치를 최신 origin/main
+    위로 rebase(커밋 3개: e686a79→7581545, db61895→db04cd6,
+    9c0a24e→6c226bf로 해시 변경, 충돌 없음 — main의 c312020이 이 브랜치의
+    조상이라 그대로 이어짐), npm run typecheck 재확인 후
+    force-with-lease push
+
+[✓] PR #9 오픈 — https://github.com/limfighter/silga/pull/9
+    (base: main, head: claude/danawa-category-spec-filters-a04sod,
+    커밋 3개, mergeable_state: clean). PR 템플릿 없어서 자유 형식으로
+    배경/변경내용/미반영/검증 섹션 구성
+
+[ ] PR #9 머지 대기 — 다음 세션 시작 시 상태 확인 필요
