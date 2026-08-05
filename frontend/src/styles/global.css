@@ -101,6 +101,7 @@ input{font-family:inherit;}
   flex-direction:column;
   gap:2px;
   overflow-y:auto;
+  overflow-x:hidden;
 }
 .nav-item{
   display:flex;
