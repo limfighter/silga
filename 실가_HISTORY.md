@@ -1168,4 +1168,23 @@
     (인수인계.md는 append-only가 아니라 "현재 상태" 문서라는 원래
     성격에 맞춤 — 상세 이력은 이 파일(HISTORY.md)에 그대로 남아있음)
 
+[✓] 커밋/push 완료(ab60a3e)
+
+---
+
+### 2026-08-05 (같은 날, 이어서 — "문제점 있어?" 코드 리뷰)
+
+[✓] GPU_MEMORY_ATTRIBUTES/GPU_MEMORY_OPTIONS 불일치 발견+수정
+    → 백엔드-프론트 스펙 딕셔너리 8쌍을 전부 스크립트로 대조 검증하다가
+      GPU_MEMORY_ATTRIBUTES(backend)에만 1/2/3/5GB가 남아있고
+      GPU_MEMORY_OPTIONS(frontend)엔 4GB부터만 있는 걸 발견 — UI로는
+      절대 선택 못 하는 죽은 딕셔너리 항목이었음. 나머지 7쌍(칩셋/소켓
+      2종/폼팩터 2종/RAM/파워/SSD)은 전부 정확히 일치 확인
+    → backend/app/main.py::GPU_MEMORY_ATTRIBUTES에서 1/2/3/5GB 제거해서
+      11개(4~48GB)로 프론트와 맞춤. FastAPI TestClient로 memory_gb=1(제거된
+      값 → 무필터)/memory_gb=16(정상) 재확인
+    → 잔여 리스크로 기록만 해둠(수정 안 함, 검증 불가): 케이스 폼팩터
+      필터만 값 형식이 "-AND"(나머지 전부 "-OR")인데 라이브 검증 불가라
+      단일값 선택에서 -OR와 동일하게 동작하는지 100% 확인은 안 됨
+
 [ ] 커밋/push 대기 — 다음 "커밋하자" 지시 대기. PR #7 아직 미생성
