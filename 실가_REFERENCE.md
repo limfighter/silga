@@ -489,6 +489,30 @@ accent — 없음(모노크롬 원칙). 상태 구분은 색이 아니라 기호
   .gauge-zone/.gauge-marker)로 교체. diff_percent를 ±30% 클램프해 바
   0~100% 위치에 매핑, VERDICT_THRESHOLD_PERCENT(±5%) 구간을 음영(.gauge-zone)
   으로 표시
+
+스펙시트 컴포넌트 (2026-08-05 2차 — 참조 디자인 요소 추가 이식)
+  .strip/.st        4칸 고정 스탯 스트립(빌드 상세 상단 요약). 셀 수가 항상
+                    4로 고정이라 위의 "빈 셀 노출" 함정에 해당 없음
+  .total-row        큰 총액 숫자 + 우측 메타 블록
+  .confirm-row      견적↔판매가 대비(.confirm-num 2개 + .confirm-arrow),
+                    .diff-badge로 차액·증감률 표기
+  .sec-head         섹션 제목 + 우측 note (하단 1px ink 룰)
+  .grp              부품 그룹 헤더(연산부/그래픽/…), ::after로 우측 채움선
+  .spec-row         부품 행 3열(.spec-cat | .spec-name+.spec-desc | .spec-price)
+  .prop-bar         부품별 총액 비중 바(참조 디자인 .sp-bar)
+  .sum              소계(상단 2px ink 룰)
+  .build-summary    빌드 생성 화면 하단 sticky 러닝 총액 + 진행 틱(.bs-tick)
+  .rv               스크롤/마운트 리빌(prefers-reduced-motion에서 무효화)
+
+숫자 정렬 규칙 (중요)
+  가격이 열로 정렬되려면 자릿수 폭이 같아야 함 — 모노 폰트를 쓰는 클래스는
+  전부 font-variant-numeric:tabular-nums 적용(global.css 상단 셀렉터 목록).
+  새 가격 표시 클래스를 추가하면 그 목록에도 같이 넣을 것
+
+인쇄
+  빌드 상세는 견적서로 출력 가능해야 함 — @page margin 14mm, 사이드바/탑바/
+  버튼/sticky 요약은 @media print에서 숨김, .spec-row/.strip/.sum은
+  break-inside:avoid
 ```
 
 ---

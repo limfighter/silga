@@ -23,6 +23,15 @@ body{
   height:100vh;
   overflow:hidden;
 }
+/* 가격 숫자가 열로 정렬되려면 자릿수 폭이 같아야 함 — 스펙시트의 핵심 디테일.
+   모노 폰트를 쓰는 곳은 전부 tabular-nums 적용 */
+[class*="mono"],
+.bc-price,.b-row .val,.gauge-card .price,.chart-stats,
+.spec-price,.sum-val,.confirm-num,.total-num,.st-v,
+.search-result-row .pr,.recent-row .pr,.part-selected .pr,
+.autocomplete-item .pr{
+  font-variant-numeric:tabular-nums;
+}
 button{font-family:inherit;cursor:pointer;}
 input{font-family:inherit;}
 :focus-visible{outline:2px solid var(--ink);outline-offset:2px;}
@@ -583,3 +592,168 @@ input{font-family:inherit;}
   transition:color .15s,background .15s;
 }
 .recent-row .remove:hover{color:var(--ink);background:var(--paper-2);}
+
+/* ── 스탯 스트립 (빌드 상세 상단 요약) ───────────────────────
+   참조 디자인 .strip — 격자선은 컨테이너 background+gap:1px 트릭.
+   셀 개수가 항상 4개로 고정이라 빈 셀 노출 문제(REFERENCE.md #디자인-토큰)
+   없음 */
+.strip{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:1px;
+  background:var(--line-lt);
+  border:1px solid var(--line-lt);
+  margin-bottom:36px;
+}
+.st{background:var(--paper);padding:18px 20px 20px;}
+.st-k{
+  font-family:var(--font-mono);font-size:10px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--mute-lt);margin-bottom:9px;
+}
+.st-v{font-size:14px;font-weight:500;letter-spacing:-.01em;line-height:1.45;}
+.st-v em{
+  font-style:normal;display:block;font-size:11.5px;font-weight:400;
+  color:var(--mute-lt);margin-top:3px;font-family:var(--font-mono);
+}
+@media(max-width:860px){.strip{grid-template-columns:1fr 1fr;}}
+@media(max-width:520px){.strip{grid-template-columns:1fr;}}
+
+/* ── 총액 표시 ── */
+.total-row{
+  display:flex;align-items:flex-end;justify-content:space-between;
+  gap:24px;flex-wrap:wrap;margin-bottom:36px;
+}
+.total-label{
+  font-family:var(--font-mono);font-size:10.5px;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--mute-lt);margin-bottom:12px;
+}
+.total-num{
+  font-family:var(--font-mono);font-size:clamp(32px,5.4vw,48px);
+  font-weight:500;letter-spacing:-.04em;line-height:1;
+}
+.total-num span{font-size:.4em;font-weight:400;color:var(--mute-lt);margin-left:8px;letter-spacing:0;}
+.total-meta{
+  text-align:right;font-family:var(--font-mono);font-size:11.5px;
+  color:var(--mute-lt);line-height:1.9;
+}
+@media(max-width:660px){.total-meta{text-align:left;}}
+
+/* ── 견적 ↔ 판매가 비교 (참조 디자인 .confirm-row) ── */
+.confirm-row{display:flex;align-items:flex-end;gap:32px;flex-wrap:wrap;margin-bottom:22px;}
+.confirm-col{flex:1;min-width:150px;}
+.confirm-k{
+  font-family:var(--font-mono);font-size:10.5px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--mute-lt);margin-bottom:10px;
+}
+.confirm-num{
+  font-family:var(--font-mono);font-size:clamp(22px,3.4vw,32px);
+  font-weight:500;letter-spacing:-.03em;line-height:1;
+}
+.confirm-num span{font-size:.42em;font-weight:400;color:var(--mute-lt);margin-left:6px;letter-spacing:0;}
+.confirm-arrow{font-size:18px;color:var(--mute-lt);padding-bottom:5px;}
+.diff-badge{
+  display:inline-block;padding:8px 15px;border:1px solid var(--ink);
+  font-family:var(--font-mono);font-size:12.5px;letter-spacing:.06em;color:var(--ink);
+}
+.diff-badge.dn{border-color:var(--line-lt);color:var(--mute-lt);}
+
+/* ── 섹션 헤드 (제목 + 우측 note) ── */
+.sec-head{
+  display:flex;align-items:baseline;gap:16px;
+  padding-bottom:14px;border-bottom:1px solid var(--ink);margin-bottom:4px;
+}
+.sec-title{font-size:19px;font-weight:600;letter-spacing:-.01em;}
+.sec-note{
+  font-family:var(--font-mono);font-size:11.5px;color:var(--mute-lt);
+  margin-left:auto;text-align:right;
+}
+
+/* ── 그룹 헤더 (연산부 · 그래픽 …) — 참조 디자인 .grp ── */
+.grp{
+  display:flex;align-items:center;gap:14px;
+  padding:30px 0 12px;
+  font-family:var(--font-mono);font-size:10.5px;
+  letter-spacing:.18em;text-transform:uppercase;color:var(--mute-lt);
+}
+.grp::after{content:"";flex:1;height:1px;background:var(--line-lt);}
+
+/* ── 부품 스펙 행 (참조 디자인 .row) ── */
+.spec-row{
+  display:grid;grid-template-columns:104px 1fr 128px;
+  gap:20px;align-items:baseline;
+  padding:18px 0;border-bottom:1px solid var(--line-lt);
+  transition:background .18s ease;
+}
+.spec-row:hover{background:var(--paper-2);}
+.spec-cat{
+  font-family:var(--font-mono);font-size:11px;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--mute-lt);
+}
+.spec-name{font-size:15px;font-weight:500;letter-spacing:-.01em;}
+.spec-desc{font-family:var(--font-mono);font-size:11.5px;color:var(--mute-lt);margin-top:4px;}
+.spec-desc .fallback{color:var(--ink);}
+.spec-price{font-size:15px;font-weight:500;white-space:nowrap;text-align:right;}
+.spec-price.missing{color:var(--mute-lt);font-weight:400;}
+/* 비중 바 — 참조 디자인 .sp-bar */
+.prop-bar{height:3px;background:var(--paper-2);margin-top:8px;position:relative;overflow:hidden;}
+.prop-bar i{position:absolute;inset:0 auto 0 0;background:var(--ink);width:0;transition:width 1s cubic-bezier(.22,1,.36,1);}
+@media(prefers-reduced-motion:reduce){.prop-bar i{transition:none;}}
+@media(max-width:660px){
+  .spec-row{grid-template-columns:1fr auto;gap:6px 16px;}
+  .spec-cat{grid-column:1/-1;}
+}
+
+/* ── 소계 (참조 디자인 .sum) ── */
+.sum{
+  display:grid;grid-template-columns:1fr auto;gap:20px;align-items:baseline;
+  padding-top:24px;margin-top:4px;border-top:2px solid var(--ink);
+}
+.sum-k{font-family:var(--font-mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;font-weight:600;}
+.sum-val{font-size:24px;font-weight:600;letter-spacing:-.02em;text-align:right;}
+
+/* ── 빌드 생성 진행 요약 (PCPartPicker식 상시 노출 러닝 총액) ── */
+.build-summary{
+  position:sticky;bottom:0;
+  display:flex;align-items:center;gap:20px;flex-wrap:wrap;
+  padding:16px 20px;margin-top:26px;
+  background:var(--ink);color:var(--paper);
+}
+.bs-k{
+  font-family:var(--font-mono);font-size:10.5px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--mute-dk);
+}
+.bs-progress{display:flex;align-items:center;gap:12px;}
+.bs-count{font-family:var(--font-mono);font-size:13px;font-variant-numeric:tabular-nums;}
+.bs-ticks{display:flex;gap:3px;}
+.bs-tick{width:14px;height:3px;background:var(--line-dk);}
+.bs-tick.on{background:var(--paper);}
+.bs-total{margin-left:auto;text-align:right;}
+.bs-total .bs-k{display:block;margin-bottom:5px;}
+.bs-total .v{
+  display:block;font-family:var(--font-mono);font-size:20px;font-weight:500;
+  font-variant-numeric:tabular-nums;letter-spacing:-.02em;
+}
+@media(max-width:660px){.bs-total{margin-left:0;text-align:left;}}
+
+/* ── 스크롤 리빌 (참조 디자인 .rv) ── */
+.rv{
+  opacity:0;transform:translateY(12px);
+  transition:opacity .6s cubic-bezier(.22,1,.36,1),transform .6s cubic-bezier(.22,1,.36,1);
+}
+.rv.in{opacity:1;transform:none;}
+@media(prefers-reduced-motion:reduce){
+  .rv{opacity:1;transform:none;transition:none;}
+}
+
+/* ── 인쇄 / PDF — 빌드 상세는 견적서로 출력할 수 있어야 함 ── */
+@page{margin:14mm;}
+@media print{
+  body{height:auto;overflow:visible;background:#fff;}
+  .app{display:block;height:auto;}
+  .sidebar,.topbar,.detail-head .btn-ghost,.build-summary{display:none;}
+  .main{overflow:visible;}
+  .page{padding:0;max-width:none;}
+  .rv{opacity:1 !important;transform:none !important;}
+  .prop-bar i{transition:none;}
+  .spec-row,.strip,.sum,.gauge-card{break-inside:avoid;}
+}
