@@ -111,9 +111,9 @@ const CATEGORY_SPEC_FILTERS: Record<string, SpecFilterDef[]> = {
   ],
 };
 
-// .part-spec-filter 폭(116px) + .part-row gap(14px) — 오른쪽에 붙는 select
+// .part-spec-filter 폭(144px) + .part-row gap(14px) — 오른쪽에 붙는 select
 // 개수만큼 자동완성 드롭다운 오른쪽 여백을 늘리는 데 씀
-const SPEC_FILTER_SLOT_WIDTH = 130;
+const SPEC_FILTER_SLOT_WIDTH = 158;
 
 export default function PartRow({
   category,

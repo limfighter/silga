@@ -162,14 +162,15 @@ input{font-family:inherit;}
   backdrop-filter:saturate(180%) blur(10px);
   z-index:10;
 }
-.topbar-kicker{
-  font-family:var(--font-mono);
-  font-size:11px;
-  letter-spacing:.1em;
-  text-transform:uppercase;
-  color:var(--mute-dk);
-}
-.topbar-kicker b{color:var(--paper);font-weight:500;}
+/* ── 탑바 브레드크럼 — "/" 슬래시 하나뿐이던 걸 인장(도장) 모티프로 교체.
+   구분자는 얇은 세로 hairline, 현재 위치만 굵은 페이퍼색으로 대비 ── */
+.topbar .seal{width:22px;height:22px;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:2px;}
+.topbar .seal-inner{width:100%;height:100%;border:1px solid var(--paper);display:flex;align-items:center;justify-content:center;}
+.topbar .seal-char{color:var(--paper);font-size:12px;font-weight:700;line-height:1;}
+.topbar .brand{font-size:12.5px;font-weight:700;letter-spacing:.04em;color:var(--paper);margin-left:10px;}
+.topbar .crumb-divider{width:1px;height:13px;background:var(--line-dk);margin:0 12px;}
+.topbar .crumb{font-family:var(--font-mono);font-size:11px;letter-spacing:.06em;color:var(--mute-dk);}
+.topbar .crumb.current{color:var(--paper);font-weight:600;}
 .page{padding:36px 32px 64px;max-width:1100px;}
 
 .section-label{
@@ -218,10 +219,31 @@ input{font-family:inherit;}
   font-weight:500;
   font-size:13.5px;
   letter-spacing:.01em;
-  transition:opacity .15s;
+  transition:background .15s;
 }
-.btn-primary:hover{opacity:.82;}
-.btn-primary:disabled{opacity:.35;cursor:not-allowed;}
+.btn-primary:hover{background:#242422;}
+.btn-primary:disabled{
+  background:var(--paper-2);
+  color:var(--mute-lt);
+  border-color:var(--line-lt);
+  cursor:not-allowed;
+}
+/* secondary — 잉크 보더로 primary와 명확히 구분되는 클릭 가능한 액션
+   (예: 홈 "부품 검색"). ghost와 달리 hover 시 잉크로 반전 */
+.btn-secondary{
+  background:none;
+  border:2px solid var(--ink);
+  color:var(--ink);
+  padding:10px 19px;
+  font-weight:600;
+  font-size:13.5px;
+  transition:background .15s,color .15s;
+  text-decoration:none;
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+}
+.btn-secondary:hover{background:var(--ink);color:var(--paper);}
 .btn-ghost{
   background:none;
   border:1px solid var(--line-lt);
@@ -369,14 +391,17 @@ input{font-family:inherit;}
 .part-spec-filter{
   appearance:none;
   -webkit-appearance:none;
-  flex:0 0 116px;
-  width:116px;
+  flex:0 0 144px;
+  width:144px;
   min-width:0;
   background:var(--paper-2);
   border:1px solid var(--line-lt);
   padding:9px 8px;
   color:var(--ink);
   font-size:12.5px;
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
 }
 .part-spec-filter:focus{outline:none;border-color:var(--ink);}
 .part-selected{
@@ -397,11 +422,10 @@ input{font-family:inherit;}
   position:absolute;
   left:106px;right:16px;top:52px;
   background:var(--paper);
-  border:1px solid var(--line-lt);
+  border:1px solid var(--ink);
   max-height:220px;
   overflow-y:auto;
   z-index:20;
-  box-shadow:0 8px 20px rgba(11,11,11,.14);
 }
 .autocomplete-item{
   padding:9px 12px;
@@ -458,23 +482,49 @@ input{font-family:inherit;}
 .gauge-card .price-range{margin-top:6px;font-family:var(--font-mono);font-size:12.5px;color:var(--mute-lt);}
 .verdict-basis-note{margin-top:10px;font-family:var(--font-mono);font-size:11px;color:var(--mute-lt);}
 
+/* 저가/고가 구간은 잉크로 완전히 채우고 적정 구간만 페이퍼로 비워서
+   진짜 흑백 대비로 읽히게 함(기존 회색 4단 그라데이션은 대비가 흐릿했음) */
 .gauge-track{
   position:relative;
   height:34px;
-  background:var(--paper-2);
-  border:1px solid var(--line-lt);
+  background:var(--ink);
+  border:2px solid var(--ink);
   margin-top:22px;
 }
 .gauge-zone{
   position:absolute;
   top:0;bottom:0;
-  background:var(--line-lt);
+  background:var(--paper);
+  border-left:2px solid var(--ink);
+  border-right:2px solid var(--ink);
 }
 .gauge-marker{
   position:absolute;
-  top:-5px;bottom:-5px;
-  width:2px;
+  top:-10px;bottom:-2px;
+  width:3px;
   background:var(--ink);
+  transition:left 1s cubic-bezier(.2,.9,.25,1);
+}
+.gauge-marker::before{
+  content:"";
+  position:absolute;
+  top:-9px;left:50%;
+  transform:translateX(-50%);
+  border-left:6px solid transparent;
+  border-right:6px solid transparent;
+  border-top:8px solid var(--ink);
+}
+.gauge-marker-value{
+  position:absolute;
+  top:-34px;
+  transform:translateX(-50%);
+  background:var(--ink);
+  color:var(--paper);
+  font-family:var(--font-mono);
+  font-size:11px;
+  font-weight:600;
+  white-space:nowrap;
+  padding:3px 7px;
   transition:left 1s cubic-bezier(.2,.9,.25,1);
 }
 .gauge-labels{
@@ -678,6 +728,8 @@ input{font-family:inherit;}
 .grp::after{content:"";flex:1;height:1px;background:var(--line-lt);}
 
 /* ── 부품 스펙 행 (참조 디자인 .row) ── */
+.spec-row-container{border:2px solid var(--ink);margin-top:12px;}
+.spec-row-container .spec-row:last-child{border-bottom:none;}
 .spec-row{
   display:grid;grid-template-columns:104px 1fr 128px;
   gap:20px;align-items:baseline;
@@ -703,13 +755,14 @@ input{font-family:inherit;}
   .spec-cat{grid-column:1/-1;}
 }
 
-/* ── 소계 (참조 디자인 .sum) ── */
+/* ── 소계 (참조 디자인 .sum) ── 잉크로 완전히 채워서 "이게 최종 숫자다"라는
+   위계를 명확히 함(회색 트랙 대신 얇은 잉크 트랙을 쓰는 prop-bar와 같은 원칙) */
 .sum{
   display:grid;grid-template-columns:1fr auto;gap:20px;align-items:baseline;
-  padding-top:24px;margin-top:4px;border-top:2px solid var(--ink);
+  padding:16px 18px;margin-top:4px;background:var(--ink);
 }
-.sum-k{font-family:var(--font-mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;font-weight:600;}
-.sum-val{font-size:24px;font-weight:600;letter-spacing:-.02em;text-align:right;}
+.sum-k{font-family:var(--font-mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;font-weight:600;color:var(--paper);}
+.sum-val{font-size:24px;font-weight:600;letter-spacing:-.02em;text-align:right;color:var(--paper);}
 
 /* ── 빌드 생성 진행 요약 (PCPartPicker식 상시 노출 러닝 총액) ── */
 .build-summary{

@@ -72,9 +72,14 @@ export default function AppShell() {
 
       <div className="main">
         <div className="topbar">
-          <span className="topbar-kicker">
-            실가<b> / {titleFor(location.pathname)}</b>
+          <span className="seal">
+            <span className="seal-inner">
+              <span className="seal-char">실</span>
+            </span>
           </span>
+          <span className="brand">실가</span>
+          <span className="crumb-divider" />
+          <span className="crumb current">{titleFor(location.pathname)}</span>
         </div>
         <div className="page">
           <Outlet />
