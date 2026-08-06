@@ -206,6 +206,12 @@ function BuildDetailView({ data }: { data: BuildDetail }) {
           <div className="gauge-track">
             <div className="gauge-zone" style={{ left: `${ZONE_LEFT}%`, width: `${ZONE_WIDTH}%` }} />
             <div className="gauge-marker" style={{ left: `${mounted ? markerPos : 50}%` }} />
+            {data.diff_percent != null && (
+              <span className="gauge-marker-value" style={{ left: `${mounted ? markerPos : 50}%` }}>
+                {data.diff_percent > 0 ? "+" : ""}
+                {data.diff_percent}%
+              </span>
+            )}
           </div>
           <div className="gauge-labels">
             <span>저가</span>
@@ -225,6 +231,7 @@ function BuildDetailView({ data }: { data: BuildDetail }) {
       {groups.map((group) => (
         <div key={group.label}>
           <p className="grp">{group.label}</p>
+          <div className="spec-row-container">
           {group.items.map((item) => {
             const share = item.price != null ? (item.price / data.total_price) * 100 : 0;
             const delay = `${Math.min(rowIndex++, 12) * 45}ms`;
@@ -258,6 +265,7 @@ function BuildDetailView({ data }: { data: BuildDetail }) {
               </div>
             );
           })}
+          </div>
         </div>
       ))}
 

@@ -162,14 +162,15 @@ input{font-family:inherit;}
   backdrop-filter:saturate(180%) blur(10px);
   z-index:10;
 }
-.topbar-kicker{
-  font-family:var(--font-mono);
-  font-size:11px;
-  letter-spacing:.1em;
-  text-transform:uppercase;
-  color:var(--mute-dk);
-}
-.topbar-kicker b{color:var(--paper);font-weight:500;}
+/* ── 탑바 브레드크럼 — "/" 슬래시 하나뿐이던 걸 인장(도장) 모티프로 교체.
+   구분자는 얇은 세로 hairline, 현재 위치만 굵은 페이퍼색으로 대비 ── */
+.topbar .seal{width:22px;height:22px;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:2px;}
+.topbar .seal-inner{width:100%;height:100%;border:1px solid var(--paper);display:flex;align-items:center;justify-content:center;}
+.topbar .seal-char{color:var(--paper);font-size:12px;font-weight:700;line-height:1;}
+.topbar .brand{font-size:12.5px;font-weight:700;letter-spacing:.04em;color:var(--paper);margin-left:10px;}
+.topbar .crumb-divider{width:1px;height:13px;background:var(--line-dk);margin:0 12px;}
+.topbar .crumb{font-family:var(--font-mono);font-size:11px;letter-spacing:.06em;color:var(--mute-dk);}
+.topbar .crumb.current{color:var(--paper);font-weight:600;}
 .page{padding:36px 32px 64px;max-width:1100px;}
 
 .section-label{
@@ -218,10 +219,31 @@ input{font-family:inherit;}
   font-weight:500;
   font-size:13.5px;
   letter-spacing:.01em;
-  transition:opacity .15s;
+  transition:background .15s;
 }
-.btn-primary:hover{opacity:.82;}
-.btn-primary:disabled{opacity:.35;cursor:not-allowed;}
+.btn-primary:hover{background:#242422;}
+.btn-primary:disabled{
+  background:var(--paper-2);
+  color:var(--mute-lt);
+  border-color:var(--line-lt);
+  cursor:not-allowed;
+}
+/* secondary — 잉크 보더로 primary와 명확히 구분되는 클릭 가능한 액션
+   (예: 홈 "부품 검색"). ghost와 달리 hover 시 잉크로 반전 */
+.btn-secondary{
+  background:none;
+  border:2px solid var(--ink);
+  color:var(--ink);
+  padding:10px 19px;
+  font-weight:600;
+  font-size:13.5px;
+  transition:background .15s,color .15s;
+  text-decoration:none;
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+}
+.btn-secondary:hover{background:var(--ink);color:var(--paper);}
 .btn-ghost{
   background:none;
   border:1px solid var(--line-lt);
@@ -244,9 +266,10 @@ input{font-family:inherit;}
   gap:16px;
 }
 .build-card{
+  position:relative;
   background:var(--paper);
   border:1px solid var(--line-lt);
-  padding:22px;
+  padding:26px 22px 22px;
   cursor:pointer;
   transition:background .18s;
   text-decoration:none;
@@ -254,19 +277,26 @@ input{font-family:inherit;}
   display:block;
 }
 .build-card:hover{background:var(--paper-2);}
+/* 판정 배지 — 카드 위쪽 hairline에 살짝 걸치는 탭 형태(참조 디자인 .card-badge).
+   고가/저가는 잉크 완전 채움(주의 필요), 적정은 아웃라인만(평상 상태) —
+   색 대신 잉크 채움 여부 + ▲▼— 글리프로만 구분 */
 .bc-tag{
-  display:inline-block;
+  position:absolute;
+  top:-13px;left:-1px;
+  display:inline-flex;
+  align-items:center;
   font-family:var(--font-mono);
   font-size:10.5px;
   letter-spacing:.04em;
-  padding:3px 9px;
-  border:1px solid var(--line-lt);
-  color:var(--mute-lt);
-  margin-bottom:14px;
+  padding:5px 10px;
+  border:1px solid var(--ink);
+  color:var(--ink);
+  background:var(--paper);
 }
 .bc-tag.fair::before{content:"— ";}
-.bc-tag.high{border-color:var(--ink);color:var(--ink);background:var(--paper-2);}
+.bc-tag.high{background:var(--ink);color:var(--paper);}
 .bc-tag.high::before{content:"▲ ";}
+.bc-tag.low{background:var(--ink);color:var(--paper);}
 .bc-tag.low::before{content:"▼ ";}
 .bc-title{font-size:15.5px;font-weight:600;margin-bottom:6px;letter-spacing:-.01em;}
 .bc-meta{font-family:var(--font-mono);font-size:12px;color:var(--mute-lt);margin-bottom:18px;}
@@ -369,14 +399,17 @@ input{font-family:inherit;}
 .part-spec-filter{
   appearance:none;
   -webkit-appearance:none;
-  flex:0 0 116px;
-  width:116px;
+  flex:0 0 144px;
+  width:144px;
   min-width:0;
   background:var(--paper-2);
   border:1px solid var(--line-lt);
   padding:9px 8px;
   color:var(--ink);
   font-size:12.5px;
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
 }
 .part-spec-filter:focus{outline:none;border-color:var(--ink);}
 .part-selected{
@@ -397,11 +430,10 @@ input{font-family:inherit;}
   position:absolute;
   left:106px;right:16px;top:52px;
   background:var(--paper);
-  border:1px solid var(--line-lt);
+  border:1px solid var(--ink);
   max-height:220px;
   overflow-y:auto;
   z-index:20;
-  box-shadow:0 8px 20px rgba(11,11,11,.14);
 }
 .autocomplete-item{
   padding:9px 12px;
@@ -458,23 +490,49 @@ input{font-family:inherit;}
 .gauge-card .price-range{margin-top:6px;font-family:var(--font-mono);font-size:12.5px;color:var(--mute-lt);}
 .verdict-basis-note{margin-top:10px;font-family:var(--font-mono);font-size:11px;color:var(--mute-lt);}
 
+/* 저가/고가 구간은 잉크로 완전히 채우고 적정 구간만 페이퍼로 비워서
+   진짜 흑백 대비로 읽히게 함(기존 회색 4단 그라데이션은 대비가 흐릿했음) */
 .gauge-track{
   position:relative;
   height:34px;
-  background:var(--paper-2);
-  border:1px solid var(--line-lt);
+  background:var(--ink);
+  border:2px solid var(--ink);
   margin-top:22px;
 }
 .gauge-zone{
   position:absolute;
   top:0;bottom:0;
-  background:var(--line-lt);
+  background:var(--paper);
+  border-left:2px solid var(--ink);
+  border-right:2px solid var(--ink);
 }
 .gauge-marker{
   position:absolute;
-  top:-5px;bottom:-5px;
-  width:2px;
+  top:-10px;bottom:-2px;
+  width:3px;
   background:var(--ink);
+  transition:left 1s cubic-bezier(.2,.9,.25,1);
+}
+.gauge-marker::before{
+  content:"";
+  position:absolute;
+  top:-9px;left:50%;
+  transform:translateX(-50%);
+  border-left:6px solid transparent;
+  border-right:6px solid transparent;
+  border-top:8px solid var(--ink);
+}
+.gauge-marker-value{
+  position:absolute;
+  top:-34px;
+  transform:translateX(-50%);
+  background:var(--ink);
+  color:var(--paper);
+  font-family:var(--font-mono);
+  font-size:11px;
+  font-weight:600;
+  white-space:nowrap;
+  padding:3px 7px;
   transition:left 1s cubic-bezier(.2,.9,.25,1);
 }
 .gauge-labels{
@@ -506,8 +564,7 @@ input{font-family:inherit;}
 .search-box{
   display:flex;
   gap:10px;
-  max-width:560px;
-  margin-bottom:28px;
+  margin-bottom:14px;
 }
 .search-box input{
   flex:1;
@@ -519,16 +576,93 @@ input{font-family:inherit;}
 }
 .search-box input:focus{outline:none;border-color:var(--ink);}
 
+.search-spec-filters{display:flex;gap:8px;margin-bottom:20px;}
+
+/* ── 검색 화면 카테고리 탭 (검색+견적 카트 플로우 진입점) ── */
+.category-tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px;}
+.category-tab{
+  display:inline-flex;align-items:center;gap:6px;
+  background:none;border:1px solid var(--line-lt);color:var(--mute-lt);
+  padding:8px 14px;font-size:13px;
+  transition:border-color .15s,color .15s;
+}
+.category-tab:hover{border-color:var(--mute-lt);color:var(--ink);}
+.category-tab.active{border-color:var(--ink);color:var(--ink);background:var(--paper-2);font-weight:600;}
+.ct-dot{width:6px;height:6px;background:var(--ink);flex-shrink:0;}
+
+/* ── 검색 결과 + 견적 카트 2단 레이아웃 ── */
+.search-shell{display:grid;grid-template-columns:1fr 300px;gap:28px;align-items:start;}
+.search-main{min-width:0;}
+@media(max-width:980px){.search-shell{grid-template-columns:1fr;}}
+
+/* ── 정렬 탭 (.month-tab과 동일 패턴) ── */
+.sort-tabs{display:flex;gap:8px;margin-bottom:14px;}
+.sort-tab{
+  border:1px solid var(--line-lt);color:var(--mute-lt);background:none;
+  padding:8px 14px;font-size:12.5px;
+  transition:border-color .15s,color .15s,background .15s;
+}
+.sort-tab:hover{border-color:var(--mute-lt);color:var(--ink);}
+.sort-tab.active{background:var(--ink);color:var(--paper);border-color:var(--ink);}
+
 .search-results{display:flex;flex-direction:column;gap:1px;background:var(--line-lt);border:1px solid var(--line-lt);}
 .search-result-row{
-  display:flex;justify-content:space-between;align-items:center;
+  display:flex;align-items:center;gap:16px;
   padding:14px 18px;background:var(--paper);font-size:13.5px;
   transition:background .15s;
 }
 .search-result-row:hover{background:var(--paper-2);}
-.search-result-row .nm{color:var(--ink);}
+.search-result-row .nm{color:var(--ink);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .search-result-row .code{font-family:var(--font-mono);font-size:11px;color:var(--mute-lt);margin-left:8px;}
-.search-result-row .pr{font-family:var(--font-mono);color:var(--ink);font-weight:500;}
+.search-result-row .pr{font-family:var(--font-mono);color:var(--ink);font-weight:500;flex-shrink:0;}
+.btn-cart{
+  flex-shrink:0;background:none;border:1px solid var(--ink);color:var(--ink);
+  padding:7px 14px;font-size:12.5px;font-weight:600;
+  transition:background .15s,color .15s;
+}
+.btn-cart:hover{background:var(--ink);color:var(--paper);}
+.btn-cart.on{background:var(--ink);color:var(--paper);}
+
+/* ── 견적 카트 패널 ── */
+.cart-panel{border:1px solid var(--ink);background:var(--paper);position:sticky;top:14px;}
+.cart-head{
+  display:flex;justify-content:space-between;align-items:baseline;
+  padding:16px 18px;border-bottom:1px solid var(--ink);
+}
+.cart-title{font-weight:700;font-size:14px;}
+.cart-count{font-family:var(--font-mono);font-size:11px;color:var(--mute-lt);}
+.cart-list{display:flex;flex-direction:column;}
+.cart-slot{
+  display:flex;align-items:stretch;
+  border-bottom:1px solid var(--line-lt);
+}
+.cart-slot:last-child{border-bottom:none;}
+.cart-slot.current{background:var(--paper-2);}
+.cs-select{
+  flex:1;min-width:0;text-align:left;background:none;border:none;
+  display:flex;flex-direction:column;gap:2px;
+  padding:11px 14px;color:inherit;
+}
+.cs-cat{
+  font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--mute-lt);
+}
+.cart-slot.filled .cs-cat{color:var(--ink);}
+.cs-part{font-size:12.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cs-empty{font-size:12.5px;color:var(--mute-lt);}
+.cs-remove{
+  flex-shrink:0;background:none;border:none;border-left:1px solid var(--line-lt);
+  color:var(--mute-lt);font-size:16px;padding:0 14px;cursor:pointer;
+  transition:color .15s,background .15s;
+}
+.cs-remove:hover{color:var(--ink);background:var(--paper-2);}
+.cart-actions{padding:16px 18px;border-top:1px solid var(--ink);display:flex;flex-direction:column;gap:10px;}
+.cart-actions input{
+  background:var(--paper);border:1px solid var(--line-lt);padding:11px 12px;
+  color:var(--ink);font-size:13px;
+}
+.cart-actions input:focus{outline:none;border-color:var(--ink);}
+.cart-actions .btn-primary{width:100%;text-align:center;justify-content:center;}
 
 .status-line{font-family:var(--font-mono);font-size:13px;color:var(--mute-lt);margin-bottom:16px;}
 .status-line.error{color:var(--ink);font-weight:600;}
@@ -678,6 +812,8 @@ input{font-family:inherit;}
 .grp::after{content:"";flex:1;height:1px;background:var(--line-lt);}
 
 /* ── 부품 스펙 행 (참조 디자인 .row) ── */
+.spec-row-container{border:2px solid var(--ink);margin-top:12px;}
+.spec-row-container .spec-row:last-child{border-bottom:none;}
 .spec-row{
   display:grid;grid-template-columns:104px 1fr 128px;
   gap:20px;align-items:baseline;
@@ -703,13 +839,14 @@ input{font-family:inherit;}
   .spec-cat{grid-column:1/-1;}
 }
 
-/* ── 소계 (참조 디자인 .sum) ── */
+/* ── 소계 (참조 디자인 .sum) ── 잉크로 완전히 채워서 "이게 최종 숫자다"라는
+   위계를 명확히 함(회색 트랙 대신 얇은 잉크 트랙을 쓰는 prop-bar와 같은 원칙) */
 .sum{
   display:grid;grid-template-columns:1fr auto;gap:20px;align-items:baseline;
-  padding-top:24px;margin-top:4px;border-top:2px solid var(--ink);
+  padding:16px 18px;margin-top:4px;background:var(--ink);
 }
-.sum-k{font-family:var(--font-mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;font-weight:600;}
-.sum-val{font-size:24px;font-weight:600;letter-spacing:-.02em;text-align:right;}
+.sum-k{font-family:var(--font-mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;font-weight:600;color:var(--paper);}
+.sum-val{font-size:24px;font-weight:600;letter-spacing:-.02em;text-align:right;color:var(--paper);}
 
 /* ── 빌드 생성 진행 요약 (PCPartPicker식 상시 노출 러닝 총액) ── */
 .build-summary{

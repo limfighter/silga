@@ -35,7 +35,7 @@ export default function HomePage() {
 
       <div className="home-actions">
         <Link className="btn-primary" to="/build/new">+ 새 빌드 만들기</Link>
-        <Link className="btn-ghost" to="/search">부품 검색</Link>
+        <Link className="btn-secondary" to="/search">부품 검색</Link>
       </div>
 
       <div className="build-header" style={{ marginTop: 36 }}>
