@@ -1528,3 +1528,80 @@ UI/UX도 리서치로 고도화해서 실제 시중 빌드 웹 디자인처럼" 
   state만 씀. 검색 화면에서 담다가 새로고침하면 카트가 날아감(기존
   BuildCreatePage의 PartRow 선택도 원래 같은 특성 — 이번에 새로 생긴
   제약이 아님)
+
+---
+
+### 2026-08-06 (이어진 세션)
+
+#### backend v0.8 / frontend v0.10.1 — SSD 폼팩터 스펙 필터 추가
+
+[✓] 배경
+    → PR #11 머지 확인 후, 사용자가 "스펙 필터 확장 → SSD 폼팩터"를 선택.
+      SSD는 그동안 interface(SATA3/PCIe 세대)만 있고 폼팩터(M.2 길이/규격)
+      필터가 없었음
+    → 이 환경은 danawa.com 접근이 프록시로 차단돼 있어(반복 확인된 제약),
+      사용자가 다나와 "SSD" 검색결과 페이지의 #prodArea outerHTML을
+      통째로 제공 — 기존에 자리잡은 검증 패턴(체크박스 값+상품목록을
+      한 파일로 확보) 그대로 재사용
+
+[✓] SSD_FORMFACTOR_ATTRIBUTES 신규 (속성코드 14695 = 폼팩터)
+    → 실측 8종 전부 확인: M.2(2280)=202347, M.2(2242)=202350,
+      M.2(2230)=656345, M.2(22110)=203997, 6.4cm(2.5형)=86092,
+      Mini SATA(mSATA)=109348, PCIe 카드=108308, 기타=86094
+      (전부 "{14695}-{값코드}-OR" 형식, #prodArea 내 체크박스 value
+      속성에서 직접 확보 — 필터 UI를 조작해서 URL 변화를 관찰하는 대신
+      정적 HTML의 value 속성을 바로 읽는 방식, 이전 세션들과 동일)
+    → 채택 4종: M.2 2280(가장 흔한 규격) / M.2 2242 / M.2 2230(소형
+      폼팩터, 미니PC 등) / 2.5인치(SATA, 여전히 보조 저장장치로 흔함)
+    → 제외 4종: M.2(22110, 서버/엔터프라이즈용 — 개인 조립 PC 범위 밖),
+      Mini SATA(mSATA, 구형 노트북 전용 규격 — 데스크탑 신규 조립에
+      해당 없음), PCIe 카드(애드인 카드 형태, 소수 규격), 기타(라벨
+      자체가 불명확) — 기존 데이터 트리밍 원칙(CLAUDE.md, 워크스테이션/
+      서버/구형 값 제외) 그대로 적용
+
+[✓] /search?formfactor= 파라미터의 적용 category를 SSD까지 확장
+    → 새 쿼리파라미터를 만들지 않고 기존 formfactor 파라미터를 재사용 —
+      메인보드(속성코드 506)/케이스(6196)가 이미 같은 파라미터명을
+      카테고리별로 다른 딕셔너리로 분리해서 쓰던 방식 그대로 SSD용
+      SSD_FORMFACTOR_ATTRIBUTES를 추가(backend/app/main.py::search()의
+      `elif category == "SSD":` 분기)
+    → SSD는 이제 interface(기존)+formfactor(신규) 2개 스펙 파라미터 보유.
+      동시 지정 시 `SSD_INTERFACE_ATTRIBUTES.get(interface) or
+      SSD_FORMFACTOR_ATTRIBUTES.get(formfactor)` 체이닝으로 interface
+      우선 적용 — GPU(chipset 우선)/메인보드(socket 우선)/쿨러
+      (cooler_type 우선)와 동일한 "값 하나만 허용" 제약(다중 attribute
+      결합 규칙 미검증) 때문. SSD는 세대/성능을 더 직접 나타내는
+      interface를 우선하기로 결정(엄밀한 원칙이 있다기보다 이번에도
+      다른 2-스펙 카테고리처럼 임의로 하나 고른 것)
+    → API 계약 변경(기존엔 SSD에서 formfactor가 무시됐는데 이제 적용됨)이라
+      두 번째 자리 v0.7→v0.8
+
+[✓] 프론트: frontend/src/lib/specFilters.ts의 SSD 항목에 formfactor select
+  추가
+    → SSD_FORMFACTOR_OPTIONS = ["M.2 2280", "M.2 2242", "M.2 2230", "2.5인치"]
+      상수 추가 + CATEGORY_SPEC_FILTERS.SSD 배열에 항목 하나 추가
+    → PartRow.tsx/SearchPage.tsx 둘 다 CATEGORY_SPEC_FILTERS[category]를
+      specDefs로 받아 .map()으로 select를 렌더링하는 범용 구조라 컴포넌트
+      코드 변경 전혀 없이 SSD가 select 1개→2개로 자동 확장됨 — GPU/
+      메인보드/쿨러가 이미 2-스펙 카테고리라 이 렌더링 경로 자체는 기존에
+      검증된 상태였음(자동완성 드롭다운 우측 오프셋도
+      `specDefs.length * SPEC_FILTER_SLOT_WIDTH`로 계산되는 범용 로직이라
+      마찬가지로 자동 대응)
+    → api.ts의 SearchSpecParams.formfactor 주석에 SSD 추가
+
+[✓] 검증
+    → npm run typecheck 통과 (node_modules 세션 리셋으로 재설치 필요했음 —
+      이 환경 반복 특이사항)
+    → mock 백엔드(danawa.get_product_codes를 attribute값별로 다른 픽스처
+      반환하도록 monkeypatch) + curl로 백엔드 단독 검증: formfactor=M.2
+      2280 필터링 확인, interface+formfactor 동시 지정 시 interface 우선
+      확인, 무필터/다른 category(CPU)에서 formfactor 무시 확인 — 4가지
+      케이스 모두 기대값과 일치
+    → Vite dev + Playwright(사전 설치 Chromium)로 실브라우저 검증:
+      SearchPage SSD 탭에서 select 2개(인터페이스/폼팩터) 정상 렌더링,
+      폼팩터에서 "M.2 2280" 선택 후 검색 → 결과가 실제로 그 필터가 적용된
+      상품만 표시되는 것 화면에서 확인(스크린샷). BuildCreatePage(PartRow)
+      SSD 행도 select 2개 정상 렌더링 + 자동완성 드롭다운이 겹치지 않는
+      것 확인. 두 화면 모두 pageerror 0건
+    → 검증에 쓴 mock 서버/스크린샷은 스크래치패드에서만 작업(리포에
+      커밋 안 함), 임시로 생성됐던 backend/silga.db도 검증 후 삭제

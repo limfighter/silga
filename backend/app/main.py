@@ -181,6 +181,24 @@ SSD_INTERFACE_ATTRIBUTES = {
     "PCIe5.0x4": "14690-859759-OR",
 }
 
+# /search?formfactor= 값(SSD 전용, category=SSD일 때만 적용) →
+# danawa.get_product_codes(attribute=...) 전달값 매핑(속성코드 14695 = 폼팩터,
+# "NVMe 2TB" 검색 결과 필터 사이드바에서 실측). 같은 파라미터명을 메인보드/
+# 케이스가 이미 쓰고 있지만 그쪽과 마찬가지로 카테고리별 별도 딕셔너리로
+# 분리 처리(아래 search() 참조) — attribute 코드 자체는 SSD 전용(14695),
+# 재사용 아님. Mini SATA(mSATA, 구형 노트북용)·PCIe 카드(애드인 카드,
+# 소수 규격)·기타(불명확)는 제외 — M.2(22110, 서버/엔터프라이즈용)도 개인
+# 조립 PC 범위 밖이라 제외하고 소비자용 4개만 채택. interface와 동시 지정
+# 시 interface 우선 적용(둘 다 SSD 자체 성격을 정의하는 축이라 우선순위
+# 기준 명확한 원칙은 없음 — SSD 성능/세대를 더 직접적으로 나타내는
+# interface를 우선한 것으로 결정)
+SSD_FORMFACTOR_ATTRIBUTES = {
+    "M.2 2280": "14695-202347-OR",
+    "M.2 2242": "14695-202350-OR",
+    "M.2 2230": "14695-656345-OR",
+    "2.5인치": "14695-86092-OR",
+}
+
 # /search?cooler_type= 값(쿨러 전용, category=쿨러일 때만 적용) →
 # danawa.get_product_codes(attribute=...) 전달값 매핑(속성코드 687 = 제품 종류,
 # "CPU 쿨러" 검색 결과 필터 사이드바에서 실측). 다나와 "쿨러/튜닝" 카테고리는
@@ -277,9 +295,10 @@ def search(
     ),
     formfactor: Optional[str] = Query(
         None,
-        description="폼팩터 스펙 필터(ATX/M-ATX/ITX/E-ATX) — category=메인보드 또는 케이스일 때만 "
-                     "적용(메인보드=자기 크기, 케이스=장착 가능한 보드 크기), 그 외 무시. "
-                     "메인보드는 socket과 동시 지정 시 socket 우선 적용",
+        description="폼팩터 스펙 필터 — category=메인보드/케이스일 때는 ATX/M-ATX/ITX/E-ATX "
+                     "(메인보드=자기 크기, 케이스=장착 가능한 보드 크기), category=SSD일 때는 "
+                     "M.2 2280/M.2 2242/M.2 2230/2.5인치. 그 외 category에서는 무시. "
+                     "메인보드는 socket과, SSD는 interface와 동시 지정 시 그쪽이 우선 적용",
     ),
     ram_type: Optional[str] = Query(
         None,
@@ -293,7 +312,7 @@ def search(
     interface: Optional[str] = Query(
         None,
         description="SSD 인터페이스 스펙 필터(SATA3/PCIe3.0x4/PCIe4.0x4/PCIe5.0x4) — "
-                     "category=SSD일 때만 적용, 그 외 무시",
+                     "category=SSD일 때만 적용, 그 외 무시. formfactor와 동시 지정 시 interface 우선 적용",
     ),
     cooler_type: Optional[str] = Query(
         None,
@@ -323,7 +342,7 @@ def search(
     elif category == "파워":
         attribute = PSU_WATTAGE_ATTRIBUTES.get(wattage)
     elif category == "SSD":
-        attribute = SSD_INTERFACE_ATTRIBUTES.get(interface)
+        attribute = SSD_INTERFACE_ATTRIBUTES.get(interface) or SSD_FORMFACTOR_ATTRIBUTES.get(formfactor)
     elif category == "쿨러":
         attribute = COOLER_TYPE_ATTRIBUTES.get(cooler_type) or COOLER_SOCKET_ATTRIBUTES.get(socket)
     try:

@@ -42,7 +42,7 @@ export interface SearchSpecParams {
   memoryGb?: number; // GPU 전용
   socket?: string; // CPU/메인보드/쿨러 전용
   chipset?: string; // GPU 전용
-  formfactor?: string; // 메인보드/케이스 전용
+  formfactor?: string; // 메인보드/케이스/SSD 전용
   ramType?: string; // RAM 전용
   wattage?: string; // 파워 전용
   interface?: string; // SSD 전용
