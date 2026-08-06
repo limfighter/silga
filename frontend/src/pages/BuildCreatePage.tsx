@@ -5,8 +5,7 @@ import { api } from "../lib/api";
 import PartRow, { type SelectedPart } from "../components/PartRow";
 import { useMaWindow } from "../lib/settings";
 import { addRecentProduct } from "../lib/recentProducts";
-
-const CATEGORIES = ["CPU", "GPU", "메인보드", "RAM", "SSD", "케이스", "파워", "쿨러"];
+import { CATEGORIES } from "../lib/specFilters";
 
 export default function BuildCreatePage() {
   const navigate = useNavigate();
