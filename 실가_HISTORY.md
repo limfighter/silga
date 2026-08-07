@@ -1718,3 +1718,23 @@ UI/UX도 리서치로 고도화해서 실제 시중 빌드 웹 디자인처럼" 
   #prodArea outerHTML을 붙여주는 방식)으로 돌아가면 됨. 코드/문서 어느
   쪽도 접근 가능 여부에 의존하도록 바꾸지 않음(danawa.py 자체는 원래도
   그냥 requests로 직접 호출하는 구조라 프록시 정책 변화에 영향받지 않음)
+
+#### 오래 미결이던 조사 항목 2건 확인 (코드 변경 없음)
+
+[x] 다나와 공식 오픈API 생사 확인
+    → api.danawa.com / developer.danawa.com은 502 Bad Gateway(호스트 자체
+      불능으로 추정) — 대신 openapi.danawa.com이 살아있고
+      auth.danawa.com/login으로 리다이렉트되는 로그인형 개발자 포털로
+      확인됨. 로그인 이후 단계(가격정보 API 공개 여부, 무료 발급 가능
+      여부)는 여전히 사람이 직접 가입해서 봐야 함 — "죽음" 결론이 아니라
+      "다음 확인 단계"까지 좁혀짐
+
+[x] danawa.com / search.danawa.com robots.txt 상세 확인
+    → www.danawa.com: 계정·에러 페이지(/user_report/, /my/, /member/,
+      /error/ 등)만 제외, 상품/검색 페이지는 허용
+    → search.danawa.com(우리가 실제 스크래핑하는 도메인): /api_ui/,
+      /classes/, /genfile/, /globalData/, /snippets/, /tpl/,
+      /mobile/tpl/ 만 Disallow — 우리가 쓰는 /dsearch.php는 안 걸림
+    → **Crawl-delay: 10 명시 확인** — CLAUDE.md의 "요청 간격 최소
+      5~10초" 원칙이 다나와 자체 robots.txt 권고와 정확히 일치. 지금까지
+      추정치였던 매너 크롤링 간격에 공식 근거가 생김
