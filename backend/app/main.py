@@ -111,6 +111,33 @@ GPU_CHIPSET_ATTRIBUTES = {
     "Intel": "654-805627-OR",
 }
 
+# /search?length= 값(GPU 전용, category=GPU일 때만 적용) →
+# danawa.get_product_codes(attribute=...) 전달값 매핑(속성코드 682 = 가로(길이)).
+# "그래픽카드"(전체 모델) 검색 결과 #prodArea 실측 — 이 필터는 지금까지 쓴
+# 다른 GPU/CPU 등 필터와 달리 다나와 "기본검색"(RepOption,가로형) UI가 아니라
+# "상세검색"(searchAttributeValue[]) UI에만 노출돼 있고, 값 형식도
+# "{카테고리seq}|{속성seq}|{값seq}|OR"(예: "753|682|3993|OR")로 달랐음.
+# 다나와 접근이 이 환경에서 잠깐 열렸을 때 라이브로 직접 검증: 카테고리seq를
+# 빼고 하이픈으로 바꾼 "682-3993-OR" 형식이 기존 attribute= 파라미터에
+# 그대로 먹힘 확인(140~149mm 필터 → GT1030/GT730 등 초소형 카드만,
+# 360mm~ 필터 → RTX 5080/5090 등 초대형 카드만 반환되는 것으로 실측 확인).
+# 콤마/파이프/파라미터 반복 전부 시도했으나 여러 구간을 하나로 묶는 다중
+# attribute 결합은 안 됨 확인(기존 "다중 attribute 결합 규칙 미검증" 제약과
+# 동일) — 그래서 PSU_WATTAGE_ATTRIBUTES와 같은 방식으로 다나와가 제공하는
+# 10mm 단위 구간(전체 23개) 중 현재 시장 판매 카드가 몰려 있는 실사용
+# 범위(190~369mm)에서 7개만 골라 채택. 140~189mm(구형 로우프로파일
+# 업무용 카드 GT710/GT730급, 개인 게이밍 조립 범위 밖)는 제외 — 기존
+# 트리밍 원칙과 동일
+GPU_LENGTH_ATTRIBUTES = {
+    "190~199mm": "682-203119-OR",
+    "260~269mm": "682-3989-OR",
+    "280~289mm": "682-3991-OR",
+    "300~309mm": "682-857731-OR",
+    "320~329mm": "682-857734-OR",
+    "340~349mm": "682-857740-OR",
+    "360mm~": "682-3993-OR",
+}
+
 # /search?socket= 값(메인보드 전용, category=메인보드일 때만 적용) →
 # danawa.get_product_codes(attribute=...) 전달값 매핑(속성코드 500 = CPU 소켓,
 # "B650" 검색 결과 필터 사이드바에서 실측). CPU_SOCKET_ATTRIBUTES와 값 이름은
@@ -293,6 +320,12 @@ def search(
         description="GPU 칩셋 제조사 스펙 필터(NVIDIA/AMD/Intel) — category=GPU일 때만 적용, "
                      "그 외에는 무시. memory_gb와 동시 지정 시 chipset 우선 적용",
     ),
+    length: Optional[str] = Query(
+        None,
+        description="GPU 가로(길이) 스펙 필터(예: 300~309mm, 360mm~) — category=GPU일 때만 적용, "
+                     "GPU_LENGTH_ATTRIBUTES 키와 정확히 일치해야 함, 그 외 무시. "
+                     "chipset/memory_gb와 동시 지정 시 그쪽이 우선 적용",
+    ),
     formfactor: Optional[str] = Query(
         None,
         description="폼팩터 스펙 필터 — category=메인보드/케이스일 때는 ATX/M-ATX/ITX/E-ATX "
@@ -322,15 +355,19 @@ def search(
 ):
     """
     GET /search?q={keyword}&category={CATEGORY_LABELS 키, 선택}&memory_gb={GPU 전용}&chipset={GPU 전용}&
-        socket={CPU/메인보드/쿨러 전용}&formfactor={메인보드/케이스 전용}&ram_type={RAM 전용}&
-        wattage={파워 전용}&interface={SSD 전용}&cooler_type={쿨러 전용}
+        length={GPU 전용}&socket={CPU/메인보드/쿨러 전용}&formfactor={메인보드/케이스/SSD 전용}&
+        ram_type={RAM 전용}&wattage={파워 전용}&interface={SSD 전용}&cooler_type={쿨러 전용}
         (스펙 파라미터는 전부 선택, category와 안 맞으면 무시) →
         [{code, title, price, price_formatted}, ...]
     """
     category_label = CATEGORY_LABELS.get(category) if category else None
     attribute = None
     if category == "GPU":
-        attribute = GPU_CHIPSET_ATTRIBUTES.get(chipset) or GPU_MEMORY_ATTRIBUTES.get(memory_gb)
+        attribute = (
+            GPU_CHIPSET_ATTRIBUTES.get(chipset)
+            or GPU_MEMORY_ATTRIBUTES.get(memory_gb)
+            or GPU_LENGTH_ATTRIBUTES.get(length)
+        )
     elif category == "CPU":
         attribute = CPU_SOCKET_ATTRIBUTES.get(socket)
     elif category == "메인보드":

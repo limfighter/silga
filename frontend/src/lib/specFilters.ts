@@ -9,6 +9,15 @@ export const CATEGORIES = ["CPU", "GPU", "메인보드", "RAM", "SSD", "케이�
 // 정확히 일치해야 함(값이 어긋나면 필터가 조용히 무시됨 — main.py 주석 참조)
 const GPU_MEMORY_OPTIONS = ["4", "6", "8", "10", "11", "12", "16", "20", "24", "32", "48"];
 const GPU_CHIPSET_OPTIONS = ["NVIDIA", "AMD", "Intel"];
+const GPU_LENGTH_OPTIONS = [
+  "190~199mm",
+  "260~269mm",
+  "280~289mm",
+  "300~309mm",
+  "320~329mm",
+  "340~349mm",
+  "360mm~",
+];
 const SOCKET_OPTIONS = ["AM5", "AM4", "LGA1851", "LGA1700"];
 const FORMFACTOR_OPTIONS = ["ATX", "M-ATX", "ITX", "E-ATX"];
 const RAM_TYPE_OPTIONS = ["DDR5", "DDR4"];
@@ -52,6 +61,12 @@ export const CATEGORY_SPEC_FILTERS: Record<string, SpecFilterDef[]> = {
       title: "메모리 용량으로 좁혀서 검색",
       options: GPU_MEMORY_OPTIONS,
       formatOption: (v) => `${v}GB`,
+    },
+    {
+      specKey: "length",
+      placeholder: "길이 전체",
+      title: "카드 가로 길이로 좁혀서 검색(케이스 장착 호환성 참고용)",
+      options: GPU_LENGTH_OPTIONS,
     },
   ],
   CPU: [
