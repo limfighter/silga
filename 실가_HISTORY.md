@@ -1880,3 +1880,92 @@ UI/UX도 리서치로 고도화해서 실제 시중 빌드 웹 디자인처럼" 
     동작을 검증하지 못함 — 파일 내용은 설계 검토 수준으로만 확인. 실제
     VM에서 처음 돌려볼 때 오탈자/권한/방화벽 이슈 등이 나올 수 있음.
     사용자가 직접 실행해보고 문제 생기면 다음 세션에서 대응 필요
+
+---
+
+### 2026-08-07 (같은 세션, 실제 GCP VM 배포 진행하며 이어서)
+
+#### GCP e2-micro 실배포 — 문제 4건 발견·해결, 최종 정상 확인 (PR #16~#19)
+
+[✓] PR #16 — deploy/ 준비 커밋들이 main에 안 올라가 있던 것 뒤늦게 발견
+    → 사용자가 `git clone`으로 VM에 리포 받았는데 `deploy/silga-backend.service`가
+      "No such file or directory" — 원인은 GCP 배포 준비 작업 커밋들을
+      만들어놓고 PR을 안 만든 채 방치했던 것(직전 세션에서 "PR 만들어서
+      머지할까요?"라고 물어놓고 실제로 안 함). 부랴부랴 PR #16 생성+머지,
+      main에 deploy/ 반영. **교훈: 커밋 쌓아두지 말고 그때그때 PR 만들어서
+      머지할 것** — 이후 이 세션에서는 커밋마다 바로 PR 만들어서 머지하는
+      패턴으로 전환(#17~#19가 그 예)
+
+[✓] `git clone` "destination path already exists and is not an empty
+    directory" 반복 발생 — 원인 규명에 몇 차례 시행착오
+    → 1차: `useradd -m -d /opt/silga`가 홈 디렉토리 생성 시 스켈레톤
+      파일(.bash_logout/.bashrc/.profile)을 자동으로 넣어놔서 "비어있지
+      않음" 판정 — 해당 3개 파일만 지우고 재시도해서 1차 클론 성공
+    → 2차(deploy/ 뒤늦게 머지 후 재클론 시도): 이번엔 `rm -rf
+      /opt/silga/* /opt/silga/.[!.]*` 글롭 방식으로 지웠는데도 동일 에러
+      재발 — 사용자가 확인 중 실수로 `ls -la`를 인자 없이 쳐서 자기
+      홈 디렉토리(`/home/wltjd0623`)를 보고 "/opt/silga 맞나" 헷갈렸던
+      해프닝 있었음(연결 문제 아니었음, 단순 경로 착오)
+    → 최종 해결: `/opt/silga`를 통째로 `rm -rf`한 뒤 `mkdir -p` +
+      `chown silga:silga`로 새로 만들고 클론 — 이 과정에서 `/opt`
+      자체가 root 소유라 `silga` 유저가 직접 `git clone .../opt/silga`로
+      새 디렉토리를 만들 권한이 없다는 것도 확인(mkdir을 root가 먼저
+      해줘야 함)
+
+[✓] PR #17 — 실사용 버그 2건 + nginx 타임아웃 선제 조정
+    → `sudo journalctl -u silga-backend -f`로 재현 로그 확보, 정확한
+      원인 파악: `PriceHistory.min`/`max`(schemas/history.py, `str` 타입)에
+      `danawa.get_price_variance()`가 반환하는 int(`minPrice`/`maxPrice`)를
+      그대로 대입해서 pydantic ValidationError → 500. `PricePoint.price`는
+      이미 `str(p["price"])`로 캐스팅돼 있었는데 `min`/`max`만 빠져있던
+      실수 — `str()` 캐스팅 추가로 해결
+    → 왜 "3개월 이상만" 증상으로 보였는지: 데이터가 아예 없는 기간은
+      `get_price_variance`가 `TypeError`를 던지고 엔드포인트가 그걸
+      404로 먼저 처리해버려서 이 타입버그 지점까지 도달을 안 함 — 실제
+      가격 데이터가 있는 기간(사용자가 테스트한 상품 기준 3/6/12개월)만
+      끝까지 진행되다가 크래시가 드러난 것
+    → nginx `/api/` 프록시 타임아웃도 60→180초로 미리 늘림(`create_build`가
+      부품마다 `danawa.get_product()` 순차 호출 — 매너 크롤링 원칙상
+      병렬화 안 하는 기존 설계라 부품 많은 빌드는 오래 걸릴 수 있음,
+      main.py 기존 주석에도 명시돼 있던 특성)
+
+[✓] PR #18 — `deploy.sh` 권한 구조 버그
+    → 사용자가 안내대로 `sudo -u silga ./deploy.sh` 실행 → 스크립트 내부
+      `sudo systemctl restart silga-backend` 지점에서 `[sudo] password
+      for silga:` 프롬프트 뜨고 실패(`silga`는 `-s /usr/sbin/nologin`으로
+      만든 로그인 불가 시스템 계정이라 애초에 유효한 비밀번호가 없음,
+      sudoers도 아님)
+    → `deploy.sh`를 **root로 실행**하도록 재구성 — 스크립트 시작 시
+      `id -u -ne 0`이면 에러로 즉시 중단, 파일 작업(git pull/pip/npm)만
+      내부에서 `sudo -u silga bash -c "..."`로 낮춰서 처리, systemctl은
+      이미 root 컨텍스트라 그대로 실행. README.md "이후 업데이트" 절차도
+      같이 수정 + "nginx/systemd 설정 파일 자체가 바뀐 경우 deploy.sh만으론
+      부족함" 안내 추가(설정 파일은 자동 동기화 안 되는 구조라서)
+
+[✓] PR #19 — danawa.py 타임아웃 누락
+    → PR #17~#18 반영 후 재배포하는 과정에서 `sudo systemctl restart`가
+      즉시 안 끝나고 `State 'stop-sigterm' timed out. Killing.` →
+      SIGKILL로 강제 종료되는 로그 확인 — 90초 넘게 이전 프로세스가
+      graceful shutdown 신호에 응답을 안 함
+    → 원인: `danawa.py`의 `requests.get()` 3곳(get_product_codes/
+      get_product/get_price_variance) 전부 `timeout=` 파라미터가 없었음
+      — 다나와 쪽 요청이 어딘가에서 멈추면 무한정 대기하다가 워커
+      스레드를 붙잡고 있을 수 있는 구조였음(실제로 그게 원인이었는지
+      100% 확증은 못 했지만 정황상 가장 유력, 재현 로그에 특정 요청
+      단계가 안 찍히고 그냥 멈춰있었음)
+    → 셋 다 `timeout=20` 추가. `requests.Timeout`이
+      `requests.RequestException`의 서브클래스인 것 python으로 직접
+      확인(`issubclass(requests.Timeout, requests.RequestException)` →
+      True) — main.py 전역에 이미 깔려있는 503/부품별 fallback 예외
+      처리가 타임아웃도 자동으로 커버하게 됨, 별도 except 분기 추가 불필요
+
+[✓] 최종 검증 — 사용자가 실제 배포된 사이트(GCP e2-micro, 외부 IP
+    34.56.49.73)에서 브라우저로 직접 확인
+    → 검색 정상(이전엔 502 Bad Gateway로 전부 실패했었음)
+    → 빌드 저장 정상
+    → 히스토리 3/6개월 이상 조회 정상
+    → 사용자 코멘트: "깔끔하게 잘 된다 다듬기만 하면 되겠네"
+
+→ 실가가 처음으로 로컬 개발 환경을 벗어나 실제 서버에서 상시 구동되는
+  상태 달성. 이후 코드 변경 시 재배포는 `deploy/README.md` "이후
+  업데이트" 섹션 절차(PR #18로 고쳐진 버전) 그대로 따르면 됨
