@@ -1969,3 +1969,73 @@ UI/UX도 리서치로 고도화해서 실제 시중 빌드 웹 디자인처럼" 
 → 실가가 처음으로 로컬 개발 환경을 벗어나 실제 서버에서 상시 구동되는
   상태 달성. 이후 코드 변경 시 재배포는 `deploy/README.md` "이후
   업데이트" 섹션 절차(PR #18로 고쳐진 버전) 그대로 따르면 됨
+
+---
+
+## 2026-08-07 (새 세션) 검색 기본 목록 자동 로딩 + 썸네일 이미지
+
+사용자가 GCP 배포 검증 완료 이후 "기능면을 다듬자"며 지목한 두 가지:
+(1) 검색 버튼을 눌러야만 결과가 뜨는 게 불편, (2) 상품 이미지 표시.
+backend v0.9.1 → v0.10, frontend v0.10.2 → v0.11 (둘 다 API 계약 영향 —
+두 번째 자리).
+
+[✓] `/search?q=` 선택화
+  → `CATEGORY_DEFAULT_QUERY` 신규(main.py) — 카테고리별로 다나와 검색창에
+    실제로 넣을 기본 키워드 정의. 기존 `CATEGORY_LABELS`(사후 필터용 라벨)와
+    값이 다를 수 있음이 확인됨: 쿨러는 label="쿨러/튜닝"이지만 검색어로
+    "쿨러/튜닝"을 그대로 넣으면 안 되고 "쿨러"만 써야 결과가 나옴
+  → 8개 카테고리 전부 라이브(danawa.com 접근이 이 세션도 열려 있음)로
+    `키워드 검색 + category_label 사후필터` 조합 실측: CPU="CPU"(40건),
+    GPU="그래픽카드"(40), 메인보드="메인보드"(40), RAM="RAM"(40),
+    SSD="SSD"(37), 케이스="케이스"(40), 파워="파워"(40), 쿨러="쿨러"(40) —
+    전부 30건대 후반~40건으로 기본 목록으로 쓰기 충분한 양 확인
+  → `search()` 핸들러: `q` 파라미터를 `Query(..., min_length=1)`에서
+    `Query(None, min_length=1)`로 변경, q가 falsy면
+    `CATEGORY_DEFAULT_QUERY.get(category)`로 대체. q도 category도 없으면
+    400("q 또는 유효한 category가 필요합니다") — q를 명시하면 기존과 완전히
+    동일하게 동작(하위 호환, PartRow 자동완성 등 다른 호출부 변경 불필요)
+  → 프론트 `api.ts::api.search()` 시그니처를 `q: string` →
+    `q: string | undefined`로 변경, falsy면 쿼리스트링에 아예 안 붙임
+  → `SearchPage.tsx`: `useQuery`의 `enabled: query.length > 0` 조건을
+    제거해서 마운트 시/카테고리 탭 전환 시 항상 fetch되도록 변경(query가
+    비어있으면 백엔드가 카테고리 기본 목록으로 응답). 기존 "검색어를
+    입력하세요" 빈 상태 블록은 제거, 대신 결과가 있고 q가 빈 상태일 때만
+    "검색어 없이 {category} 기본 목록을 보여주는 중" status-line 캡션 추가
+
+[✓] 검색 결과 썸네일 — `SearchResultItem.img` 신규 필드
+  → `danawa.py::get_product_codes()`가 상품 li의 `div.thumb_image img`에서
+    이미지 URL 파싱 추가. **실측 중 발견한 함정**: 상품 목록 40건 중 위쪽
+    극소수(4건)만 즉시 로딩이라 `src`에 실제 URL이 바로 들어있고, 나머지
+    대다수(lazyload 클래스 부착)는 `src`가 `//img.danawa.com/new/noData/
+    img/noImg_160.gif` 플레이스홀더 고정값이고 실제 URL은 `data-src`
+    속성에 들어있음 — 처음엔 `src`만 봐서 CPU 40건 중 4건만 이미지가
+    잡히는 버그로 나타났다가, `data-src` 우선 사용(`img.get("data-src")
+    or img.get("src")`)으로 고쳐서 40/40 확인. 그래도 진짜 이미지가 없는
+    상품은 소수 존재(noImg 플레이스홀더만 있음) — 이 경우는 걸러내서
+    `img=None` 반환(프론트가 자체 플레이스홀더 박스 렌더링)
+  → `SearchResultItem` 스키마(schemas/search.py)에 `img: Optional[str]`
+    추가, `/search` 응답 구성에 `img=item.get("img")` 반영
+  → 프론트: `SearchPage.tsx` 결과 행에 40×40 `.thumb` 이미지(hairline
+    보더, `object-fit:contain`, 디자인 토큰 `--line-lt`/`--paper-2`만
+    사용 — 모노크롬 톤 규칙 안 건드림) 추가, `img`가 없으면
+    `.thumb-empty` 빈 박스로 자리만 유지. `PartRow.tsx`(빌드 생성 화면
+    자동완성 드롭다운)는 이번 범위 밖 — 사용자가 검색 화면만 지목함,
+    필요해지면 별도 확장
+
+[검증]
+  → 백엔드: curl로 `/search?category={8개 전부}` q 생략 호출 → 각각
+    37~40건 정상 반환 + img 필드 채워짐 확인. `/search` (q도 category도
+    없음) → 400 확인. `/search?q=9800X3D&category=CPU`(기존 방식) →
+    기존과 동일하게 동작 확인(하위 호환)
+  → 프론트: `npm run typecheck` 통과. mock 아닌 실제 danawa 라이브 데이터로
+    Vite dev + Playwright 검증 — `/search` 진입 시 검색 버튼 없이 기본
+    카테고리(CPU) 40건 자동 로딩 확인, GPU 탭으로 전환해도 버튼 없이 자동
+    재로딩 확인, 두 카테고리 다 40/40 썸네일 `<img>` 엘리먼트가 올바른
+    `src`(실제 danuri.io URL)로 DOM에 박히는 것까지 확인
+  → **검증 한계**: 이 세션 환경은 Playwright Chromium이 아웃바운드
+    프록시를 못 타서(`fonts.googleapis.com`도 동일 증상으로 실패) 이미지
+    요청 자체가 응답 없이 걸림 — DOM에 올바른 src가 들어가는 것과 그
+    URL이 curl로는 200 정상 응답하는 것까지는 확인했지만, 실제 픽셀
+    렌더링(브로큰 이미지 아이콘 없이 뜨는지)은 이 환경에서 육안 확인
+    못 함. 실제 배포 서버/사용자 로컬 브라우저에서는 문제 없을 것으로
+    판단되나 다음 세션(또는 사용자)이 최종 확인 필요

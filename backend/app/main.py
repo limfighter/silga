@@ -60,6 +60,23 @@ CATEGORY_LABELS = {
     "쿨러": "쿨러/튜닝",
 }
 
+# /search?q= 생략 시(검색 버튼을 안 눌러도 카테고리 선택만으로 기본 목록을
+# 보여주기 위한 용도) 대신 사용할 검색어. CATEGORY_LABELS와 달리 이건 다나와
+# 검색창에 실제로 넣는 키워드라 값이 다를 수 있음(예: 쿨러는 label이
+# "쿨러/튜닝"이지만 검색어로는 "쿨러"만 넣어야 함) — 8개 전부 실측으로
+# category_label 사후 필터까지 거쳐도 40건 안팎이 나오는 것 확인
+# (2026-08-07, 실가_HISTORY.md 참조)
+CATEGORY_DEFAULT_QUERY = {
+    "CPU": "CPU",
+    "GPU": "그래픽카드",
+    "메인보드": "메인보드",
+    "RAM": "RAM",
+    "SSD": "SSD",
+    "케이스": "케이스",
+    "파워": "파워",
+    "쿨러": "쿨러",
+}
+
 # /search?memory_gb= 값(GPU 전용, category=GPU일 때만 적용) →
 # danawa.get_product_codes(attribute=...) 전달값 매핑. "{속성코드}-{값코드}-OR"
 # 형식은 다나와 상세검색 필터 체크박스 클릭 시 실측 URL에서 그대로 가져온 값
@@ -298,7 +315,12 @@ app.add_middleware(
 
 @app.get("/search", response_model=list[SearchResultItem])
 def search(
-    q: str = Query(..., min_length=1, description="검색 키워드"),
+    q: Optional[str] = Query(
+        None,
+        min_length=1,
+        description="검색 키워드 — 생략 시 category 기준 기본 목록(CATEGORY_DEFAULT_QUERY) 반환, "
+                     "q와 category 둘 다 없으면 400",
+    ),
     category: Optional[str] = Query(
         None,
         description="CPU/GPU/메인보드/RAM/SSD/케이스/파워/쿨러 중 하나 — "
@@ -354,12 +376,21 @@ def search(
     ),
 ):
     """
-    GET /search?q={keyword}&category={CATEGORY_LABELS 키, 선택}&memory_gb={GPU 전용}&chipset={GPU 전용}&
+    GET /search?q={keyword, 선택}&category={CATEGORY_LABELS 키, 선택}&memory_gb={GPU 전용}&chipset={GPU 전용}&
         length={GPU 전용}&socket={CPU/메인보드/쿨러 전용}&formfactor={메인보드/케이스/SSD 전용}&
         ram_type={RAM 전용}&wattage={파워 전용}&interface={SSD 전용}&cooler_type={쿨러 전용}
         (스펙 파라미터는 전부 선택, category와 안 맞으면 무시) →
-        [{code, title, price, price_formatted}, ...]
+        [{code, title, price, price_formatted, img}, ...]
+
+    q 생략 시 category의 CATEGORY_DEFAULT_QUERY 키워드로 대신 검색(검색 버튼을
+    누르지 않아도 카테고리 선택만으로 기본 목록이 뜨도록 하기 위함) — q와
+    category 둘 다 없으면 400.
     """
+    if not q:
+        q = CATEGORY_DEFAULT_QUERY.get(category) if category else None
+        if not q:
+            raise HTTPException(status_code=400, detail="q 또는 유효한 category가 필요합니다")
+
     category_label = CATEGORY_LABELS.get(category) if category else None
     attribute = None
     if category == "GPU":
@@ -394,6 +425,7 @@ def search(
             title=item.get("title"),
             price=item.get("price"),
             price_formatted=format_won(item.get("price")),
+            img=item.get("img"),
         )
         for item in results
     ]

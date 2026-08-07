@@ -99,12 +99,22 @@ def get_product_codes(keyword: str, category_label: str = None, attribute: str =
         price2 = (price1 or None) and price1.get("value")
 
         title = product.select_one("div.prod_main_info > div.prod_info > p.prod_name > a")
+        img = product.select_one("div.thumb_image img")
+        # 위쪽 소수(≈40건 중 4건)만 즉시 로딩이라 src에 실제 URL이 들어있고,
+        # 나머지 대다수는 lazyload(class="lazyload")라 src는 noImg 플레이스홀더
+        # gif 고정값이고 실제 URL은 data-src에 있음 — data-src 우선 사용
+        img_src = (img or None) and (img.get("data-src") or img.get("src"))
 
         prod = {"code": code3}
         if price2 is not None:
             prod["price"] = int(price2)
         if title is not None:
             prod["title"] = title.text.strip()
+        # 진짜로 이미지가 없는 상품만 noImg 플레이스홀더 gif가 유일한 값으로
+        # 남음 — 그대로 넘기지 않고 걸러냄, 프론트는 img가 None이면 자체
+        # 플레이스홀더를 씀
+        if img_src and "noImg" not in img_src:
+            prod["img"] = img_src
 
         product_codes.append(prod)
 
