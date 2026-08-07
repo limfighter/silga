@@ -8,11 +8,9 @@
 갱신 필요, 계약 변경이라 버전 v0.2 표기 대상).
 """
 
-import os
 import time
 from typing import Optional
 
-from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -42,16 +40,6 @@ from app.utils import format_won
 from app.database import Base, engine, get_db
 from app.models import Product, Build, BuildItem, Favorite
 from app.timezone_utils import now_kst
-
-load_dotenv()
-
-# 다나와 공식 오픈API(openapi.danawa.com) 인증키 — .env(gitignore 대상, 커밋 안
-# 됨)의 DANAWA_OPENAPI_KEY에서 로드. 2026-08-07 발급, 아직 실제로 이 키를
-# 써서 호출하는 코드는 없음(엔드포인트/응답 형식 미확인 + IP 화이트리스트
-# 방식이라 이 개발 환경에선 테스트 자체가 불가 — 실가_인수인계.md 참조).
-# 엔드포인트 문서 확보되면 이 값으로 실제 API 클라이언트 작성 예정.
-# None이면(.env 미설정) 기존과 동일하게 스크래핑(services/danawa.py)만 사용
-DANAWA_OPENAPI_KEY = os.getenv("DANAWA_OPENAPI_KEY")
 
 # /search?category= 값 → danawa.get_product_codes(category_label=...) 매핑.
 # 값은 다나와 상품 li의 productItem_categoryInfo_{code} 필드 마지막 조각과
