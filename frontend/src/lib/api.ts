@@ -42,6 +42,7 @@ export interface SearchSpecParams {
   memoryGb?: number; // GPU 전용
   socket?: string; // CPU/메인보드/쿨러 전용
   chipset?: string; // GPU 전용
+  length?: string; // GPU 전용
   formfactor?: string; // 메인보드/케이스/SSD 전용
   ramType?: string; // RAM 전용
   wattage?: string; // 파워 전용
@@ -145,6 +146,7 @@ export const api = {
     if (spec?.memoryGb) params.set("memory_gb", String(spec.memoryGb));
     if (spec?.socket) params.set("socket", spec.socket);
     if (spec?.chipset) params.set("chipset", spec.chipset);
+    if (spec?.length) params.set("length", spec.length);
     if (spec?.formfactor) params.set("formfactor", spec.formfactor);
     if (spec?.ramType) params.set("ram_type", spec.ramType);
     if (spec?.wattage) params.set("wattage", spec.wattage);
