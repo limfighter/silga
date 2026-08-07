@@ -36,6 +36,12 @@ pip install playwright && playwright install chromium
 python3 scripts/e2e_smoke_test.py
 ```
 
+## 배포
+
+GCP e2-micro 무료 티어 VM에 프론트+백엔드를 함께 올리는 방법은
+`deploy/README.md` 참조 (systemd 서비스 파일, nginx 설정, 업데이트
+스크립트 포함).
+
 ## 현재 구현 상태 (요약)
 
 | 영역 | 상태 |
