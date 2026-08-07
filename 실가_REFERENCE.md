@@ -90,8 +90,13 @@ silga/                (git 리포 루트, 커밋 4개: v0.2 백엔드/v0.3 빌�
 │       ├── pages/        Search/BuildList/BuildCreate/BuildDetail/Placeholder
 │       ├── lib/           api.ts(백엔드 클라이언트), useDebouncedValue.ts
 │       └── styles/global.css  디자인 토큰 이식
-└── scripts/
-    └── e2e_smoke_test.py       Playwright E2E 스모크 테스트
+├── scripts/
+│   └── e2e_smoke_test.py       Playwright E2E 스모크 테스트
+└── deploy/                     GCP e2-micro 배포 설정 (2026-08-07 신설)
+    ├── README.md                셋업 절차(gcloud 명령 포함)
+    ├── silga-backend.service    systemd 유닛(uvicorn)
+    ├── nginx-silga.conf         nginx 설정(정적 서빙 + /api/ 리버스 프록시)
+    └── deploy.sh                업데이트 스크립트(git pull+재빌드+재시작)
 
 Phase 5(Flutter 이식) 시점에 flutter/ 추가되어 3개 체제로 전환 예정 (지금은 2개)
 ```
@@ -161,18 +166,26 @@ DB         SQLite (WAL 모드) — 개인용 트래픽 규모에 충분, 서버 
            웹/Flutter 공통: 동일 REST API 한 벌만 사용, 프론트는 얇은 렌더링 레이어
 
 알림       FCM (Flutter 이식 이후 적용, 웹 단계에서는 보류)
-배포       미정 — 개인 로컬 실행으로 시작, 원격 접근 필요해지면 그때 결정
-           (지금 단계 급하지 않음, 결정 자체를 의도적으로 미룸)
-           후보: Fly.io / Railway (SQLite+단일 프로세스 앱에 특화, 마찰 최소)
-                GCP Compute Engine VM (e2-micro 무료 티어, 지금 스택 그대로
-                무수정 배포 가능하나 확장은 수동)
-                GCP Cloud Run (서버리스 자동 확장, 단 SQLite 파일을 GCS
+배포       확정(2026-08-07) — GCP Compute Engine e2-micro 무료 티어 VM 단일
+           인스턴스. 사용자가 GCP를 자주 다뤄봐서 익숙하다는 이유로 선택 —
+           Fly.io/Railway(마찰은 더 적었을 후보)보다 우선. 프론트(정적
+           빌드)+백엔드(FastAPI) 같은 VM 하나에서 서빙(nginx가 정적파일
+           서빙 + `/api/`만 uvicorn으로 리버스 프록시) — 이 구성이면
+           프론트가 같은 오리진으로 호출하게 되어 CORS 자체가 불필요해짐
+           (프로덕션 한정, 로컬 dev는 여전히 크로스 오리진이라 CORS 필요).
+           도메인/HTTPS는 아직 없음 — VM 외부 IP로 HTTP 직접 접속, 도메인
+           생기면 그때 certbot 추가 예정. 셋업 절차/systemd·nginx 설정은
+           `deploy/` 참조
+           (기각된 후보, 참고용)
+                Fly.io / Railway — SQLite+단일 프로세스에 특화, 마찰
+                최소였을 후보지만 GCP 익숙함을 우선해 선택 안 함
+                GCP Cloud Run — 서버리스 자동 확장, 단 SQLite 파일을 GCS
                 FUSE로 마운트해야 해서 단일 인스턴스 고정 필요 — 결국
                 SQLite 쓰는 한 확장성 이점 못 씀. 진짜 확장 필요해지면
-                Postgres 이전 + 멀티 인스턴스가 정공법)
-           Cloudflare(Workers)는 후보에서 제외 — Python은 Pyodide 경유라
-           FastAPI/uvicorn이 그대로 안 올라가고, SQLite도 D1/Durable
-           Objects로 갈아타야 해서 스택 재설계 수준의 변경 필요
+                Postgres 이전 + 멀티 인스턴스가 정공법
+                Cloudflare(Workers) — Python은 Pyodide 경유라
+                FastAPI/uvicorn이 그대로 안 올라가고, SQLite도 D1/Durable
+                Objects로 갈아타야 해서 스택 재설계 수준의 변경 필요해 제외
 ```
 
 ---
