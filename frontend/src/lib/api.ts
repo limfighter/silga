@@ -34,6 +34,7 @@ export interface SearchResultItem {
   title: string | null;
   price: number | null;
   price_formatted: string | null;
+  img: string | null;
 }
 
 // /search 스펙 필터 파라미터 — 카테고리와 안 맞는 필드는 백엔드가 무시함
@@ -140,8 +141,12 @@ export interface FavoriteItem {
 // ---- API 함수 ----
 
 export const api = {
-  search: (q: string, category?: string, spec?: SearchSpecParams) => {
-    const params = new URLSearchParams({ q });
+  // q 생략(빈 문자열/undefined) 시 백엔드가 category 기본 키워드로 대신
+  // 검색함(검색 버튼을 안 눌러도 카테고리 선택만으로 기본 목록이 뜨도록) —
+  // 이 경우 category는 필수(백엔드가 q/category 둘 다 없으면 400)
+  search: (q: string | undefined, category?: string, spec?: SearchSpecParams) => {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
     if (category) params.set("category", category);
     if (spec?.memoryGb) params.set("memory_gb", String(spec.memoryGb));
     if (spec?.socket) params.set("socket", spec.socket);

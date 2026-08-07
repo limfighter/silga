@@ -234,10 +234,18 @@ sammy310/Danawa-Crawler (MIT):
 
 ## 엔드포인트 설계 (계약 — app-shell-mockup.html이 이 계약 전제로 만들어짐)
 ```
-GET  /search?q={keyword}&category={선택}&memory_gb={GPU}&chipset={GPU}&length={GPU}&socket={CPU|메인보드|쿨러}
+GET  /search?q={keyword, 선택}&category={선택}&memory_gb={GPU}&chipset={GPU}&length={GPU}&socket={CPU|메인보드|쿨러}
      &formfactor={메인보드|케이스|SSD}&ram_type={RAM}&wattage={파워}&interface={SSD}
      &cooler_type={쿨러}
-  → [{code, title, price, price_formatted}, ...]
+  → [{code, title, price, price_formatted, img}, ...]
+  ※ q 선택화 + img 필드(v0.9.2, 2026-08-07 추가) — 검색 버튼을 안 눌러도
+    카테고리 선택만으로 기본 목록이 뜨도록, q 생략 시 backend/app/main.py의
+    CATEGORY_DEFAULT_QUERY(카테고리별 기본 검색어, 예: GPU→"그래픽카드")로
+    대신 검색함. q와 category 둘 다 없으면 400. img는 danawa.get_product_codes()가
+    상품 li의 div.thumb_image img에서 파싱한 썸네일 URL — 실측 결과 상위
+    소수만 즉시로딩(src)이고 대다수는 lazyload라 실제 URL이 data-src에 있어
+    data-src 우선 사용(둘 다 없거나 noImg 플레이스홀더면 None, 프론트가 자체
+    플레이스홀더 처리)
   ※ category(v0.5, 2026-08-05 추가) — 검색어가 다른 카테고리 상품과 겹칠 때
     결과를 좁히는 선택적 필터. 값은 backend/app/main.py의 CATEGORY_LABELS 키
     (CPU/GPU/메인보드/RAM/SSD/케이스/파워/쿨러)와 정확히 일치해야 적용됨

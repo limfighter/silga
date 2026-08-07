@@ -38,10 +38,11 @@ export default function SearchPage() {
     ? { [specValue.key]: specValue.key === "memoryGb" ? Number(specValue.value) : specValue.value }
     : undefined;
 
+  // q가 비어 있으면 백엔드가 category 기본 키워드로 대신 검색 — 검색 버튼을
+  // 안 눌러도 카테고리 선택만으로 기본 목록이 뜨도록 하기 위함
   const { data, isFetching, isError, error } = useQuery({
     queryKey: ["search", query, category, specValue],
-    queryFn: () => api.search(query, category, spec),
-    enabled: query.length > 0,
+    queryFn: () => api.search(query || undefined, category, spec),
   });
 
   const results = useMemo(() => sortResults(data ?? [], sort), [data, sort]);
@@ -135,13 +136,6 @@ export default function SearchPage() {
             </div>
           )}
 
-          {query.length === 0 && (
-            <div className="empty-state">
-              <div className="t">검색어를 입력하세요</div>
-              <div className="d">다나와 실시간 최저가 기준 · {category} 카테고리</div>
-            </div>
-          )}
-
           {isFetching && <div className="status-line">검색 중...</div>}
           {isError && (
             <div className="status-line error">
@@ -154,6 +148,11 @@ export default function SearchPage() {
 
           {results.length > 0 && (
             <>
+              {query.length === 0 && (
+                <div className="status-line">
+                  검색어 없이 {category} 기본 목록을 보여주는 중 — 다나와 실시간 최저가 기준
+                </div>
+              )}
               <div className="sort-tabs">
                 <button
                   className={`sort-tab${sort === "popular" ? " active" : ""}`}
@@ -180,6 +179,11 @@ export default function SearchPage() {
                   const isInCart = cart[category]?.code === item.code;
                   return (
                     <div className="search-result-row" key={item.code}>
+                      {item.img ? (
+                        <img className="thumb" src={item.img} alt="" loading="lazy" />
+                      ) : (
+                        <span className="thumb thumb-empty" aria-hidden="true" />
+                      )}
                       <span className="nm">
                         {item.title ?? "(제목 없음)"}
                         <span className="code">#{item.code}</span>
