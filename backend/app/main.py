@@ -605,8 +605,8 @@ def get_price_history(code: int, months: int = Query(..., description="1, 3, 6, 
         raise HTTPException(status_code=404, detail="가격 히스토리를 찾을 수 없음")
 
     return PriceHistory(
-        min=variance["min"],
-        max=variance["max"],
+        min=str(variance["min"]),
+        max=str(variance["max"]),
         prices=[
             PricePoint(date=p["date"], price=str(p["price"]), full_date=p.get("full_date"))
             for p in variance["prices"]
