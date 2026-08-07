@@ -222,7 +222,7 @@ sammy310/Danawa-Crawler (MIT):
 ## 엔드포인트 설계 (계약 — app-shell-mockup.html이 이 계약 전제로 만들어짐)
 ```
 GET  /search?q={keyword}&category={선택}&memory_gb={GPU}&chipset={GPU}&socket={CPU|메인보드|쿨러}
-     &formfactor={메인보드|케이스}&ram_type={RAM}&wattage={파워}&interface={SSD}
+     &formfactor={메인보드|케이스|SSD}&ram_type={RAM}&wattage={파워}&interface={SSD}
      &cooler_type={쿨러}
   → [{code, title, price, price_formatted}, ...]
   ※ category(v0.5, 2026-08-05 추가) — 검색어가 다른 카테고리 상품과 겹칠 때
@@ -233,7 +233,8 @@ GET  /search?q={keyword}&category={선택}&memory_gb={GPU}&chipset={GPU}&socket=
     비교해서 사후 필터링(요청 URL에 새 파라미터를 추가하는 방식이 아님) — 8개
     전부 실제 상품 li HTML로 직접 검증 완료(실가_HISTORY.md 2026-08-05 참조)
   ※ 스펙 파라미터(memory_gb/chipset/socket/formfactor/ram_type/wattage/
-    interface는 v0.5, cooler_type은 v0.7 추가) — category와 달리 다나와 서버측 요청 자체를
+    interface는 v0.5, cooler_type은 v0.7, formfactor의 SSD 적용은 v0.8 추가) —
+    category와 달리 다나와 서버측 요청 자체를
     좁히는 필터. danawa.get_product_codes(attribute=...)로 "{속성코드}-
     {값코드}-OR"(또는 케이스만 -AND, 동작상 차이 없음) 형식 문자열을 다나와
     요청 URL에 그대로 전달(다나와 상세검색 필터 체크박스 클릭 시 실측 URL에서
@@ -245,17 +246,17 @@ GET  /search?q={keyword}&category={선택}&memory_gb={GPU}&chipset={GPU}&socket=
     | memory_gb   | GPU           | 16 (GB)                | GPU_MEMORY_ATTRIBUTES            |
     | chipset     | GPU           | NVIDIA/AMD/Intel        | GPU_CHIPSET_ATTRIBUTES           |
     | socket      | CPU, 메인보드, 쿨러 | AM5/AM4/LGA1851/LGA1700| CPU_SOCKET_ATTRIBUTES / MAINBOARD_SOCKET_ATTRIBUTES / COOLER_SOCKET_ATTRIBUTES (카테고리마다 다나와 내부 코드 자체가 달라 값도 다름 — 절대 재사용 불가. 쿨러는 "그 쿨러가 지원하는 소켓" 의미이고, 인텔(6805)/AMD(6806) 필터 그룹이 나뉘어 있어 값에 따라 속성코드까지 갈림) |
-    | formfactor  | 메인보드, 케이스 | ATX/M-ATX/ITX/E-ATX | MAINBOARD_FORMFACTOR_ATTRIBUTES / CASE_FORMFACTOR_ATTRIBUTES (메인보드=자기 크기, 케이스=장착 가능한 보드 크기 — 의미가 다름) |
+    | formfactor  | 메인보드, 케이스, SSD | 메인보드/케이스: ATX/M-ATX/ITX/E-ATX, SSD: M.2 2280/M.2 2242/M.2 2230/2.5인치 | MAINBOARD_FORMFACTOR_ATTRIBUTES / CASE_FORMFACTOR_ATTRIBUTES / SSD_FORMFACTOR_ATTRIBUTES (메인보드=자기 크기, 케이스=장착 가능한 보드 크기, SSD=드라이브 규격 — 의미가 다름) |
     | ram_type    | RAM           | DDR5/DDR4               | RAM_TYPE_ATTRIBUTES              |
     | wattage     | 파워          | "800W~899W" 등          | PSU_WATTAGE_ATTRIBUTES           |
     | interface   | SSD           | SATA3/PCIe3.0x4/PCIe4.0x4/PCIe5.0x4 | SSD_INTERFACE_ATTRIBUTES |
     | cooler_type | 쿨러          | CPU 쿨러/시스템 쿨러/VGA 쿨러/M.2 SSD 쿨러/써멀그리스 | COOLER_TYPE_ATTRIBUTES (다나와 "쿨러/튜닝" 카테고리엔 CPU 쿨러·케이스팬·써멀그리스·조명기기가 다 섞여 있어 category 필터만으론 안 걸러짐 — 이 카테고리에 특히 필요한 필터) |
 
     **같은 category 안에 스펙 파라미터가 2개 있는 경우(GPU: memory_gb+chipset,
-    메인보드: socket+formfactor, 쿨러: cooler_type+socket) 동시에 못 씀** —
-    attribute 인자가 값 하나만
-    받을 수 있어서(다중 attribute 결합 규칙 미검증) chipset/socket/cooler_type이 우선
-    적용되고 나머지는 무시됨(main.py::search()의 `A or B` 체이닝 참조). 프론트
+    메인보드: socket+formfactor, 쿨러: cooler_type+socket, SSD: interface+formfactor)
+    동시에 못 씀** — attribute 인자가 값 하나만
+    받을 수 있어서(다중 attribute 결합 규칙 미검증) chipset/socket/cooler_type/interface가
+    우선 적용되고 나머지는 무시됨(main.py::search()의 `A or B` 체이닝 참조). 프론트
     (PartRow)는 이 제약을 반영해 같은 카테고리의 스펙 select를 상호 배타로
     구현(하나 고르면 다른 하나 자동 해제) — API를 직접 호출하는 쪽(AI 라우터
     등)도 이 우선순위를 알아야 함

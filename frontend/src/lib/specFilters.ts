@@ -22,6 +22,7 @@ const PSU_WATTAGE_OPTIONS = [
   "1000W~1299W",
 ];
 const SSD_INTERFACE_OPTIONS = ["SATA3", "PCIe3.0x4", "PCIe4.0x4", "PCIe5.0x4"];
+const SSD_FORMFACTOR_OPTIONS = ["M.2 2280", "M.2 2242", "M.2 2230", "2.5인치"];
 const COOLER_TYPE_OPTIONS = ["CPU 쿨러", "시스템 쿨러", "VGA 쿨러", "M.2 SSD 쿨러", "써멀그리스"];
 
 export interface SpecFilterDef {
@@ -85,6 +86,12 @@ export const CATEGORY_SPEC_FILTERS: Record<string, SpecFilterDef[]> = {
       placeholder: "인터페이스",
       title: "인터페이스로 좁혀서 검색",
       options: SSD_INTERFACE_OPTIONS,
+    },
+    {
+      specKey: "formfactor",
+      placeholder: "폼팩터 전체",
+      title: "폼팩터로 좁혀서 검색",
+      options: SSD_FORMFACTOR_OPTIONS,
     },
   ],
   // 쿨러는 다나와 "쿨러/튜닝" 카테고리에 CPU 쿨러·케이스팬·써멀그리스·조명기기가
