@@ -1738,3 +1738,20 @@ UI/UX도 리서치로 고도화해서 실제 시중 빌드 웹 디자인처럼" 
     → **Crawl-delay: 10 명시 확인** — CLAUDE.md의 "요청 간격 최소
       5~10초" 원칙이 다나와 자체 robots.txt 권고와 정확히 일치. 지금까지
       추정치였던 매너 크롤링 간격에 공식 근거가 생김
+
+#### 다나와 공식 오픈API 조사 마무리 — openapi.danawa.com/robots.txt 확인 (코드 변경 없음)
+
+[✓] 사용자가 "API 조사 이어가자"고 해서 openapi.danawa.com을 좀 더 파봄
+    → curl -L로 실제 진입해보니 auth.danawa.com/login으로 최종 리다이렉트
+      (로그인 폼 HTML 28KB 확인) — 예상대로 로그인 게이트
+    → openapi.danawa.com/robots.txt 확인 → `Disallow: /`로 서브도메인
+      전체가 크롤링 차단. /guide, /docs, /api-guide, /member/join,
+      /sitemap.xml 등 로그인 없이 접근 가능한 공개 문서 경로가 있는지
+      찔러봤으나 전부 404 — 공개 문서 페이지 자체가 없거나 전부 로그인
+      뒤에 있음
+    → robots.txt의 전면 Disallow를 우회해서 더 스크래핑하는 건 매너
+      크롤링 원칙(CLAUDE.md) 위반이라 여기서 조사 중단 — "가격정보 API
+      실제 공개 여부/무료 발급 가능 여부/요청 한도"는 사람이 직접
+      브라우저로 로그인·가입해야 확인 가능한 것으로 최종 확정. 이 항목은
+      더 이상 자동화로 좁힐 수 있는 부분이 없어서 인수인계.md에도
+      "사람 몫"으로 명시
