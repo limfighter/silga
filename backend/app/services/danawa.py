@@ -64,7 +64,7 @@ def get_product_codes(keyword: str, category_label: str = None, attribute: str =
     url = "https://search.danawa.com/dsearch.php?query={}&tab=main".format(quote(keyword))
     if attribute:
         url += "&attribute={}".format(quote(attribute))
-    response = requests.get(url, headers=_get_header(host="search.danawa.com"))
+    response = requests.get(url, headers=_get_header(host="search.danawa.com"), timeout=20)
     if response.status_code != 200:
         response.raise_for_status()
 
@@ -127,7 +127,7 @@ def get_product(product_code: int) -> dict:
         절대 미반영 (실가_REFERENCE.md #엔드포인트-설계 참조)
     """
     response = requests.get("https://prod.danawa.com/info/?pcode={}".format(product_code),
-                            headers=_get_header(host="prod.danawa.com"))
+                            headers=_get_header(host="prod.danawa.com"), timeout=20)
     if response.status_code != 200:
         response.raise_for_status()
 
@@ -269,7 +269,7 @@ def get_price_variance(product_code: int, by_month: int = 1) -> dict:
 
     response = requests.get(
         "https://prod.danawa.com/info/ajax/getProductPriceList.ajax.php?productCode={}&period=1".format(product_code),
-        headers=_get_header(host="prod.danawa.com", referer="danawa.com"))
+        headers=_get_header(host="prod.danawa.com", referer="danawa.com"), timeout=20)
     if response.status_code != 200:
         response.raise_for_status()
 
