@@ -130,12 +130,27 @@ Swagger UI도 확인 가능.
 
 ```bash
 cd /opt/silga
-sudo -u silga ./deploy/deploy.sh
+sudo ./deploy/deploy.sh
 ```
 
-(`deploy.sh`가 git pull + 의존성 재설치 + 프론트 재빌드 + 서비스 재시작까지
-전부 처리 — `sudo` 필요한 systemctl 명령만 스크립트 안에서 별도로 sudo 호출함,
-나머지는 실행 유저 그대로)
+**주의: 반드시 `sudo ./deploy/deploy.sh`(root로 실행)여야 함 —
+`sudo -u silga ./deploy.sh`로 실행하면 안 됨.** silga는 로그인 불가
+시스템 계정이라, 그렇게 실행하면 스크립트 내부의 systemctl 호출이 다시
+sudo 승격을 시도하다가 비밀번호가 없어서 막힘. `deploy.sh`는 root로
+시작해서 파일 작업(git pull/pip/npm)만 내부적으로 `sudo -u silga`로
+낮춰서 처리하고, systemctl은 이미 root 상태 그대로 실행하는 구조로
+되어 있음.
+
+**nginx나 systemd 설정 파일 자체(`nginx-silga.conf`, `silga-backend.service`)를
+바꾼 업데이트라면 `deploy.sh`만으론 부족함** — 이 스크립트는 코드(백엔드/
+프론트)만 갱신하고 설정 파일은 안 건드림. 그럴 때는 아래도 같이 실행:
+
+```bash
+sudo cp /opt/silga/deploy/nginx-silga.conf /etc/nginx/sites-available/silga
+sudo cp /opt/silga/deploy/silga-backend.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo nginx -t && sudo systemctl reload nginx
+```
 
 ## 참고
 
