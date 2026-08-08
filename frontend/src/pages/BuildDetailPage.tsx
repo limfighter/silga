@@ -87,6 +87,13 @@ function BuildDetailView({ data }: { data: BuildDetail }) {
   const markerPos = markerPosition(data.diff_percent);
   const groups = groupItems(data.items);
 
+  // market_price(비교 판매가)를 입력 안 한 빌드는 즉시가를 이동평균
+  // 기준가와 비교해서 판정함(2026-08-08 결정) — 그 경우 우측 비교값은
+  // market_price가 아니라 verdict_basis_price가 됨
+  const hasMarketPrice = data.market_price != null;
+  const compareLabel = hasMarketPrice ? "비교 판매가" : `최근 ${data.ma_window ?? "N"}일 평균가`;
+  const compareValue = hasMarketPrice ? data.market_price! : data.verdict_basis_price;
+
   // 이동평균이 무효라 즉시가로 대체된 부품 — 판정 신뢰도를 부품 단위로
   // 드러내기 위해 code로 조회할 수 있게 Set으로 만들어둠
   const fallbackCodes = new Set(
@@ -145,11 +152,11 @@ function BuildDetailView({ data }: { data: BuildDetail }) {
           <p className="st-k">판정</p>
           <p className="st-v">
             {data.verdict ?? "—"}
-            {data.verdict == null && <em>비교 판매가 미입력</em>}
+            {data.verdict == null && <em>가격 조회 실패로 판정 불가</em>}
             {data.diff_percent != null && (
               <em>
                 {data.diff_percent > 0 ? "+" : ""}
-                {data.diff_percent}% vs 판매가
+                {data.diff_percent}% vs {data.market_price != null ? "판매가" : "평균가"}
               </em>
             )}
           </p>
@@ -176,7 +183,7 @@ function BuildDetailView({ data }: { data: BuildDetail }) {
         </p>
       </div>
 
-      {data.market_price != null && (
+      {data.diff_percent != null && compareValue != null && (
         <div className="gauge-card" style={{ marginBottom: 40 }}>
           <div className="confirm-row">
             <div className="confirm-col">
@@ -187,21 +194,19 @@ function BuildDetailView({ data }: { data: BuildDetail }) {
             </div>
             <div className="confirm-arrow">→</div>
             <div className="confirm-col">
-              <p className="confirm-k">비교 판매가</p>
+              <p className="confirm-k">{compareLabel}</p>
               <p className="confirm-num">
-                {data.market_price.toLocaleString()}<span>원</span>
+                {compareValue.toLocaleString()}<span>원</span>
               </p>
             </div>
           </div>
 
-          {data.diff_percent != null && (
-            <p className={`diff-badge${data.diff_percent < 0 ? " dn" : ""}`}>
-              {data.diff_percent > 0 ? "▲" : data.diff_percent < 0 ? "▼" : "—"}{" "}
-              {Math.abs(data.market_price - data.total_price).toLocaleString()}원 ·{" "}
-              {data.diff_percent > 0 ? "+" : ""}
-              {data.diff_percent}%
-            </p>
-          )}
+          <p className={`diff-badge${data.diff_percent < 0 ? " dn" : ""}`}>
+            {data.diff_percent > 0 ? "▲" : data.diff_percent < 0 ? "▼" : "—"}{" "}
+            {Math.abs(compareValue - data.total_price).toLocaleString()}원 ·{" "}
+            {data.diff_percent > 0 ? "+" : ""}
+            {data.diff_percent}%
+          </p>
 
           <div className="gauge-track">
             <div className="gauge-zone" style={{ left: `${ZONE_LEFT}%`, width: `${ZONE_WIDTH}%` }} />

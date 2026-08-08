@@ -859,10 +859,13 @@ def list_builds(
 
         verdict = None
         confidence = None
-        if build.market_price and total_price and items:
+        if total_price and items:
             basis_price, confidence, _ = _get_cached_verdict_basis(build.id, ma_window, items, breakdown)
             if basis_price:
-                verdict, _ = calc_verdict(basis_price, build.market_price)
+                # market_price(비교 판매가)를 입력 안 했으면 즉시가를 대신 넣어서
+                # "이동평균 대비 지금 가격이 비싼지/싼지"로 판정 — 비교할 완제품
+                # 시세를 몰라도 판정이 항상 뜨도록(2026-08-08 결정, 실가_인수인계.md 참조)
+                verdict, _ = calc_verdict(basis_price, build.market_price or total_price)
 
         results.append(
             BuildSummary(
@@ -911,12 +914,14 @@ def get_build_detail(
     basis_price = None
     confidence = None
     basis_breakdown = []
-    if build.market_price and total_price and items:
+    if total_price and items:
         basis_price, confidence, basis_breakdown = _get_cached_verdict_basis(
             build.id, ma_window, items, breakdown
         )
         if basis_price:
-            verdict, diff_percent = calc_verdict(basis_price, build.market_price)
+            # market_price 없으면 즉시가를 대신 비교 대상으로 씀(list_builds와
+            # 동일 규칙 — 위 주석 참조)
+            verdict, diff_percent = calc_verdict(basis_price, build.market_price or total_price)
 
     return BuildDetail(
         id=build.id,

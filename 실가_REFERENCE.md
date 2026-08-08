@@ -344,6 +344,13 @@ GET  /builds?ma_window={7|14|30}  (신규, v0.3)
   ※ total_price는 즉시가로 매번 새로 조회. verdict는 이동평균 기준가로
     계산하며 (build_id, ma_window) 단위 5분 메모리 캐시를 씀(아래 "verdict
     판정 기준가" 항목 참조)
+  ※ market_price(비교 판매가) 선택화(2026-08-08) — 원래는 market_price를
+    입력해야만(완제품 시세를 알아야만) verdict가 계산됐는데, 실사용해보니
+    "비교할 완제품 판매가를 애초에 모른다"는 경우가 대부분이라 사실상 항상
+    verdict가 None으로 나오는 문제였음. market_price가 없으면 즉시가
+    (total_price)를 대신 비교 대상으로 써서 "이동평균 대비 지금이 비싼지"로
+    자동 판정하도록 변경 — market_price를 입력한 경우는 기존과 동일(그
+    값과 비교). 아래 "verdict 판정 임계값" 항목 참조
 
 GET  /builds/{id}?ma_window={7|14|30}  (신규, v0.3)
   → BuildDetail {id, name, market_price, created_at, items: [...],
@@ -372,10 +379,14 @@ DELETE /favorites/{code}  (신규, v0.4.4)
   → 204 No Content. 즐겨찾기에 없는 code면 404
 
 verdict 판정 임계값:
-  diff_percent = (market_price - basis_price) / basis_price * 100
+  diff_percent = (compare_price - basis_price) / basis_price * 100
   diff_percent > +5%  → "고가"
   diff_percent < -5%  → "저가"
   그 외              → "적정가"
+  ※ compare_price는 build.market_price가 있으면 그 값, 없으면 total_price
+    (즉시가) — POST /builds에서 market_price를 안 넣은 빌드는 "즉시가가
+    이동평균 대비 몇 % 인지"로 판정됨(2026-08-08 결정, 아래 원본 공식은
+    market_price 표기 그대로 유지 — 최초 검증 근거를 남기기 위함)
   ※ ±5%는 REFERENCE.md에 수치가 없어 2026-08-03 구현 시 임의로 잡은 가정값
     (backend/app/services/verdict.py::VERDICT_THRESHOLD_PERCENT). silga-mockup.html
     API 예시(estimate_total=3390000, market_price=3464000 → diff_percent=2.1,
