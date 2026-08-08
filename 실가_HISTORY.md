@@ -2282,3 +2282,54 @@ backend v0.10.1 → v0.11, frontend v0.12.1 → v0.13.
   → 삭제(accept) 시나리오: `/build` 목록으로 자동 이동, 목록에서 해당
     빌드명이 더 이상 안 보임 확인
   → npm run typecheck 통과, Playwright pageerror 0건
+
+---
+
+## 2026-08-08 (같은 세션, 바로 이어서) 빌드 삭제를 목록/홈 화면 카드에도 확장
+
+방금 BuildDetailPage 상세 화면에만 넣고 "머지할까요?" 물었더니 사용자가
+"다 추가해줘"로 응답 — 빌드 목록(BuildListPage)/홈 화면 최근빌드 카드에도
+같은 삭제 버튼을 넣으라는 뜻으로 해석. frontend v0.13 → v0.13.1(백엔드
+변경 없음).
+
+[✓] `lib/useDeleteBuild.ts` 신규 훅 — 3화면 중복 방지
+  → confirm(`"${name}" 빌드를 삭제할까요? 되돌릴 수 없습니다.`) →
+    `api.deleteBuild(id)` 호출 → 성공 시 `["builds"]` 쿼리 무효화 +
+    선택적 `onSuccess` 콜백 실행, 이렇게 세 단계를 훅 하나로 캡슐화
+  → 화면마다 삭제 성공 후 동작이 다름(상세 화면은 자신의 빌드가 없어졌으니
+    목록으로 navigate 필요, 목록/홈은 그 자리에 계속 있으면서 그리드만
+    갱신하면 됨)이라 `useDeleteBuild(onSuccess?)`처럼 콜백을 인자로 받는
+    구조로 설계 — `BuildDetailPage`는 `useDeleteBuild(() =>
+    navigate("/build"))`, `BuildListPage`/`HomePage`는
+    `useDeleteBuild()`(콜백 없음, 쿼리 무효화만으로 카드가 자동으로
+    사라짐)
+  → `BuildDetailPage.tsx`의 기존 인라인 `useMutation` 코드를 이 훅
+    사용으로 교체(동작 동일, 코드 중복만 제거)
+
+[✓] `BuildListPage.tsx`/`HomePage.tsx` 빌드 카드에 `.bc-delete` 버튼 추가
+  → 카드 자체가 `<Link to="/build/{id}" className="build-card">`라서,
+    버튼 클릭이 그대로 버블링되면 삭제 대신 상세 페이지로 이동해버림 —
+    `onClick`에서 `e.preventDefault()` + `e.stopPropagation()`을 반드시
+    같이 호출(둘 다 필요: preventDefault는 Link의 네비게이션 자체를
+    막고, stopPropagation은 이벤트가 상위 Link의 클릭 핸들러로 전파되는
+    것을 막음)
+  → CSS `.bc-delete`(global.css) — 기존 `.bc-tag`(카드 좌상단 판정 배지)와
+    대칭되는 카드 우상단 위치(`position:absolute;top:14px;right:14px`),
+    24×24 정사각형. `.btn-delete`(상세 화면용, 36×36)와 같은 hover 반전
+    원칙이지만 카드 안에 들어가야 해서 더 작은 사이즈로 별도 정의
+
+[검증] 실제 danawa 라이브 데이터 + Vite dev + Playwright, 2개 빌드
+    생성해서 목록/홈 양쪽 확인:
+  → 빌드 목록 화면: 카드 A의 × 클릭 → confirm accept → A 카드만 사라지고
+    B 카드는 그대로 남음, URL도 `/build`에 그대로 머묾(상세로 이동 안 함)
+    확인
+  → 홈 화면: 같은 방식으로 카드 B 삭제 → 최근 빌드 목록에서 사라짐 확인
+  → **검증 중 겪은 시행착오**: 처음엔 삭제 클릭 후 `time.sleep(0.8)`만
+    걸고 DOM을 읽었더니 카드가 그대로 남아있는 것처럼 보여서 "삭제가
+    안 됐나?" 했었음 — 백엔드에 직접 curl로 확인해보니 실제로는 삭제가
+    정상 처리돼 있었고(GET /builds 응답에 해당 id 없음), 단지 React
+    Query의 쿼리 무효화→리페치→리렌더 사이클이 0.8초보다 오래 걸렸을
+    뿐이었음. `page.wait_for_selector(text, state="detached")`로 조건부
+    대기로 바꾸니 정상 확인됨 — 비동기 UI 삭제/갱신을 Playwright로 검증할
+    땐 고정 sleep 대신 조건 대기를 쓸 것(다음에도 참고)
+  → npm run typecheck 통과, Playwright pageerror 0건

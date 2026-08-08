@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { api, type BuildDetail, type BuildItemDetail } from "../lib/api";
 import { useMaWindow } from "../lib/settings";
+import { useDeleteBuild } from "../lib/useDeleteBuild";
 
 // 게이지 위치 매핑: diff_percent를 -GAUGE_RANGE~+GAUGE_RANGE 구간으로 클램프해서
 // 바 위 0~100% 위치로 선형 매핑 (범위 자체는 REFERENCE.md에 수치가 없어 임의로 잡은
@@ -79,25 +80,15 @@ export default function BuildDetailPage() {
 // "값이 확정된 시점"이 됨 — 비중 바/리빌 애니메이션의 시작점으로 씀
 function BuildDetailView({ data }: { data: BuildDetail }) {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     const raf = requestAnimationFrame(() => setMounted(true));
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  const deleteMutation = useMutation({
-    mutationFn: () => api.deleteBuild(data.id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["builds"] });
-      navigate("/build");
-    },
-  });
-
-  const handleDelete = () => {
-    if (!window.confirm(`"${data.name}" 빌드를 삭제할까요? 되돌릴 수 없습니다.`)) return;
-    deleteMutation.mutate();
-  };
+  const { deleteBuild, isPending: isDeleting, isError: isDeleteError, error: deleteError } = useDeleteBuild(() =>
+    navigate("/build")
+  );
 
   const markerPos = markerPosition(data.diff_percent);
   const groups = groupItems(data.items);
@@ -135,8 +126,8 @@ function BuildDetailView({ data }: { data: BuildDetail }) {
         </button>
         <button
           className="btn-delete"
-          onClick={handleDelete}
-          disabled={deleteMutation.isPending}
+          onClick={() => deleteBuild(data.id, data.name)}
+          disabled={isDeleting}
           aria-label="빌드 삭제"
           title="빌드 삭제"
         >
@@ -144,9 +135,9 @@ function BuildDetailView({ data }: { data: BuildDetail }) {
         </button>
       </div>
 
-      {deleteMutation.isError && (
+      {isDeleteError && (
         <div className="status-line error">
-          삭제 실패: {deleteMutation.error instanceof Error ? deleteMutation.error.message : "알 수 없는 오류"}
+          삭제 실패: {deleteError instanceof Error ? deleteError.message : "알 수 없는 오류"}
         </div>
       )}
 
