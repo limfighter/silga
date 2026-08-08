@@ -2150,3 +2150,83 @@ HTML(claude.ai 디자인 도구 산출물 포맷 — 인라인 스타일 + `sc-f
   → 이미지 픽셀 렌더링 육안 확인은 이 세션도 동일한 환경 한계(Playwright
     브라우저가 아웃바운드 프록시를 못 탐, 2026-08-07 항목 참조)로 스킵 —
     DOM에 올바른 img src가 반영되는 것까지만 확인
+
+---
+
+## 2026-08-08 (이어진 세션) 판정 비교 판매가 선택화 — market_price 없어도 자동 판정
+
+배포 사이트가 SSH까지 안 될 정도로 완전히 응답 없어져서(e2-micro RAM 1GB
+한계로 인한 OOM 추정) 사용자가 `gcloud compute instances reset`으로 강제
+재부팅해서 복구(코드 변경 아님, 별도 조치 없음 — 스왑 파일 설정은 다음
+세션에서 확인 예정).
+
+복구 후 사용자 피드백: "빌드에 비교할 판매가 이게 쓸모가 없어 판매가를
+알아야 비교를 하는데, 이평선 기준 가격으로 빌드 비교를 넣어야될듯".
+backend v0.10 → v0.10.1, frontend v0.12 → v0.12.1.
+
+[✓] 문제 확인 — market_price 없으면 verdict가 아예 계산 안 되던 구조
+  → `main.py::list_builds()`/`get_build_detail()` 둘 다
+    `if build.market_price and total_price and items:`로 게이팅돼 있어서,
+    사용자가 "비교할 판매가"를 입력 안 하면(완제품 시세를 모르는 게
+    대부분이라 흔한 케이스) verdict/verdict_basis_price/diff_percent가
+    전부 None으로 응답됨
+  → 프론트 `BuildDetailPage.tsx`도 게이지 카드 전체를 `data.market_price
+    != null`로 게이팅하고 있어서, market_price 없는 빌드는 판정 시각화
+    자체가 안 보였음(상단 통계 스트립에 "—"와 "비교 판매가 미입력" 문구만
+    뜸) — 이 도구의 핵심 기능(적정가 판정)을 사실상 못 쓰는 상태였음
+
+[✓] 해결 — market_price 없으면 즉시가를 이동평균 기준가와 비교
+  → `list_builds()`: 게이팅 조건에서 `build.market_price and` 제거,
+    `calc_verdict(basis_price, build.market_price or total_price)`로 변경.
+    market_price 입력했으면 기존과 동일하게 그 값과 비교, 없으면 즉시가
+    (total_price)를 대신 넣음 — "이동평균 기준가 대비 지금 가격이 몇 %
+    비싼지/싼지"로 자동 판정됨
+  → `get_build_detail()`도 동일 패턴 적용
+  → `market_price` 응답 필드 자체는 안 건드림(사용자가 입력한 값 그대로,
+    없으면 여전히 None) — calc_verdict 호출 시 인자로만 total_price를
+    대신 넣는 것이라 필드 의미가 안 바뀜(CLAUDE.md "응답 필드명 임의
+    변경 금지" 규칙 위반 아님)
+  → 스코프 결정: `POST /build/compare`, `GET /product/{code}/compare`는
+    안 건드림 — 이 둘은 애초에 "구체적인 비교 대상 가격을 갖고 쓰는
+    일회성 비교 도구"라 market_price 필수인 게 맞는 설계(REFERENCE.md
+    #엔드포인트-설계 참조). 이번 피드백은 "저장한 빌드"(POST/GET /builds
+    계열)에 한정된 것으로 판단해 그쪽만 수정
+  → 스키마 주석(`schemas/build.py`) 갱신 — "market_price 없으면 판정
+    불가 -> None"이라는 이제는 틀린 주석을 "market_price 입력 시 그
+    값과, 없으면 즉시가와 이동평균 기준가를 비교해서 항상 계산됨"으로
+    수정
+
+[✓] 프론트 반영 — `BuildDetailPage.tsx`
+  → 게이지 카드 렌더링 조건을 `data.market_price != null`에서
+    `data.diff_percent != null && compareValue != null`로 변경(항상
+    diff_percent가 있으면 뜸)
+  → `hasMarketPrice`/`compareLabel`/`compareValue` 지역변수 신규 — market_price
+    있으면 라벨 "비교 판매가"+그 값, 없으면 라벨 "최근 {ma_window}일
+    평균가"+`verdict_basis_price` 값. 우측 비교 박스가 상황에 따라
+    market_price ↔ verdict_basis_price로 바뀌는 구조
+  → 차액(원) 배지: 기존 `Math.abs(data.market_price - data.total_price)`는
+    market_price가 null이면 NaN이 나던 잠재 버그였음(이번에 market_price
+    없는 케이스가 실제로 렌더링되면서 처음 노출) → `Math.abs(compareValue
+    - data.total_price)`로 일반화해서 두 모드 다 정확한 차액이 나오도록
+    수정
+  → 상단 통계 스트립 "판정" 항목: "{diff}% vs 판매가" 고정 문구를
+    market_price 유무에 따라 "판매가"/"평균가"로 분기. "비교 판매가
+    미입력" 문구는 이제 verdict가 진짜 null인 경우(가격 조회 자체 실패로
+    total_price가 0이거나 items가 없는 경우)로 의미가 바뀜 →
+    "가격 조회 실패로 판정 불가"로 문구도 같이 수정
+  → `BuildCreatePage.tsx`의 "비교할 판매가" 필드 힌트: "저장 후 판정은
+    N일 이동평균 기준가로 계산됩니다"(모호해서 필드가 필수처럼 보일
+    수 있었음) → "비워두면 즉시가를 N일 이동평균 기준가와 비교해서 자동
+    판정합니다. 완제품 판매가를 아는 경우에만 입력하세요"로 명확화
+
+[검증] 실제 danawa 라이브 데이터로 백엔드/프론트 둘 다 확인
+  → market_price 없이 CPU 1종짜리 빌드 생성(POST /builds) → GET
+    /builds/{id}?ma_window=14 응답에서 total_price=690,660,
+    verdict_basis_price=643,513, verdict="고가", diff_percent=7.3 확인
+    (즉시가가 최근 14일 평균보다 7.3% 비싸다는 뜻 — 계산 정확함,
+    (690660-643513)/643513*100 ≈ 7.33)
+  → GET /builds(목록)도 동일 빌드에서 verdict="고가" 정상 반영 확인
+  → 프론트: 같은 빌드 상세 화면을 Playwright로 열어서 게이지 카드 렌더링
+    확인 — "실측 합계 690,660원 → 최근 14일 평균가 643,513원", 배지
+    "▲ 47,147원 · +7.3%", 게이지 바 + "고가 판정" 태그까지 전부 정상
+    표시. npm run typecheck 통과, pageerror 0건

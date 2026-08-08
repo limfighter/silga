@@ -120,8 +120,9 @@ export default function BuildCreatePage() {
               onChange={(e) => setMarketPrice(e.target.value)}
             />
             <div className="field-hint">
-              저장 후 판정은 {maWindow}일 이동평균 기준가로 계산됩니다 (설정
-              탭에서 변경 가능).
+              비워두면 즉시가를 {maWindow}일 이동평균 기준가와 비교해서 자동
+              판정합니다. 완제품 판매가를 아는 경우에만 입력하세요(설정
+              탭에서 이동평균 기간 변경 가능).
             </div>
           </div>
 
