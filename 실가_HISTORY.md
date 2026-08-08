@@ -2039,3 +2039,114 @@ backend v0.9.1 → v0.10, frontend v0.10.2 → v0.11 (둘 다 API 계약 영향 
     렌더링(브로큰 이미지 아이콘 없이 뜨는지)은 이 환경에서 육안 확인
     못 함. 실제 배포 서버/사용자 로컬 브라우저에서는 문제 없을 것으로
     판단되나 다음 세션(또는 사용자)이 최종 확인 필요
+
+---
+
+## 2026-08-08 새 빌드 만들기 화면 마스터-디테일 재설계
+
+사용자가 "새 빌드 만들기 창이 너무 사용하기 불편하다"며 화면을 따로 떼서
+다른 Claude 세션(디자인 도구)에서 재설계해오겠다고 함 — BuildCreatePage.tsx
++ PartRow.tsx + specFilters.ts + 관련 API 타입 + CSS 디자인 토큰을 마크다운
+한 파일로 정리해 전달(SendUserFile). 이후 대화에서 완성된 `.dc` 목업
+HTML(claude.ai 디자인 도구 산출물 포맷 — 인라인 스타일 + `sc-for`/`sc-if`
+템플릿 지시자 + 별도 JS 로직 블록)을 사용자가 다시 붙여넣어서 그대로
+구현. frontend v0.11 → v0.12.
+
+[✓] 목업 구조 분석
+  → 좌우 2단(`display:flex`) — 왼쪽은 빌드 이름 입력 + 부품 8종 행 목록
+    (border box) + 판매가 입력 + 액션 버튼 + 하단 요약 바, 오른쪽은
+    고정폭 아닌 flex:1 검색 패널(활성 카테고리 없으면 중앙 정렬
+    placeholder 텍스트)
+  → 왼쪽 각 행: 카테고리 라벨 + 표시 텍스트(선택 전 "부품을 검색하세요"
+    회색, 선택 후 실제 제목 검정) + 가격(선택된 경우만) + "›" 화살표.
+    행 전체가 클릭 가능, 활성 카테고리는 `background:#E7E5DF` +
+    `box-shadow:inset 0 0 0 1px #0B0B0B`(레이아웃 안 밀리는 보더 표현)
+  → 오른쪽 패널: 헤더({카테고리} 검색 + ✕ 닫기) → 스펙 필터 select들
+    (168px, 기존 144px보다 넓게) → 검색 입력 → 결과 목록(스크롤 가능,
+    44×44 썸네일 + 제목 + 가격, 행 클릭으로 선택)
+  → 목업의 mock 데이터 로직(`pickItem`)에서 확인한 핵심 동작: 부품 선택 시
+    자동으로 다음 미선택 카테고리로 이동(`CATEGORIES.find(c => !parts[c])`),
+    전부 채워지면 패널 닫힘(activeCategory=null)
+  → 목업 `state`엔 `clearPart(cat, e)` 함수가 정의돼 있지만 렌더 템플릿
+    어디서도 호출되지 않음(죽은 코드) — 이미 선택된 행을 클릭해도 그냥
+    재검색 패널이 열릴 뿐 선택이 지워지진 않음. 목업을 있는 그대로
+    구현했으므로 이 프로젝트도 "선택 지우기 전용 동작" 없음(재선택으로만
+    변경 가능)
+
+[✓] PartRow.tsx는 건드리지 않고 새 컴포넌트로 분리 — 가장 중요한 설계 판단
+  → 구현 전 grep으로 `PartRow` 실사용처를 전부 확인: `BuildCreatePage.tsx`
+    뿐 아니라 `StatsPage.tsx`(통계 탭 "부품" 검색으로 가격 이력 조회),
+    `FavoritesPage.tsx`(즐겨찾기 추가 검색, selected를 항상 null로 두고
+    재사용)에서도 독립적인 단일 검색+자동완성 위젯으로 쓰이고 있었음
+  → 마스터-디테일 구조(카테고리 목록 + 별도 검색 패널)는 "부품 8종을 한
+    화면에서 순서대로 채운다"는 BuildCreatePage 특유의 문맥에서만 말이
+    되는 UX라, 이걸 PartRow.tsx 자체에 넣으면 StatsPage/FavoritesPage의
+    단순 검색창까지 다 같이 망가짐 — 그래서 `PartSearchPanel.tsx`
+    (컴포넌트) 신규 생성, PartRow.tsx는 기존 그대로 유지
+  → `SelectedPart` 타입은 계속 `PartRow.tsx`에서 export(BuildCreatePage/
+    SearchPage 등 기존 소비처가 이미 이 경로로 import 중이라 이동 없이
+    그대로 재사용)
+
+[✓] PartSearchPanel.tsx 신규(BuildCreatePage 전용)
+  → props: `category: string`(단일 활성 카테고리, null이면 이 컴포넌트
+    자체가 렌더링 안 됨 — BuildCreatePage가 상위에서 분기), `onPick`,
+    `onClose`
+  → 검색 로직은 기존 PartRow.tsx의 패턴(useDebouncedValue 500ms + api.search)
+    을 그대로 재사용하되, **`enabled` 게이팅 없이 항상 fetch** — 카테고리
+    진입 즉시(검색어 없이) 기본 목록이 뜨도록 하기 위함. 이건 직전
+    세션(2026-08-07)에 구현한 `/search` q 선택화(생략 시 category 기본
+    키워드로 대체) 기능의 두 번째 소비처 — SearchPage.tsx에 이어 이번에도
+    같은 백엔드 기능을 그대로 활용, 백엔드 변경 불필요
+  → 결과 행에 `item.img`(검색 화면에 최근 추가된 필드) 기반 썸네일 표시 —
+    `SearchPage.tsx`의 `.thumb`/`.thumb-empty` 패턴을 44×44 크기로
+    재사용(`.bc-thumb`/`.bc-thumb-empty`)
+  → BuildCreatePage.tsx에서 `<PartSearchPanel key={activeCategory} .../>`로
+    렌더 — 카테고리가 바뀔 때마다 `key`가 바뀌어 컴포넌트가 완전히
+    새로 마운트되고, 그 안의 검색어/스펙필터 로컬 state가 자동으로
+    초기화됨(별도 useEffect나 부모→자식 리셋 신호 불필요, React 기본
+    동작으로 목업의 "카테고리 전환 시 query/specValues 리셋" 요구사항을
+    해결)
+
+[✓] BuildCreatePage.tsx 재작성
+  → `activeCategory` state 신규(현재 오른쪽 패널이 보여주는 카테고리,
+    없으면 null)
+  → 왼쪽 부품 행: 기존 `<PartRow>` 8개 반복 렌더링을 제거하고, 각 카테고리를
+    클릭 가능한 `.bc-row` div(카테고리 라벨 + 선택 상태 텍스트 + 가격 +
+    화살표)로 교체. 클릭 시 이미 선택된 행이어도 그냥 `activeCategory`를
+    그 카테고리로 설정(재검색 패널 열림 — 목업 그대로, 별도 "지우기"
+    동작 없음)
+  → `handlePick(category, item)`: 선택 반영(`setParts`) + 최근조회 기록
+    (`addRecentProduct`, 기존 로직 유지) + `CATEGORIES.find(c => !nextParts[c])`
+    로 다음 빈 카테고리를 찾아 `activeCategory` 갱신(전부 채워지면
+    `undefined ?? null` → 패널 닫힘)
+  → 하단 러닝 총액 요약 바(`build-summary`/`bs-*`)는 로직 변경 없이 그대로
+    유지, 다만 CSS에서 `position:sticky;bottom:0;` 제거(목업이 정적
+    블록으로 그려서 그대로 반영 — 이 클래스가 BuildCreatePage 전용이라
+    다른 화면에 영향 없음 확인 후 변경)
+
+[✓] CSS — 새 `bc-*` 클래스 전부 신설, 기존 클래스 재사용은 `.part-cat`(카테고리
+    라벨 스타일)과 `.part-rows`(외곽 테두리 박스) 둘뿐(둘 다 순수 프레젠테이션,
+    다른 컴포넌트 로직과 무관해서 안전하게 공유 가능하다고 판단)
+  → `.bc-shell`/`.bc-left`(2단 레이아웃), `.bc-row`/`.bc-row-text`/
+    `.bc-row-price`/`.bc-row-chevron`(왼쪽 행), `.bc-panel`/`.bc-empty-panel`/
+    `.bc-panel-header`/`.bc-panel-title`/`.bc-panel-close`/`.bc-panel-specs`/
+    `.bc-spec-filter`(168px, 기존 `.part-spec-filter` 144px과 별개 —
+    SearchPage/PartRow에 영향 안 주려고 분리)/`.bc-search-input`/
+    `.bc-results`/`.bc-result-row`/`.bc-thumb`/`.bc-thumb-empty`/
+    `.bc-result-title`/`.bc-result-price`/`.bc-no-results`
+  → 900px 이하에서 `.bc-shell`이 세로로 쌓이도록 미디어쿼리 추가(목업엔
+    없던 것 — 2단 flex를 좁은 화면에 그대로 두면 오른쪽 패널이 찌그러질
+    게 뻔해서 최소한의 반응형 처리만 자체 판단으로 추가함)
+
+[검증] 실제 danawa 라이브 데이터(mock 아님) + Vite dev + Playwright:
+  → 초기 진입 시 오른쪽 패널에 placeholder 텍스트 확인
+  → CPU 행 클릭 → 검색어 없이 기본 목록 40건 자동 로딩, 썸네일 40개
+    DOM 반영 확인
+  → 첫 결과 클릭 → CPU 행에 선택된 제목/가격 반영 + 자동으로 GPU 패널로
+    전환(패널 제목이 "GPU 검색"으로 바뀜) + GPU 기본 목록도 바로 로딩되는
+    것까지 확인
+  → 닫기 버튼 클릭 → placeholder로 복귀 확인
+  → npm run typecheck 통과, Playwright pageerror 0건
+  → 이미지 픽셀 렌더링 육안 확인은 이 세션도 동일한 환경 한계(Playwright
+    브라우저가 아웃바운드 프록시를 못 탐, 2026-08-07 항목 참조)로 스킵 —
+    DOM에 올바른 img src가 반영되는 것까지만 확인

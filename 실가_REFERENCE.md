@@ -86,7 +86,10 @@ silga/                (git 리포 루트, 커밋 4개: v0.2 백엔드/v0.3 빌�
 │   └── requirements.txt
 ├── frontend/         Vite+React+TS+React Router+TanStack Query (app-shell-mockup.html 재구현)
 │   └── src/
-│       ├── components/  AppShell.tsx(사이드바/탑바), PartRow.tsx(자동완성)
+│       ├── components/  AppShell.tsx(사이드바/탑바), PartRow.tsx(단일
+│       │                검색+자동완성 위젯 — StatsPage/FavoritesPage/
+│       │                SearchPage가 재사용), PartSearchPanel.tsx(BuildCreatePage
+│       │                전용 마스터-디테일 검색 패널, 2026-08-08 추가)
 │       ├── pages/        Search/BuildList/BuildCreate/BuildDetail/Placeholder
 │       ├── lib/           api.ts(백엔드 클라이언트), useDebouncedValue.ts
 │       └── styles/global.css  디자인 토큰 이식
