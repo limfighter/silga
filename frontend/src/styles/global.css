@@ -451,6 +451,71 @@ input{font-family:inherit;}
 
 .form-actions{display:flex;justify-content:flex-end;gap:10px;}
 
+/* ── 새 빌드 만들기 — 마스터(부품 목록)/디테일(검색 패널) 2단 레이아웃.
+   기존엔 부품 8종 각자가 인라인 검색창+자동완성을 들고 있었는데(.part-row 등,
+   PartRow.tsx — StatsPage/FavoritesPage/SearchPage가 계속 쓰므로 그대로 둠),
+   왼쪽에서 카테고리 하나를 고르면 오른쪽 패널에서만 검색하는 구조로 재설계
+   (PartSearchPanel.tsx, 2026-08-08) ── */
+.bc-shell{display:flex;gap:24px;align-items:flex-start;}
+.bc-left{flex:0 0 460px;display:flex;flex-direction:column;}
+
+.bc-row{
+  display:flex;align-items:center;gap:14px;
+  padding:14px 16px;border-bottom:1px solid var(--line-lt);
+  background:var(--paper);cursor:pointer;transition:background .15s;
+}
+.bc-row:last-child{border-bottom:none;}
+.bc-row:hover{background:var(--paper-2);}
+.bc-row.active{background:var(--paper-2);box-shadow:inset 0 0 0 1px var(--ink);}
+.bc-row-text{flex:1;font-size:13px;color:var(--mute-dk);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bc-row-text.filled{color:var(--ink);}
+.bc-row-price{font-family:var(--font-mono);font-size:12.5px;color:var(--ink);margin-left:10px;flex-shrink:0;}
+.bc-row-chevron{margin-left:10px;color:var(--mute-dk);font-size:13px;flex-shrink:0;}
+
+.bc-panel{
+  flex:1;min-width:0;border:1px solid var(--line-lt);background:var(--paper);
+  padding:28px;min-height:520px;display:flex;flex-direction:column;
+}
+.bc-empty-panel{
+  flex:1;display:flex;align-items:center;justify-content:center;
+  color:var(--mute-dk);font-size:13.5px;text-align:center;padding:80px 20px;
+}
+.bc-panel-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+.bc-panel-title{font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--mute-lt);}
+.bc-panel-close{
+  background:none;border:1px solid var(--line-lt);color:var(--mute-lt);
+  padding:6px 10px;font-size:12px;transition:border-color .15s,color .15s;
+}
+.bc-panel-close:hover{border-color:var(--ink);color:var(--ink);}
+.bc-panel-specs{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+.bc-spec-filter{
+  appearance:none;-webkit-appearance:none;flex:0 0 168px;
+  background:var(--paper-2);border:1px solid var(--line-lt);
+  padding:9px 8px;color:var(--ink);font-size:12.5px;
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+}
+.bc-spec-filter:focus{outline:none;border-color:var(--ink);}
+.bc-search-input{
+  width:100%;background:var(--paper-2);border:1px solid var(--line-lt);
+  padding:11px 12px;color:var(--ink);font-size:13.5px;margin-bottom:16px;
+}
+.bc-search-input:focus{outline:none;border-color:var(--ink);}
+.bc-results{flex:1;overflow-y:auto;border:1px solid var(--line-lt);}
+.bc-result-row{
+  display:flex;align-items:center;gap:14px;padding:12px 14px;
+  border-bottom:1px solid var(--line-lt);cursor:pointer;background:var(--paper);
+  transition:background .15s;
+}
+.bc-result-row:last-child{border-bottom:none;}
+.bc-result-row:hover{background:var(--paper-2);}
+.bc-thumb{width:44px;height:44px;flex-shrink:0;object-fit:contain;border:1px solid var(--line-lt);background:var(--paper-2);}
+.bc-thumb-empty{display:inline-block;}
+.bc-result-title{flex:1;font-size:13.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bc-result-price{font-family:var(--font-mono);font-size:12.5px;color:var(--ink);flex-shrink:0;}
+.bc-no-results{padding:20px;font-size:13px;color:var(--mute-lt);text-align:center;}
+
+@media(max-width:900px){.bc-shell{flex-direction:column;}.bc-left{flex:1 1 auto;width:100%;}}
+
 .detail-head{
   display:flex;
   align-items:center;
@@ -855,7 +920,6 @@ input{font-family:inherit;}
 
 /* ── 빌드 생성 진행 요약 (PCPartPicker식 상시 노출 러닝 총액) ── */
 .build-summary{
-  position:sticky;bottom:0;
   display:flex;align-items:center;gap:20px;flex-wrap:wrap;
   padding:16px 20px;margin-top:26px;
   background:var(--ink);color:var(--paper);
