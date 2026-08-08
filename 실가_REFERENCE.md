@@ -360,6 +360,14 @@ GET  /builds/{id}?ma_window={7|14|30}  (신규, v0.3)
   ※ GET /builds와 같은 verdict 기준가 캐시를 공유 — 목록↔상세 이동 시
     판정이 서로 다르게 뜨는 걸 방지
 
+DELETE /builds/{id}  (신규, v0.11 — 2026-08-08)
+  → 204 No Content. 존재하지 않는 id면 404
+  ※ Build.items의 cascade="all, delete-orphan"(models/build.py)으로
+    BuildItem도 같이 삭제됨. products 캐시(테이블)는 다른 빌드/즐겨찾기가
+    참조할 수 있어 건드리지 않음
+  ※ 프론트: BuildDetailPage 우측 상단 "×" 버튼 → window.confirm()으로
+    확인 문구 받고 삭제, 성공 시 /build(목록)로 이동
+
 POST /favorites  (신규, v0.4.4 — 즐겨찾기 탭 채우는 첫 엔드포인트)
   body: {code}
   → FavoriteItem {code, title, price, price_formatted, created_at}

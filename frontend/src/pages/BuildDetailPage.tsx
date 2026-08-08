@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type BuildDetail, type BuildItemDetail } from "../lib/api";
 import { useMaWindow } from "../lib/settings";
 
@@ -78,11 +78,26 @@ export default function BuildDetailPage() {
 // 데이터가 도착한 뒤에 마운트되므로, 여기서 잡는 mounted 플래그가 곧
 // "값이 확정된 시점"이 됨 — 비중 바/리빌 애니메이션의 시작점으로 씀
 function BuildDetailView({ data }: { data: BuildDetail }) {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     const raf = requestAnimationFrame(() => setMounted(true));
     return () => cancelAnimationFrame(raf);
   }, []);
+
+  const deleteMutation = useMutation({
+    mutationFn: () => api.deleteBuild(data.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["builds"] });
+      navigate("/build");
+    },
+  });
+
+  const handleDelete = () => {
+    if (!window.confirm(`"${data.name}" 빌드를 삭제할까요? 되돌릴 수 없습니다.`)) return;
+    deleteMutation.mutate();
+  };
 
   const markerPos = markerPosition(data.diff_percent);
   const groups = groupItems(data.items);
@@ -118,7 +133,22 @@ function BuildDetailView({ data }: { data: BuildDetail }) {
         <button className="btn-ghost" style={{ marginLeft: "auto" }} onClick={() => window.print()}>
           견적서 인쇄
         </button>
+        <button
+          className="btn-delete"
+          onClick={handleDelete}
+          disabled={deleteMutation.isPending}
+          aria-label="빌드 삭제"
+          title="빌드 삭제"
+        >
+          ×
+        </button>
       </div>
+
+      {deleteMutation.isError && (
+        <div className="status-line error">
+          삭제 실패: {deleteMutation.error instanceof Error ? deleteMutation.error.message : "알 수 없는 오류"}
+        </div>
+      )}
 
       <div className="strip">
         <div className="st">

@@ -949,6 +949,23 @@ def get_build_detail(
     )
 
 
+@app.delete("/builds/{build_id}", status_code=204)
+def delete_build(build_id: int, db: Session = Depends(get_db)):
+    """
+    DELETE /builds/{id} → 빌드 삭제 (2026-08-08 신규)
+
+    Build.items의 cascade="all, delete-orphan" 설정(models/build.py)으로
+    BuildItem도 같이 삭제됨 — 별도 수동 삭제 불필요. products 캐시는
+    다른 빌드/즐겨찾기가 참조할 수 있어 안 건드림.
+    """
+    build = db.query(Build).filter(Build.id == build_id).first()
+    if build is None:
+        raise HTTPException(status_code=404, detail="빌드를 찾을 수 없음")
+
+    db.delete(build)
+    db.commit()
+
+
 @app.post("/favorites", response_model=FavoriteItem, status_code=201)
 def add_favorite(payload: FavoriteCreateRequest, db: Session = Depends(get_db)):
     """

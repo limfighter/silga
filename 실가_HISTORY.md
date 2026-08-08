@@ -2230,3 +2230,55 @@ backend v0.10 → v0.10.1, frontend v0.12 → v0.12.1.
     확인 — "실측 합계 690,660원 → 최근 14일 평균가 643,513원", 배지
     "▲ 47,147원 · +7.3%", 게이지 바 + "고가 판정" 태그까지 전부 정상
     표시. npm run typecheck 통과, pageerror 0건
+
+---
+
+## 2026-08-08 (이어진 세션) 빌드 삭제 기능 추가
+
+사용자 요청: "빌드 삭제 버튼 빌드 우측 상단에 x로 두고 삭제 확인 문구 받고
+삭제하는거 넣자". 저장된 빌드를 지우는 기능이 그동안 아예 없었음(DELETE
+엔드포인트 자체가 없어서 한 번 만든 빌드는 DB에서 영구히 안 지워짐).
+backend v0.10.1 → v0.11, frontend v0.12.1 → v0.13.
+
+[✓] `DELETE /builds/{id}` 신규(backend/app/main.py)
+  → `DELETE /favorites/{code}`와 동일한 패턴: 조회 → 없으면 404 → 있으면
+    `db.delete()` + `db.commit()` → 204 No Content
+  → `models/build.py`의 `Build.items` relationship에 이미
+    `cascade="all, delete-orphan"`이 걸려 있어서(빌드 생성 시점부터
+    있던 기존 설정) `db.delete(build)` 한 번으로 BuildItem 행까지 같이
+    삭제됨 — 별도 수동 cascade 코드 불필요
+  → `products` 캐시 테이블은 안 건드림 — 다른 빌드/즐겨찾기가 같은
+    상품코드(product_code)를 참조할 수 있어서 이 테이블은 원래도
+    "메타데이터 캐시" 용도로 개별 빌드 라이프사이클과 무관하게 남겨두는
+    설계(REFERENCE.md #DB-스키마)
+  → 실측: curl로 빌드 생성 → DELETE → GET(404 확인) → DELETE 재시도(404
+    확인) 전 과정 검증
+
+[✓] 프론트 — BuildDetailPage.tsx 우측 상단 "×" 버튼
+  → `api.ts`에 `deleteBuild(id)` 함수 추가(`DELETE /builds/${id}` 호출,
+    기존 `removeFavorite` 패턴과 동일)
+  → `detail-head`의 기존 "견적서 인쇄" 버튼(marginLeft:auto로 이미
+    우측 정렬) 옆에 새 버튼 배치 — 같은 flex 그룹이라 자동으로 같이
+    우측 끝에 붙음
+  → 클릭 핸들러: `window.confirm(`"${data.name}" 빌드를 삭제할까요?
+    되돌릴 수 없습니다.`)`로 확인받고, 확인 시에만
+    `deleteMutation.mutate()` 실행 — 별도 모달 컴포넌트를 새로 만들지
+    않고 네이티브 confirm 사용(CLAUDE.md 1인 개인 도구 과설계 방지
+    원칙 적용, 이 프로젝트에 지금까지 모달 패턴 자체가 없었음도 확인 후
+    결정)
+  → 삭제 성공 시(`useMutation.onSuccess`) `builds` 쿼리 무효화 +
+    `navigate("/build")`로 목록 이동 — `BuildCreatePage`의 기존
+    `createBuild` 성공 처리와 대칭되는 패턴
+  → 신규 CSS `.btn-delete`(global.css) — 36×36 정사각 아이콘 버튼,
+    hover 시 잉크 배경/종이색 글자로 반전. **accent color(빨간색 등)
+    도입하지 않고** 모노크롬 원칙 그대로 유지하면서 "되돌릴 수 없는
+    조작"임을 반전 효과로만 표시(REFERENCE.md #디자인-토큰 규칙 준수)
+
+[검증] 실제 danawa 라이브 데이터 + Vite dev + Playwright:
+  → 빌드 상세 화면에서 "×" 버튼 클릭 → confirm 다이얼로그 문구 확인
+    (`"프론트삭제테스트" 빌드를 삭제할까요? 되돌릴 수 없습니다.`)
+  → 취소(dismiss) 시나리오: 페이지 그대로 유지, 빌드 안 지워짐(제목
+    엘리먼트 여전히 존재) 확인
+  → 삭제(accept) 시나리오: `/build` 목록으로 자동 이동, 목록에서 해당
+    빌드명이 더 이상 안 보임 확인
+  → npm run typecheck 통과, Playwright pageerror 0건
