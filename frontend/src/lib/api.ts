@@ -177,6 +177,9 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
+  deleteBuild: (id: number) =>
+    request<void>(`/builds/${id}`, { method: "DELETE" }),
+
   listFavorites: () => request<FavoriteItem[]>("/favorites"),
 
   addFavorite: (code: number) =>

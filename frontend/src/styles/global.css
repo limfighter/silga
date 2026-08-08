@@ -258,6 +258,17 @@ input{font-family:inherit;}
 }
 .btn-ghost:hover{border-color:var(--ink);color:var(--ink);}
 
+/* 파괴적 액션(빌드 삭제 등) — accent color 없이 hover 시 잉크 반전으로만
+   "되돌릴 수 없는 조작"임을 표시(모노크롬 원칙 유지, REFERENCE.md #디자인-토큰) */
+.btn-delete{
+  flex-shrink:0;margin-left:10px;background:none;border:1px solid var(--line-lt);
+  color:var(--mute-lt);width:36px;height:36px;
+  display:inline-flex;align-items:center;justify-content:center;
+  font-size:16px;line-height:1;transition:border-color .15s,color .15s,background .15s;
+}
+.btn-delete:hover{border-color:var(--ink);color:var(--paper);background:var(--ink);}
+.btn-delete:disabled{opacity:.5;cursor:not-allowed;}
+
 .home-actions{display:flex;gap:12px;}
 
 .build-grid{
@@ -298,6 +309,18 @@ input{font-family:inherit;}
 .bc-tag.high::before{content:"▲ ";}
 .bc-tag.low{background:var(--ink);color:var(--paper);}
 .bc-tag.low::before{content:"▼ ";}
+/* 카드 우측 상단 삭제 버튼 — .bc-tag(좌상단)와 대칭, 카드 내부에 위치
+   (판정 배지처럼 hairline에 걸치지는 않음). .btn-delete와 동일한 반전
+   원칙, 카드 안에 들어가는 크기라 더 작게 */
+.bc-delete{
+  position:absolute;top:14px;right:14px;z-index:1;
+  width:24px;height:24px;
+  display:inline-flex;align-items:center;justify-content:center;
+  background:var(--paper);border:1px solid var(--line-lt);color:var(--mute-lt);
+  font-size:14px;line-height:1;
+  transition:border-color .15s,color .15s,background .15s;
+}
+.bc-delete:hover{border-color:var(--ink);color:var(--paper);background:var(--ink);}
 .bc-title{font-size:15.5px;font-weight:600;margin-bottom:6px;letter-spacing:-.01em;}
 .bc-meta{font-family:var(--font-mono);font-size:12px;color:var(--mute-lt);margin-bottom:18px;}
 .bc-price{font-family:var(--font-mono);font-size:21px;font-weight:500;}

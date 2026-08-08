@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api, type BuildSummary } from "../lib/api";
 import { useMaWindow } from "../lib/settings";
+import { useDeleteBuild } from "../lib/useDeleteBuild";
 
 function tagClass(verdict: BuildSummary["verdict"]): string {
   if (verdict === "고가") return "bc-tag high";
@@ -17,6 +18,8 @@ export default function BuildListPage() {
     queryKey: ["builds", maWindow],
     queryFn: () => api.listBuilds(maWindow),
   });
+
+  const { deleteBuild } = useDeleteBuild();
 
   return (
     <div>
@@ -37,6 +40,18 @@ export default function BuildListPage() {
         {data?.map((build) => (
           <Link className="build-card" to={`/build/${build.id}`} key={build.id}>
             {build.verdict && <span className={tagClass(build.verdict)}>{build.verdict}</span>}
+            <button
+              className="bc-delete"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                deleteBuild(build.id, build.name);
+              }}
+              aria-label="빌드 삭제"
+              title="빌드 삭제"
+            >
+              ×
+            </button>
             <div className="bc-title">{build.name}</div>
             <div className="bc-meta">부품 {build.item_count}종</div>
             <div className="bc-price">

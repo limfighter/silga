@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api, type BuildSummary } from "../lib/api";
 import { useMaWindow } from "../lib/settings";
+import { useDeleteBuild } from "../lib/useDeleteBuild";
 
 const RECENT_BUILD_COUNT = 4;
 
@@ -25,6 +26,8 @@ export default function HomePage() {
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, RECENT_BUILD_COUNT)
     : [];
+
+  const { deleteBuild } = useDeleteBuild();
 
   return (
     <div>
@@ -64,6 +67,18 @@ export default function HomePage() {
           {recentBuilds.map((build) => (
             <Link className="build-card" to={`/build/${build.id}`} key={build.id}>
               {build.verdict && <span className={tagClass(build.verdict)}>{build.verdict}</span>}
+              <button
+                className="bc-delete"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  deleteBuild(build.id, build.name);
+                }}
+                aria-label="빌드 삭제"
+                title="빌드 삭제"
+              >
+                ×
+              </button>
               <div className="bc-title">{build.name}</div>
               <div className="bc-meta">부품 {build.item_count}종</div>
               <div className="bc-price">{build.total_price_formatted ?? "계산 중..."}</div>
