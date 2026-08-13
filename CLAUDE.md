@@ -104,9 +104,15 @@ backend/app/
   schemas/           Pydantic 요청/응답 모델, API 계약과 1:1 대응
 
 frontend/src/
-  components/        AppShell(사이드바/탑바), PartRow(자동완성 행)
-  pages/             Search, BuildList, BuildCreate, BuildDetail, Placeholder
-  lib/               api.ts(백엔드 클라이언트), useDebouncedValue.ts
+  components/        AppShell(사이드바/탑바), PartRow(자동완성 행),
+                     PartSearchPanel(빌드 생성 전용 검색 패널),
+                     Answer(전 화면 결론 블록), BuildCard, VerdictAxis
+  pages/             Home, Search, BuildList, BuildCreate, BuildDetail,
+                     Favorites, RecentHistory, Stats, Settings
+  lib/               api.ts(백엔드 클라이언트), useDebouncedValue.ts,
+                     settings.ts, recentProducts.ts, useDeleteBuild.ts,
+                     format.ts(표시 포맷), verdictScale.ts(판정 좌표계 —
+                     상세 게이지와 홈 판정 축이 공유, 한쪽만 바꾸지 말 것)
   styles/global.css  디자인 토큰 CSS 변수
 
 scripts/             e2e_smoke_test.py (위 참조)
