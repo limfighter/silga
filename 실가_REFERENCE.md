@@ -629,9 +629,24 @@ accent — 없음(모노크롬 원칙). 상태 구분은 색이 아니라 기호
   새 가격 표시 클래스를 추가하면 그 목록에도 같이 넣을 것
 
 인쇄
-  빌드 상세는 견적서로 출력 가능해야 함 — @page margin 14mm, 사이드바/탑바/
+  빌드 상세는 견적서로 출력 가능해야 함 — @page margin 12mm, 사이드바/탑바/
   버튼/sticky 요약/카트는 @media print에서 숨김, .spec-row/.strip/.sum/
-  .stack-bar/.answer는 break-inside:avoid
+  .stack-bar/.answer/.axis는 break-inside:avoid
+  **종이용 치수를 따로 준다 (2026-08-13)** — 화면 치수 그대로 인쇄하면 부품
+  8종짜리 견적서가 A4 3장으로 나뉘었음. CSS로 브라우저 인쇄 배율(%)을
+  지정하는 표준 방법은 없으므로(zoom 꼼수는 렌더러별로 깨짐) 배율 대신
+  @media print 안에서 폰트/패딩을 다시 지정해 압축한다. 기준은
+  "화면 = 훑어보는 대시보드, 종이 = 숫자를 확인하는 명세서" — 훑기를 돕는
+  장치만 걷어내고 정보 자체는 지우지 않는다:
+    .prop-bar(비중 바) 숨김 — %가 .spec-desc에 텍스트로 이미 있음
+    .spec-price em(만원 보조) 숨김 — 원 단위와 중복
+    .st-s(스탯 보조 줄) 숨김 — 같은 내용이 .because와 부품 행에도 있어 3중복
+    .strip은 4칸 한 줄 강제 — A4 내용 폭(약 703px)이 화면용 860px
+      브레이크포인트에 걸려 2×2로 접히던 것
+  실측(A4, 12mm 여백 = 내용 높이 약 1055px): 부품 8종 977px / 6종 896px로
+  **1장에 들어감**. 여유 78px ≈ 부품 2행이라 10종까지는 1장 유지.
+  치수를 바꿀 땐 Playwright의 page.pdf()로 실제 페이지 수를 다시 재볼 것 —
+  화면 스크린샷으로는 페이지 분할이 안 보임
   ⚠️ print-color-adjust:exact 필수 (2026-08-13 추가) — 이 디자인은 결론을
   전부 "잉크 배경 + 페이퍼 글자"로 표현하는데(.answer h2 mark, .sum,
   .diff-badge.fill, .bc-tag, .gauge-track, .stack-bar) 브라우저는 기본적으로
