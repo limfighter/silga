@@ -1,4 +1,5 @@
-const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
+// 설정 화면이 "지금 어느 백엔드를 보고 있는지" 표시하는 데도 씀
+export const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
 
 export class ApiError extends Error {
   status: number;
@@ -98,6 +99,9 @@ export interface BuildSummary {
   verdict: "저가" | "적정가" | "고가" | null;
   verdict_confidence: "high" | "low" | null;
   ma_window: number | null;
+  // BuildDetail.diff_percent와 동일 의미 — 목록에서도 판정 근거를 보여주려고
+  // 2026-08-13 추가(백엔드가 이미 계산하던 값이라 조회 비용 증가 없음)
+  diff_percent: number | null;
 }
 
 export interface BuildItemDetail {

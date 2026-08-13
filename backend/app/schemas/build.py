@@ -31,6 +31,11 @@ class BuildSummary(BaseModel):
     verdict: Optional[str] = None
     verdict_confidence: Optional[str] = None  # "high" | "low", verdict 없으면 None
     ma_window: Optional[int] = None  # 실제 적용된 이동평균 기간, verdict 없으면 None
+    # BuildDetail.diff_percent와 같은 값 — list_builds가 판정을 내리면서
+    # calc_verdict()로 이미 계산하던 값을 버리지 않고 그대로 실어 보냄
+    # (추가 스크래핑 없음). 카드에 판정 근거(기준가 대비 증감률)를 같이
+    # 보여주기 위해 2026-08-13 추가
+    diff_percent: Optional[float] = None
 
 
 class BuildItemDetail(BaseModel):
