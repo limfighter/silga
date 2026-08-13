@@ -5,6 +5,8 @@ import { api, type SearchResultItem, type SearchSpecParams } from "../lib/api";
 import { CATEGORIES, CATEGORY_SPEC_FILTERS } from "../lib/specFilters";
 import type { SelectedPart } from "../components/PartRow";
 import { addRecentProduct } from "../lib/recentProducts";
+import Answer, { errorMessage } from "../components/Answer";
+import { manwon, won } from "../lib/format";
 
 type SortKey = "popular" | "low" | "high";
 
@@ -50,6 +52,14 @@ export default function SearchPage() {
   const submit = () => setQuery(input.trim());
 
   const cartCount = CATEGORIES.filter((c) => cart[c]).length;
+  // 저장 전에도 "지금까지 얼마"가 보여야 함 — 가격을 못 가져온 부품은
+  // 합계에서 빠지므로 개수를 따로 표기
+  const cartTotal = CATEGORIES.reduce((sum, c) => sum + (cart[c]?.price ?? 0), 0);
+  const cartUnpriced = CATEGORIES.filter((c) => cart[c] && cart[c]!.price == null).length;
+
+  const pricedResults = results.filter((r) => r.price != null);
+  const priceLow = pricedResults.length > 0 ? Math.min(...pricedResults.map((r) => r.price!)) : null;
+  const priceHigh = pricedResults.length > 0 ? Math.max(...pricedResults.map((r) => r.price!)) : null;
 
   const mutation = useMutation({
     mutationFn: api.createBuild,
@@ -77,14 +87,91 @@ export default function SearchPage() {
     mutation.mutate({ name: buildName.trim(), items });
   };
 
+  const answer = (() => {
+    const cartLine =
+      cartCount > 0 ? (
+        <>
+          <br />
+          담은 부품 <b>{cartCount}개</b> · 지금까지 <b>{won(cartTotal)}원</b>
+        </>
+      ) : null;
+
+    if (isFetching) {
+      return (
+        <Answer
+          state="pending"
+          kick={`부품 검색 · ${category}`}
+          headline={
+            <>
+              {category} <mark>목록을 불러오는 중</mark>입니다
+            </>
+          }
+          because={<>다나와 실시간 최저가 조회{cartLine}</>}
+        />
+      );
+    }
+    if (isError) {
+      return (
+        <Answer
+          state="failed"
+          kick={`부품 검색 · ${category}`}
+          headline={
+            <>
+              검색에 <mark>실패했습니다</mark>
+            </>
+          }
+          because={<>{errorMessage(error)}</>}
+        />
+      );
+    }
+    if (results.length === 0) {
+      return (
+        <Answer
+          kick={`부품 검색 · ${category}`}
+          headline={
+            <>
+              조건에 맞는 {category}가 <mark>없습니다</mark>
+            </>
+          }
+          because={
+            <>
+              검색어나 스펙 필터를 줄여보세요{cartLine}
+            </>
+          }
+        />
+      );
+    }
+    return (
+      <Answer
+        kick={`부품 검색 · ${category}`}
+        headline={
+          <>
+            {category} <mark>{results.length}건</mark>
+            {priceLow != null && priceHigh != null && (
+              <>
+                {" "}
+                · {manwon(priceLow)} ~ {manwon(priceHigh)}
+              </>
+            )}
+          </>
+        }
+        because={
+          <>
+            다나와 실시간 최저가 ·{" "}
+            {sort === "popular" ? "인기상품순" : sort === "low" ? "낮은가격순" : "높은가격순"}
+            {query.length === 0 && ` · 검색어 없이 ${category} 기본 목록`}
+            {cartLine}
+          </>
+        }
+      />
+    );
+  })();
+
   return (
     <div>
-      <div className="section-label">REAL-TIME SCAN</div>
-      <div className="build-header">
-        <h2>부품 검색</h2>
-      </div>
+      {answer}
 
-      <div className="category-tabs">
+      <div className="category-tabs" style={{ marginTop: 26 }}>
         {CATEGORIES.map((c) => (
           <button
             key={c}
@@ -137,22 +224,9 @@ export default function SearchPage() {
           )}
 
           {isFetching && <div className="status-line">검색 중...</div>}
-          {isError && (
-            <div className="status-line error">
-              검색 실패: {error instanceof Error ? error.message : "알 수 없는 오류"}
-            </div>
-          )}
-          {data && data.length === 0 && !isFetching && (
-            <div className="status-line">검색 결과가 없습니다.</div>
-          )}
 
           {results.length > 0 && (
             <>
-              {query.length === 0 && (
-                <div className="status-line">
-                  검색어 없이 {category} 기본 목록을 보여주는 중 — 다나와 실시간 최저가 기준
-                </div>
-              )}
               <div className="sort-tabs">
                 <button
                   className={`sort-tab${sort === "popular" ? " active" : ""}`}
@@ -203,7 +277,14 @@ export default function SearchPage() {
         <aside className="cart-panel">
           <div className="cart-head">
             <span className="cart-title">견적 카트</span>
-            <span className="cart-count">담은 부품 {cartCount}개</span>
+            <span className="cart-count">{cartCount} / {CATEGORIES.length}</span>
+          </div>
+
+          {/* 슬롯 목록을 끝까지 훑지 않아도 몇 칸이 찼는지 보이게 */}
+          <div className="bs-ticks">
+            {CATEGORIES.map((c) => (
+              <i key={c} className={`bs-tick${cart[c] ? " on" : ""}`} title={c} />
+            ))}
           </div>
 
           <div className="cart-list">
@@ -225,6 +306,16 @@ export default function SearchPage() {
               </div>
             ))}
           </div>
+
+          {cartCount > 0 && (
+            <div className="cart-sum">
+              <span className="cart-sum-k">지금까지</span>
+              <span className="cart-sum-val">
+                {won(cartTotal)}원
+                {cartUnpriced > 0 && <em>{cartUnpriced}종 가격 미조회</em>}
+              </span>
+            </div>
+          )}
 
           {cartCount > 0 && (
             <div className="cart-actions">

@@ -11,7 +11,14 @@
   --font-body:'Pretendard Variable','Pretendard',-apple-system,sans-serif;
   --font-mono:'IBM Plex Mono',monospace;
   --sidebar-w:236px;
-  --sidebar-w-collapsed:72px;
+
+  /* 룰(선) 두께 3단 고정 — 지금까지 1px/2px가 자리마다 임의로 섞여 있던 걸
+     의미 단위로 묶음. 4px=문서 구분(화면 최상단 결론 블록), 2px=블록 경계,
+     1px=행 구분/헤어라인. 이 셋 밖의 두께는 쓰지 않음(삼각형 마커 같은
+     "선이 아닌 도형"은 예외) */
+  --rule-1:1px;
+  --rule-2:2px;
+  --rule-3:4px;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 body{
@@ -26,30 +33,33 @@ body{
 /* 가격 숫자가 열로 정렬되려면 자릿수 폭이 같아야 함 — 스펙시트의 핵심 디테일.
    모노 폰트를 쓰는 곳은 전부 tabular-nums 적용 */
 [class*="mono"],
-.bc-price,.b-row .val,.gauge-card .price,.chart-stats,
-.spec-price,.sum-val,.confirm-num,.total-num,.st-v,
+.bc-price,.chart-stats,
+.spec-price,.sum-val,.confirm-num,.total-num,.st-v,.st-s,
 .search-result-row .pr,.recent-row .pr,.part-selected .pr,
-.autocomplete-item .pr{
+.autocomplete-item .pr,.bc-row .pr,.sp-item .pr,
+.bc-diff,.diff-badge,.gauge-marker-value,.legend b,
+.cart-sum-val,.bs-total .v,.grp .amt{
   font-variant-numeric:tabular-nums;
 }
 button{font-family:inherit;cursor:pointer;}
-input{font-family:inherit;}
-:focus-visible{outline:2px solid var(--ink);outline-offset:2px;}
+input,select{font-family:inherit;}
+:focus-visible{outline:var(--rule-2) solid var(--ink);outline-offset:2px;}
 
 .app{display:flex;height:100vh;}
 
+/* 사이드바는 항상 펼친 상태 — 접기(햄버거)를 없앰. 탭이 7개로 고정이고
+   아이콘만 남으면 "즐겨찾기/최근기록"처럼 뜻이 겹치는 항목을 글리프만으로
+   구분해야 해서, 접었을 때 얻는 164px보다 잃는 게 큼(2026-08-13) */
 .sidebar{
-  width:var(--sidebar-w-collapsed);
+  width:var(--sidebar-w);
   flex-shrink:0;
   background:var(--ink);
   color:var(--paper);
-  border-right:1px solid var(--line-dk);
+  border-right:var(--rule-1) solid var(--line-dk);
   display:flex;
   flex-direction:column;
-  transition:width .22s ease;
   overflow:hidden;
 }
-.sidebar.expanded{width:var(--sidebar-w);}
 
 .side-top{
   display:flex;
@@ -57,42 +67,22 @@ input{font-family:inherit;}
   height:64px;
   flex-shrink:0;
   padding:0 22px;
-  gap:14px;
-}
-.hamburger{
-  width:24px;height:24px;
-  background:none;border:none;
-  display:flex;align-items:center;justify-content:center;
-  color:var(--mute-dk);
-  flex-shrink:0;
-  transition:color .2s;
-}
-.hamburger:hover{color:var(--paper);}
-.brand{
-  display:flex;
-  align-items:center;
   gap:10px;
-  opacity:0;
-  transition:opacity .18s;
-  white-space:nowrap;
-  overflow:hidden;
 }
-.sidebar.expanded .brand{opacity:1;}
-.brand-mark{
-  width:20px;height:20px;
-  flex-shrink:0;
-  display:flex;align-items:center;justify-content:center;
-  border:1.5px solid var(--paper);
-  font-family:var(--font-mono);
-  font-size:11px;
-  color:var(--paper);
-}
+/* 브랜드 워드마크 — "실"이 본체, "가"는 작게 붙는 접미 (탑바와 공통 규칙) */
 .brand-word{
   font-family:var(--font-display);
-  font-weight:600;
-  font-size:15px;
+  font-weight:700;
+  font-size:19px;
   letter-spacing:-.01em;
+  line-height:1;
   color:var(--paper);
+}
+.brand-word em{
+  font-style:normal;
+  font-weight:600;
+  font-size:.62em;
+  margin-left:1px;
 }
 
 .side-nav{
@@ -124,10 +114,7 @@ input{font-family:inherit;}
   font-size:14px;
   font-weight:500;
   white-space:nowrap;
-  opacity:0;
-  transition:opacity .15s;
 }
-.sidebar.expanded .nav-item .label{opacity:1;}
 .nav-item:hover{background:var(--line-dk);color:var(--paper);}
 .nav-item.active{
   background:var(--line-dk);
@@ -143,85 +130,100 @@ input{font-family:inherit;}
 
 .side-bottom{
   padding:14px 10px 18px;
-  border-top:1px solid var(--line-dk);
+  border-top:var(--rule-1) solid var(--line-dk);
 }
 
 .main{
   flex:1;
   overflow-y:auto;
   background:var(--paper);
+  min-width:0;
 }
+/* 탑바는 잉크 배경 + 블러였는데, 바로 아래 결론 블록(.answer)의 4px 잉크
+   룰과 두 겹으로 겹쳐서 화면 상단이 무거웠음 — 페이퍼 톤 + 헤어라인으로
+   낮추고 위계를 .answer에 넘김 (2026-08-13) */
 .topbar{
   height:64px;
   display:flex;
   align-items:center;
+  gap:12px;
   padding:0 32px;
-  border-bottom:1px solid var(--line-dk);
+  border-bottom:var(--rule-1) solid var(--line-lt);
   position:sticky;top:0;
-  background:rgba(11,11,11,.92);
-  backdrop-filter:saturate(180%) blur(10px);
-  z-index:10;
+  background:var(--paper);
+  z-index:30;
 }
-/* ── 탑바 브레드크럼 — "/" 슬래시 하나뿐이던 걸 인장(도장) 모티프로 교체.
-   구분자는 얇은 세로 hairline, 현재 위치만 굵은 페이퍼색으로 대비 ── */
-.topbar .seal{width:22px;height:22px;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:2px;}
-.topbar .seal-inner{width:100%;height:100%;border:1px solid var(--paper);display:flex;align-items:center;justify-content:center;}
-.topbar .seal-char{color:var(--paper);font-size:12px;font-weight:700;line-height:1;}
-.topbar .brand{font-size:12.5px;font-weight:700;letter-spacing:.04em;color:var(--paper);margin-left:10px;}
-.topbar .crumb-divider{width:1px;height:13px;background:var(--line-dk);margin:0 12px;}
-.topbar .crumb{font-family:var(--font-mono);font-size:11px;letter-spacing:.06em;color:var(--mute-dk);}
-.topbar .crumb.current{color:var(--paper);font-weight:600;}
-.page{padding:36px 32px 64px;max-width:1100px;}
+.tb-word{
+  font-family:var(--font-display);
+  font-weight:700;font-size:16px;
+  letter-spacing:-.01em;line-height:1;
+}
+.tb-word em{font-style:normal;font-weight:600;font-size:.6em;margin-left:1px;}
+.tb-div{width:1px;height:14px;background:var(--line-lt);}
+.tb-here{font-family:var(--font-mono);font-size:11.5px;letter-spacing:.06em;color:var(--mute-lt);}
+.page{padding:30px 32px 80px;max-width:1100px;}
 
-.section-label{
-  display:flex;
-  align-items:center;
-  gap:9px;
-  font-family:var(--font-mono);
-  font-size:11px;
-  letter-spacing:.14em;
-  text-transform:uppercase;
-  color:var(--mute-lt);
-  margin-bottom:10px;
+/* ── 결론 블록 — 전 화면 공통 헤더 ─────────────────────────
+   기존 .section-label(영문 킥커) + .build-header h2("홈", "설정")는 화면
+   이름만 되풀이해서 정보량이 0이었음. 그 자리를 "그래서 결론이 뭔데"로
+   바꾸는 게 이번 개편의 축 — 첫 줄에서 판단이 끝나야 함 */
+.answer{border-top:var(--rule-3) solid var(--ink);padding:22px 0 24px;}
+.answer .kick{
+  font-family:var(--font-mono);font-size:10.5px;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--mute-lt);margin-bottom:12px;
 }
-.section-label::before{
-  content:'';
-  width:14px;height:1px;
-  background:var(--mute-lt);
+.answer h2{
+  font-family:var(--font-display);
+  font-size:clamp(21px,3.2vw,29px);font-weight:600;
+  letter-spacing:-.025em;line-height:1.35;
 }
+.answer h2 mark{background:var(--ink);color:var(--paper);padding:0 8px;}
+.answer .because{
+  font-family:var(--font-mono);font-size:12px;color:var(--mute-lt);
+  margin-top:14px;line-height:1.8;
+}
+.answer .because b{color:var(--ink);font-weight:500;}
+.answer-acts{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;align-items:center;}
+
+/* 결론이 아직/영영 없을 때 — 이 앱의 데이터 소스는 예고 없이 DOM이 바뀌는
+   스크래퍼라 "판정 불가"가 정상 상태 중 하나임. 최상단 4px 룰은 그대로
+   두고(문서 구조가 깜빡이면 안 됨) 잉크 강조만 낮춤 */
+.answer.pending h2{color:var(--mute-lt);}
+.answer.pending h2 mark,
+.answer.failed h2 mark{
+  background:none;color:var(--ink);padding:0;
+  border-bottom:var(--rule-2) solid var(--line-lt);
+}
+.answer.failed h2 mark{border-bottom-color:var(--ink);}
+.answer.failed .because b{color:var(--ink);}
 
 .empty-state{
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
+  border:var(--rule-1) dashed var(--line-lt);
+  padding:44px 24px;
   text-align:center;
-  padding:80px 20px;
   color:var(--mute-lt);
-  border:1px solid var(--line-lt);
 }
-.empty-state svg{opacity:.4;margin-bottom:20px;}
 .empty-state .t{font-size:15px;color:var(--ink);font-weight:600;margin-bottom:6px;}
-.empty-state .d{font-size:13px;color:var(--mute-lt);font-family:var(--font-mono);}
+.empty-state .d{font-size:12px;color:var(--mute-lt);font-family:var(--font-mono);}
+.empty-state .btn-secondary{margin-top:18px;}
 
-.build-header{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  margin-bottom:28px;
-}
-.build-header h2{font-family:var(--font-display);font-weight:600;font-size:24px;letter-spacing:-.01em;}
 .btn-primary{
   background:var(--ink);
   color:var(--paper);
-  border:1px solid var(--ink);
-  padding:11px 20px;
-  font-weight:500;
+  border:var(--rule-2) solid var(--ink);
+  padding:10px 19px;
+  font-weight:600;
   font-size:13.5px;
   letter-spacing:.01em;
+  /* .answer-acts에서 <Link>와 <button>이 나란히 서므로 링크 밑줄을 끄고
+     정렬 기준을 .btn-secondary와 맞춤 */
+  text-decoration:none;
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
   transition:background .15s;
 }
-.btn-primary:hover{background:#242422;}
+.btn-primary:hover{background:var(--ink-2);}
 .btn-primary:disabled{
   background:var(--paper-2);
   color:var(--mute-lt);
@@ -232,7 +234,7 @@ input{font-family:inherit;}
    (예: 홈 "부품 검색"). ghost와 달리 hover 시 잉크로 반전 */
 .btn-secondary{
   background:none;
-  border:2px solid var(--ink);
+  border:var(--rule-2) solid var(--ink);
   color:var(--ink);
   padding:10px 19px;
   font-weight:600;
@@ -246,7 +248,7 @@ input{font-family:inherit;}
 .btn-secondary:hover{background:var(--ink);color:var(--paper);}
 .btn-ghost{
   background:none;
-  border:1px solid var(--line-lt);
+  border:var(--rule-1) solid var(--line-lt);
   color:var(--mute-lt);
   padding:10px 16px;
   font-size:13.5px;
@@ -257,19 +259,19 @@ input{font-family:inherit;}
   text-decoration:none;
 }
 .btn-ghost:hover{border-color:var(--ink);color:var(--ink);}
+.btn-ghost:disabled{color:var(--line-lt);border-color:var(--line-lt);cursor:not-allowed;}
+.btn-ghost:disabled:hover{border-color:var(--line-lt);color:var(--line-lt);}
 
 /* 파괴적 액션(빌드 삭제 등) — accent color 없이 hover 시 잉크 반전으로만
    "되돌릴 수 없는 조작"임을 표시(모노크롬 원칙 유지, REFERENCE.md #디자인-토큰) */
 .btn-delete{
-  flex-shrink:0;margin-left:10px;background:none;border:1px solid var(--line-lt);
+  flex-shrink:0;margin-left:10px;background:none;border:var(--rule-1) solid var(--line-lt);
   color:var(--mute-lt);width:36px;height:36px;
   display:inline-flex;align-items:center;justify-content:center;
   font-size:16px;line-height:1;transition:border-color .15s,color .15s,background .15s;
 }
 .btn-delete:hover{border-color:var(--ink);color:var(--paper);background:var(--ink);}
 .btn-delete:disabled{opacity:.5;cursor:not-allowed;}
-
-.home-actions{display:flex;gap:12px;}
 
 .build-grid{
   display:grid;
@@ -279,7 +281,7 @@ input{font-family:inherit;}
 .build-card{
   position:relative;
   background:var(--paper);
-  border:1px solid var(--line-lt);
+  border:var(--rule-1) solid var(--line-lt);
   padding:26px 22px 22px;
   cursor:pointer;
   transition:background .18s;
@@ -287,7 +289,7 @@ input{font-family:inherit;}
   color:inherit;
   display:block;
 }
-.build-card:hover{background:var(--paper-2);}
+.build-card:hover{background:var(--paper-2);border-color:var(--ink);}
 /* 판정 배지 — 카드 위쪽 hairline에 살짝 걸치는 탭 형태(참조 디자인 .card-badge).
    고가/저가는 잉크 완전 채움(주의 필요), 적정은 아웃라인만(평상 상태) —
    색 대신 잉크 채움 여부 + ▲▼— 글리프로만 구분 */
@@ -300,7 +302,7 @@ input{font-family:inherit;}
   font-size:10.5px;
   letter-spacing:.04em;
   padding:5px 10px;
-  border:1px solid var(--ink);
+  border:var(--rule-1) solid var(--ink);
   color:var(--ink);
   background:var(--paper);
 }
@@ -316,15 +318,24 @@ input{font-family:inherit;}
   position:absolute;top:14px;right:14px;z-index:1;
   width:24px;height:24px;
   display:inline-flex;align-items:center;justify-content:center;
-  background:var(--paper);border:1px solid var(--line-lt);color:var(--mute-lt);
+  background:var(--paper);border:var(--rule-1) solid var(--line-lt);color:var(--mute-lt);
   font-size:14px;line-height:1;
   transition:border-color .15s,color .15s,background .15s;
 }
 .bc-delete:hover{border-color:var(--ink);color:var(--paper);background:var(--ink);}
 .bc-title{font-size:15.5px;font-weight:600;margin-bottom:6px;letter-spacing:-.01em;}
-.bc-meta{font-family:var(--font-mono);font-size:12px;color:var(--mute-lt);margin-bottom:18px;}
-.bc-price{font-family:var(--font-mono);font-size:21px;font-weight:500;}
-.bc-price span{font-size:12px;color:var(--mute-lt);font-weight:400;margin-left:4px;}
+.bc-meta{font-family:var(--font-mono);font-size:12px;color:var(--mute-lt);margin-bottom:16px;}
+.bc-price{font-family:var(--font-mono);font-size:20px;font-weight:500;letter-spacing:-.02em;}
+.bc-price span{font-size:11.5px;color:var(--mute-lt);font-weight:400;margin-left:5px;}
+/* 카드에 판정 근거(기준가 대비 증감률)를 같이 실음 — 배지만으로는 "왜
+   고가인지"가 상세 화면에 들어가야만 보였음. 이동평균이 즉시가로 대체된
+   빌드(verdict_confidence:"low")는 수치를 단정하지 않고 파선으로 표시 */
+.bc-diff{
+  font-family:var(--font-mono);font-size:11.5px;color:var(--mute-lt);
+  margin-top:8px;padding-top:8px;border-top:var(--rule-1) solid var(--line-lt);
+}
+.bc-diff b{color:var(--ink);font-weight:600;}
+.bc-diff.low b{border-bottom:var(--rule-1) dashed var(--mute-lt);}
 
 .build-card.new{
   display:flex;
@@ -335,7 +346,7 @@ input{font-family:inherit;}
   min-height:158px;
   gap:10px;
   background:var(--paper);
-  border:1px dashed var(--line-lt);
+  border:var(--rule-1) dashed var(--line-lt);
   width:100%;
 }
 .build-card.new:hover{color:var(--ink);background:var(--paper-2);}
@@ -343,12 +354,6 @@ input{font-family:inherit;}
 @media(max-width:900px){.build-grid{grid-template-columns:1fr 1fr;}}
 @media(max-width:600px){.build-grid{grid-template-columns:1fr;}}
 
-.form-shell{
-  background:var(--paper);
-  border:1px solid var(--line-lt);
-  padding:32px;
-  max-width:680px;
-}
 .field{margin-bottom:22px;}
 .field label{
   display:block;
@@ -360,7 +365,7 @@ input{font-family:inherit;}
 .field input{
   width:100%;
   background:var(--paper);
-  border:1px solid var(--line-lt);
+  border:var(--rule-1) solid var(--line-lt);
   padding:13px 14px;
   color:var(--ink);
   font-size:14px;
@@ -373,7 +378,7 @@ input{font-family:inherit;}
 .field select{
   width:100%;
   background:var(--paper);
-  border:1px solid var(--line-lt);
+  border:var(--rule-1) solid var(--line-lt);
   padding:13px 14px;
   color:var(--ink);
   font-size:14px;
@@ -387,7 +392,7 @@ input{font-family:inherit;}
 .field-hint{margin-top:8px;font-size:12.5px;color:var(--mute-lt);line-height:1.5;}
 
 .part-rows{
-  border:1px solid var(--line-lt);
+  border:var(--rule-2) solid var(--ink);
   margin-bottom:26px;
 }
 .part-row{
@@ -395,7 +400,7 @@ input{font-family:inherit;}
   align-items:center;
   gap:14px;
   padding:14px 16px;
-  border-bottom:1px solid var(--line-lt);
+  border-bottom:var(--rule-1) solid var(--line-lt);
   background:var(--paper);
   position:relative;
 }
@@ -412,7 +417,7 @@ input{font-family:inherit;}
 .part-input{
   flex:1;
   background:var(--paper-2);
-  border:1px solid var(--line-lt);
+  border:var(--rule-1) solid var(--line-lt);
   padding:9px 12px;
   color:var(--ink);
   font-size:13px;
@@ -426,7 +431,7 @@ input{font-family:inherit;}
   width:144px;
   min-width:0;
   background:var(--paper-2);
-  border:1px solid var(--line-lt);
+  border:var(--rule-1) solid var(--line-lt);
   padding:9px 8px;
   color:var(--ink);
   font-size:12.5px;
@@ -441,7 +446,7 @@ input{font-family:inherit;}
   justify-content:space-between;
   align-items:center;
   background:var(--paper-2);
-  border:1px solid var(--ink);
+  border:var(--rule-1) solid var(--ink);
   padding:9px 12px;
   font-size:13px;
   cursor:pointer;
@@ -453,7 +458,7 @@ input{font-family:inherit;}
   position:absolute;
   left:106px;right:16px;top:52px;
   background:var(--paper);
-  border:1px solid var(--ink);
+  border:var(--rule-1) solid var(--ink);
   max-height:220px;
   overflow-y:auto;
   z-index:20;
@@ -462,7 +467,7 @@ input{font-family:inherit;}
   padding:9px 12px;
   font-size:12.5px;
   cursor:pointer;
-  border-bottom:1px solid var(--line-lt);
+  border-bottom:var(--rule-1) solid var(--line-lt);
   display:flex;
   justify-content:space-between;
   gap:10px;
@@ -479,25 +484,38 @@ input{font-family:inherit;}
    PartRow.tsx — StatsPage/FavoritesPage/SearchPage가 계속 쓰므로 그대로 둠),
    왼쪽에서 카테고리 하나를 고르면 오른쪽 패널에서만 검색하는 구조로 재설계
    (PartSearchPanel.tsx, 2026-08-08) ── */
-.bc-shell{display:flex;gap:24px;align-items:flex-start;}
-.bc-left{flex:0 0 460px;display:flex;flex-direction:column;}
+/* 좌우 비중을 뒤집음 — 부품 목록이 460px 고정이고 검색 패널이 남는 폭을
+   전부 먹던 구조였는데, 정작 긴 건 상품명(왼쪽)이라 계속 말줄임됐음.
+   이제 목록이 가변, 패널이 330px 고정 (2026-08-13) */
+.bc-shell{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:24px;align-items:start;}
+.bc-left{min-width:0;display:flex;flex-direction:column;}
 
+/* 카테고리 / 상품명 / 가격 / 화살표 4열 고정 — flex로 흘려보내던 때는
+   행마다 가격이 끝나는 위치가 달라 세로로 안 읽혔음 */
 .bc-row{
-  display:flex;align-items:center;gap:14px;
-  padding:14px 16px;border-bottom:1px solid var(--line-lt);
+  display:grid;grid-template-columns:88px minmax(0,1fr) 118px 16px;
+  gap:14px;align-items:center;width:100%;text-align:left;
+  padding:14px 16px;border-bottom:var(--rule-1) solid var(--line-lt);
   background:var(--paper);cursor:pointer;transition:background .15s;
 }
 .bc-row:last-child{border-bottom:none;}
 .bc-row:hover{background:var(--paper-2);}
-.bc-row.active{background:var(--paper-2);box-shadow:inset 0 0 0 1px var(--ink);}
-.bc-row-text{flex:1;font-size:13px;color:var(--mute-dk);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.bc-row-text.filled{color:var(--ink);}
-.bc-row-price{font-family:var(--font-mono);font-size:12.5px;color:var(--ink);margin-left:10px;flex-shrink:0;}
-.bc-row-chevron{margin-left:10px;color:var(--mute-dk);font-size:13px;flex-shrink:0;}
+.bc-row.active{background:var(--paper-2);box-shadow:inset 0 0 0 var(--rule-1) var(--ink);}
+.bc-row .cat{
+  font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--mute-lt);
+}
+.bc-row.filled .cat{color:var(--ink);}
+.bc-row .nm{font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bc-row .nm.empty{color:var(--mute-lt);}
+.bc-row .pr{font-family:var(--font-mono);font-size:13.5px;text-align:right;}
+.bc-row .pr.empty{color:var(--mute-lt);}
+.bc-row .arw{color:var(--mute-lt);font-size:13px;}
 
 .bc-panel{
-  flex:1;min-width:0;border:1px solid var(--line-lt);background:var(--paper);
-  padding:28px;min-height:520px;display:flex;flex-direction:column;
+  min-width:0;border:var(--rule-2) solid var(--ink);background:var(--paper);
+  padding:20px;display:flex;flex-direction:column;
+  position:sticky;top:14px;max-height:calc(100vh - 92px);
 }
 .bc-empty-panel{
   flex:1;display:flex;align-items:center;justify-content:center;
@@ -506,99 +524,79 @@ input{font-family:inherit;}
 .bc-panel-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
 .bc-panel-title{font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--mute-lt);}
 .bc-panel-close{
-  background:none;border:1px solid var(--line-lt);color:var(--mute-lt);
+  background:none;border:var(--rule-1) solid var(--line-lt);color:var(--mute-lt);
   padding:6px 10px;font-size:12px;transition:border-color .15s,color .15s;
 }
 .bc-panel-close:hover{border-color:var(--ink);color:var(--ink);}
 .bc-panel-specs{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
 .bc-spec-filter{
   appearance:none;-webkit-appearance:none;flex:0 0 168px;
-  background:var(--paper-2);border:1px solid var(--line-lt);
+  background:var(--paper-2);border:var(--rule-1) solid var(--line-lt);
   padding:9px 8px;color:var(--ink);font-size:12.5px;
   overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
 }
 .bc-spec-filter:focus{outline:none;border-color:var(--ink);}
 .bc-search-input{
-  width:100%;background:var(--paper-2);border:1px solid var(--line-lt);
+  width:100%;background:var(--paper-2);border:var(--rule-1) solid var(--line-lt);
   padding:11px 12px;color:var(--ink);font-size:13.5px;margin-bottom:16px;
 }
 .bc-search-input:focus{outline:none;border-color:var(--ink);}
-.bc-results{flex:1;overflow-y:auto;border:1px solid var(--line-lt);}
+.bc-results{flex:1;overflow-y:auto;border:var(--rule-1) solid var(--line-lt);}
 .bc-result-row{
   display:flex;align-items:center;gap:14px;padding:12px 14px;
-  border-bottom:1px solid var(--line-lt);cursor:pointer;background:var(--paper);
+  border-bottom:var(--rule-1) solid var(--line-lt);cursor:pointer;background:var(--paper);
   transition:background .15s;
 }
 .bc-result-row:last-child{border-bottom:none;}
 .bc-result-row:hover{background:var(--paper-2);}
-.bc-thumb{width:44px;height:44px;flex-shrink:0;object-fit:contain;border:1px solid var(--line-lt);background:var(--paper-2);}
+.bc-thumb{width:44px;height:44px;flex-shrink:0;object-fit:contain;border:var(--rule-1) solid var(--line-lt);background:var(--paper-2);}
 .bc-thumb-empty{display:inline-block;}
 .bc-result-title{flex:1;font-size:13.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .bc-result-price{font-family:var(--font-mono);font-size:12.5px;color:var(--ink);flex-shrink:0;}
 .bc-no-results{padding:20px;font-size:13px;color:var(--mute-lt);text-align:center;}
 
-@media(max-width:900px){.bc-shell{flex-direction:column;}.bc-left{flex:1 1 auto;width:100%;}}
-
-.detail-head{
-  display:flex;
-  align-items:center;
-  gap:14px;
-  margin-bottom:30px;
+@media(max-width:900px){
+  .bc-shell{grid-template-columns:1fr;}
+  .bc-panel{position:static;max-height:none;}
 }
-.detail-head h2{font-family:var(--font-display);font-weight:600;font-size:22px;letter-spacing:-.01em;}
 
-.verdict{
-  display:grid;
-  grid-template-columns:360px 1fr;
-  gap:40px;
-  align-items:start;
-  margin-bottom:36px;
-}
-@media(max-width:880px){.verdict{grid-template-columns:1fr;}}
-
+/* 판정 카드 — 판정 문구 자체는 이제 .answer가 첫 줄에서 말하므로 여기는
+   숫자(비교/게이지)만 남음. 예전 .verdict-tag("고가 판정" 배지)는 결론 블록과
+   같은 말을 두 번 하게 돼서 제거 */
 .gauge-card{
   background:var(--paper);
-  border:1px solid var(--line-lt);
+  border:var(--rule-1) solid var(--line-lt);
   padding:26px 24px;
 }
-.verdict-tag{
-  display:inline-block;
-  font-family:var(--font-mono);
-  font-size:11.5px;
-  letter-spacing:.06em;
-  color:var(--mute-lt);
-  border:1px solid var(--line-lt);
-  padding:5px 13px;
-  margin-bottom:14px;
-}
-.verdict-tag.high{color:var(--ink);border-color:var(--ink);background:var(--paper-2);}
-.verdict-tag.high::before{content:"▲ ";}
-.verdict-tag.low::before{content:"▼ ";}
-.gauge-card .price{font-family:var(--font-mono);font-size:28px;font-weight:500;letter-spacing:-.02em;}
-.gauge-card .price-range{margin-top:6px;font-family:var(--font-mono);font-size:12.5px;color:var(--mute-lt);}
-.verdict-basis-note{margin-top:10px;font-family:var(--font-mono);font-size:11px;color:var(--mute-lt);}
 
 /* 저가/고가 구간은 잉크로 완전히 채우고 적정 구간만 페이퍼로 비워서
    진짜 흑백 대비로 읽히게 함(기존 회색 4단 그라데이션은 대비가 흐릿했음) */
+/* margin-top은 마커 말풍선(top:-34px) + 삼각형이 위 .deltas 배지와 겹치지
+   않을 만큼 필요함 — 22px일 땐 마커가 오른쪽에 설 때 배지 위로 올라탔음 */
 .gauge-track{
   position:relative;
   height:34px;
   background:var(--ink);
-  border:2px solid var(--ink);
-  margin-top:22px;
+  border:var(--rule-2) solid var(--ink);
+  margin-top:50px;
 }
 .gauge-zone{
   position:absolute;
   top:0;bottom:0;
   background:var(--paper);
-  border-left:2px solid var(--ink);
-  border-right:2px solid var(--ink);
+  border-left:var(--rule-2) solid var(--ink);
+  border-right:var(--rule-2) solid var(--ink);
 }
+/* 마커가 통짜 잉크였을 땐 저가/고가 구간(잉크로 채운 트랙) 안에 들어가면
+   배경에 묻혀 사라졌음 — 페이퍼 심지에 잉크 테두리를 둘러 어느 구간에서도
+   보이게 함 */
 .gauge-marker{
   position:absolute;
   top:-10px;bottom:-2px;
-  width:3px;
-  background:var(--ink);
+  width:5px;box-sizing:border-box;margin-left:-2.5px;
+  background:var(--paper);
+  border-left:var(--rule-1) solid var(--ink);
+  border-right:var(--rule-1) solid var(--ink);
   transition:left 1s cubic-bezier(.2,.9,.25,1);
 }
 .gauge-marker::before{
@@ -623,6 +621,10 @@ input{font-family:inherit;}
   padding:3px 7px;
   transition:left 1s cubic-bezier(.2,.9,.25,1);
 }
+/* diff_percent는 ±30%로 클램프되므로 범위를 벗어난 빌드는 마커가 양 끝에
+   붙음 — 그대로 가운데 정렬하면 라벨이 트랙 밖으로 잘려나감 */
+.gauge-marker-value[data-edge="l"]{transform:translateX(0);}
+.gauge-marker-value[data-edge="r"]{transform:translateX(-100%);}
 .gauge-labels{
   display:flex;
   justify-content:space-between;
@@ -634,20 +636,6 @@ input{font-family:inherit;}
   color:var(--mute-lt);
 }
 
-.breakdown{border:1px solid var(--line-lt);}
-.b-row{
-  display:flex;justify-content:space-between;align-items:center;
-  padding:14px 20px;border-bottom:1px solid var(--line-lt);
-  background:var(--paper);font-size:14px;
-  transition:background .15s;
-}
-.b-row:hover{background:var(--paper-2);}
-.b-row:last-child{border-bottom:none;}
-.b-row.total{background:var(--paper-2);font-weight:600;border-top:2px solid var(--ink);}
-.b-row .part{color:var(--mute-lt);}
-.b-row .part b{color:var(--ink);font-weight:600;}
-.b-row .val{font-family:var(--font-mono);color:var(--ink);}
-.b-row.total .val{color:var(--ink);font-size:17px;}
 
 .search-box{
   display:flex;
@@ -657,7 +645,7 @@ input{font-family:inherit;}
 .search-box input{
   flex:1;
   background:var(--paper);
-  border:1px solid var(--line-lt);
+  border:var(--rule-1) solid var(--line-lt);
   padding:13px 16px;
   color:var(--ink);
   font-size:14px;
@@ -670,7 +658,7 @@ input{font-family:inherit;}
 .category-tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px;}
 .category-tab{
   display:inline-flex;align-items:center;gap:6px;
-  background:none;border:1px solid var(--line-lt);color:var(--mute-lt);
+  background:none;border:var(--rule-1) solid var(--line-lt);color:var(--mute-lt);
   padding:8px 14px;font-size:13px;
   transition:border-color .15s,color .15s;
 }
@@ -686,14 +674,14 @@ input{font-family:inherit;}
 /* ── 정렬 탭 (.month-tab과 동일 패턴) ── */
 .sort-tabs{display:flex;gap:8px;margin-bottom:14px;}
 .sort-tab{
-  border:1px solid var(--line-lt);color:var(--mute-lt);background:none;
+  border:var(--rule-1) solid var(--line-lt);color:var(--mute-lt);background:none;
   padding:8px 14px;font-size:12.5px;
   transition:border-color .15s,color .15s,background .15s;
 }
 .sort-tab:hover{border-color:var(--mute-lt);color:var(--ink);}
 .sort-tab.active{background:var(--ink);color:var(--paper);border-color:var(--ink);}
 
-.search-results{display:flex;flex-direction:column;gap:1px;background:var(--line-lt);border:1px solid var(--line-lt);}
+.search-results{display:flex;flex-direction:column;gap:var(--rule-1);background:var(--line-lt);border:var(--rule-1) solid var(--line-lt);}
 .search-result-row{
   display:flex;align-items:center;gap:16px;
   padding:14px 18px;background:var(--paper);font-size:13.5px;
@@ -702,14 +690,20 @@ input{font-family:inherit;}
 .search-result-row:hover{background:var(--paper-2);}
 .search-result-row .nm{color:var(--ink);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .search-result-row .code{font-family:var(--font-mono);font-size:11px;color:var(--mute-lt);margin-left:8px;}
-.search-result-row .pr{font-family:var(--font-mono);color:var(--ink);font-weight:500;flex-shrink:0;}
+/* 가격은 고정 슬롯 우측 정렬 — 자리폭이 자유로우면 행마다 끝나는 위치가
+   달라져서 세로로 비교가 안 됨 */
+.search-result-row .pr{
+  font-family:var(--font-mono);color:var(--ink);font-weight:500;
+  flex-shrink:0;min-width:96px;text-align:right;
+}
+.btn-cart{min-width:64px;text-align:center;justify-content:center;}
 .search-result-row .thumb{
   width:40px;height:40px;flex-shrink:0;object-fit:contain;
-  border:1px solid var(--line-lt);background:var(--paper-2);
+  border:var(--rule-1) solid var(--line-lt);background:var(--paper-2);
 }
 .search-result-row .thumb-empty{display:inline-block;}
 .btn-cart{
-  flex-shrink:0;background:none;border:1px solid var(--ink);color:var(--ink);
+  flex-shrink:0;background:none;border:var(--rule-1) solid var(--ink);color:var(--ink);
   padding:7px 14px;font-size:12.5px;font-weight:600;
   transition:background .15s,color .15s;
 }
@@ -717,17 +711,21 @@ input{font-family:inherit;}
 .btn-cart.on{background:var(--ink);color:var(--paper);}
 
 /* ── 견적 카트 패널 ── */
-.cart-panel{border:1px solid var(--ink);background:var(--paper);position:sticky;top:14px;}
+.cart-panel{border:var(--rule-2) solid var(--ink);background:var(--paper);position:sticky;top:14px;}
 .cart-head{
   display:flex;justify-content:space-between;align-items:baseline;
-  padding:16px 18px;border-bottom:1px solid var(--ink);
+  padding:16px 18px;border-bottom:var(--rule-1) solid var(--ink);
 }
 .cart-title{font-weight:700;font-size:14px;}
 .cart-count{font-family:var(--font-mono);font-size:11px;color:var(--mute-lt);}
+/* 진행 틱 — 슬롯 목록을 끝까지 스크롤하지 않아도 "8칸 중 몇 칸"이 보이게 */
+.cart-panel .bs-ticks{padding:12px 18px;border-bottom:var(--rule-1) solid var(--line-lt);}
+.cart-panel .bs-tick{flex:1;width:auto;height:6px;background:none;border:var(--rule-1) solid var(--ink);}
+.cart-panel .bs-tick.on{background:var(--ink);}
 .cart-list{display:flex;flex-direction:column;}
 .cart-slot{
   display:flex;align-items:stretch;
-  border-bottom:1px solid var(--line-lt);
+  border-bottom:var(--rule-1) solid var(--line-lt);
 }
 .cart-slot:last-child{border-bottom:none;}
 .cart-slot.current{background:var(--paper-2);}
@@ -744,14 +742,29 @@ input{font-family:inherit;}
 .cs-part{font-size:12.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .cs-empty{font-size:12.5px;color:var(--mute-lt);}
 .cs-remove{
-  flex-shrink:0;background:none;border:none;border-left:1px solid var(--line-lt);
+  flex-shrink:0;background:none;border:none;border-left:var(--rule-1) solid var(--line-lt);
   color:var(--mute-lt);font-size:16px;padding:0 14px;cursor:pointer;
   transition:color .15s,background .15s;
 }
 .cs-remove:hover{color:var(--ink);background:var(--paper-2);}
-.cart-actions{padding:16px 18px;border-top:1px solid var(--ink);display:flex;flex-direction:column;gap:10px;}
+/* 러닝 소계 — 저장 버튼을 누르기 전에도 "지금까지 얼마"가 보여야 함
+   (빌드 생성 화면의 .build-summary와 같은 역할, 카트 폭에 맞춘 축소판) */
+.cart-sum{
+  display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+  padding:14px 18px;background:var(--ink);color:var(--paper);
+}
+.cart-sum-k{
+  font-family:var(--font-mono);font-size:10px;letter-spacing:.16em;
+  text-transform:uppercase;font-weight:600;
+}
+.cart-sum-val{font-family:var(--font-mono);font-size:19px;font-weight:600;letter-spacing:-.02em;}
+.cart-sum-val em{
+  font-style:normal;display:block;text-align:right;
+  font-size:10px;letter-spacing:.1em;color:var(--mute-dk);margin-top:3px;
+}
+.cart-actions{padding:16px 18px;border-top:var(--rule-1) solid var(--ink);display:flex;flex-direction:column;gap:10px;}
 .cart-actions input{
-  background:var(--paper);border:1px solid var(--line-lt);padding:11px 12px;
+  background:var(--paper);border:var(--rule-1) solid var(--line-lt);padding:11px 12px;
   color:var(--ink);font-size:13px;
 }
 .cart-actions input:focus{outline:none;border-color:var(--ink);}
@@ -763,14 +776,14 @@ input{font-family:inherit;}
 
 .stats-picker{
   max-width:560px;
-  border:1px solid var(--line-lt);
+  border:var(--rule-1) solid var(--line-lt);
   margin-bottom:20px;
 }
 
 .month-tabs{display:flex;gap:8px;margin-bottom:24px;}
 .month-tab{
   background:var(--paper);
-  border:1px solid var(--line-lt);
+  border:var(--rule-1) solid var(--line-lt);
   border-radius:999px;
   padding:7px 16px;
   color:var(--mute-lt);
@@ -784,7 +797,7 @@ input{font-family:inherit;}
 
 .chart-card{
   background:var(--paper);
-  border:1px solid var(--line-lt);
+  border:var(--rule-1) solid var(--line-lt);
   padding:32px;
 }
 .chart-legend{
@@ -801,7 +814,7 @@ input{font-family:inherit;}
 .chart-stats div span{display:block;color:var(--mute-lt);font-size:10.5px;letter-spacing:.06em;margin-bottom:3px;text-transform:uppercase;}
 .chart-stats .min,.chart-stats .max{color:var(--ink);}
 
-.recent-list{display:flex;flex-direction:column;gap:1px;background:var(--line-lt);border:1px solid var(--line-lt);}
+.recent-list{display:flex;flex-direction:column;gap:var(--rule-1);background:var(--line-lt);border:var(--rule-1) solid var(--line-lt);}
 .recent-row{
   display:flex;justify-content:space-between;align-items:center;gap:14px;
   padding:14px 18px;background:var(--paper);font-size:13.5px;
@@ -821,27 +834,26 @@ input{font-family:inherit;}
 .recent-row .remove:hover{color:var(--ink);background:var(--paper-2);}
 
 /* ── 스탯 스트립 (빌드 상세 상단 요약) ───────────────────────
-   참조 디자인 .strip — 격자선은 컨테이너 background+gap:1px 트릭.
+   참조 디자인 .strip — 격자선은 컨테이너 background+gap:var(--rule-1) 트릭.
    셀 개수가 항상 4개로 고정이라 빈 셀 노출 문제(REFERENCE.md #디자인-토큰)
    없음 */
 .strip{
   display:grid;
   grid-template-columns:repeat(4,1fr);
-  gap:1px;
+  gap:var(--rule-1);
   background:var(--line-lt);
-  border:1px solid var(--line-lt);
+  border:var(--rule-1) solid var(--line-lt);
   margin-bottom:36px;
 }
-.st{background:var(--paper);padding:18px 20px 20px;}
+.st{background:var(--paper);padding:15px 16px;}
 .st-k{
   font-family:var(--font-mono);font-size:10px;letter-spacing:.16em;
-  text-transform:uppercase;color:var(--mute-lt);margin-bottom:9px;
+  text-transform:uppercase;color:var(--mute-lt);margin-bottom:8px;
 }
-.st-v{font-size:14px;font-weight:500;letter-spacing:-.01em;line-height:1.45;}
-.st-v em{
-  font-style:normal;display:block;font-size:11.5px;font-weight:400;
-  color:var(--mute-lt);margin-top:3px;font-family:var(--font-mono);
-}
+.st-v{font-size:15px;font-weight:600;letter-spacing:-.01em;line-height:1.4;}
+/* 보조 줄 — 예전엔 .st-v 안의 <em>이었는데, 한 칸에 보조 줄이 두 개
+   필요한 경우(판정 + 근거)가 생겨서 형제 요소로 분리 */
+.st-s{font-family:var(--font-mono);font-size:11px;color:var(--mute-lt);margin-top:4px;}
 @media(max-width:860px){.strip{grid-template-columns:1fr 1fr;}}
 @media(max-width:520px){.strip{grid-template-columns:1fr;}}
 
@@ -878,16 +890,26 @@ input{font-family:inherit;}
 }
 .confirm-num span{font-size:.42em;font-weight:400;color:var(--mute-lt);margin-left:6px;letter-spacing:0;}
 .confirm-arrow{font-size:18px;color:var(--mute-lt);padding-bottom:5px;}
+/* 차액 배지 2종 — 원 차액은 "실측 합계" 기준, 증감률은 "판정 기준가" 기준이라
+   기준이 서로 다름. 한 배지에 붙여 쓰면 같은 기준으로 오해되므로 분리하고
+   각자 무엇 대비인지 .base에 명시 (2026-08-13) */
+.deltas{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;}
 .diff-badge{
-  display:inline-block;padding:8px 15px;border:1px solid var(--ink);
-  font-family:var(--font-mono);font-size:12.5px;letter-spacing:.06em;color:var(--ink);
+  display:inline-block;padding:8px 13px;border:var(--rule-1) solid var(--ink);
+  font-family:var(--font-mono);font-size:12px;color:var(--ink);
 }
-.diff-badge.dn{border-color:var(--line-lt);color:var(--mute-lt);}
+.diff-badge b{font-weight:600;}
+.diff-badge .base{
+  display:block;font-size:9.5px;letter-spacing:.14em;
+  color:var(--mute-lt);margin-bottom:4px;
+}
+.diff-badge.fill{background:var(--ink);color:var(--paper);}
+.diff-badge.fill .base{color:var(--mute-dk);}
 
 /* ── 섹션 헤드 (제목 + 우측 note) ── */
 .sec-head{
-  display:flex;align-items:baseline;gap:16px;
-  padding-bottom:14px;border-bottom:1px solid var(--ink);margin-bottom:4px;
+  display:flex;align-items:baseline;gap:16px;margin-top:44px;
+  padding-bottom:14px;border-bottom:var(--rule-1) solid var(--ink);margin-bottom:4px;
 }
 .sec-title{font-size:19px;font-weight:600;letter-spacing:-.01em;}
 .sec-note{
@@ -895,22 +917,39 @@ input{font-family:inherit;}
   margin-left:auto;text-align:right;
 }
 
+/* ── 돈이 몰린 곳 — 스택 바 + 범례 ──────────────────────────
+   색을 못 쓰므로(모노크롬 원칙) 채움/빗금/세선/외곽선 4패턴으로 구분.
+   빗금 간격은 3px 이상 — 1~2px로 좁히면 화면 축소·인쇄에서 모아레가 생기거나
+   통짜 회색으로 뭉개짐 */
+.stack-bar{display:flex;height:34px;border:var(--rule-2) solid var(--ink);}
+.stack-bar i{display:block;height:100%;border-right:var(--rule-1) solid var(--ink);}
+.stack-bar i:last-child{border-right:none;}
+.fill-solid{background:var(--ink);}
+.fill-hatch{background:repeating-linear-gradient(45deg,var(--ink) 0 3px,var(--paper) 3px 7px);}
+.fill-line{background:repeating-linear-gradient(90deg,var(--ink) 0 3px,var(--paper) 3px 8px);}
+.fill-open{background:var(--paper);}
+.legend{display:flex;gap:20px;flex-wrap:wrap;margin-top:12px;}
+.legend div{display:flex;align-items:center;gap:8px;font-size:12.5px;}
+.legend .sw{width:15px;height:15px;border:var(--rule-1) solid var(--ink);flex-shrink:0;}
+.legend b{font-family:var(--font-mono);font-weight:500;font-size:11.5px;color:var(--mute-lt);}
+
 /* ── 그룹 헤더 (연산부 · 그래픽 …) — 참조 디자인 .grp ── */
 .grp{
   display:flex;align-items:center;gap:14px;
-  padding:30px 0 12px;
+  padding:28px 0 10px;
   font-family:var(--font-mono);font-size:10.5px;
   letter-spacing:.18em;text-transform:uppercase;color:var(--mute-lt);
 }
-.grp::after{content:"";flex:1;height:1px;background:var(--line-lt);}
+.grp::after{content:"";flex:1;height:var(--rule-1);background:var(--line-lt);order:1;}
+.grp .amt{order:2;color:var(--ink);letter-spacing:0;font-size:11.5px;}
 
 /* ── 부품 스펙 행 (참조 디자인 .row) ── */
-.spec-row-container{border:2px solid var(--ink);margin-top:12px;}
+.spec-row-container{border:var(--rule-2) solid var(--ink);margin-top:12px;}
 .spec-row-container .spec-row:last-child{border-bottom:none;}
 .spec-row{
   display:grid;grid-template-columns:104px 1fr 128px;
   gap:20px;align-items:baseline;
-  padding:18px 0;border-bottom:1px solid var(--line-lt);
+  padding:18px 0;border-bottom:var(--rule-1) solid var(--line-lt);
   transition:background .18s ease;
 }
 .spec-row:hover{background:var(--paper-2);}
@@ -921,7 +960,16 @@ input{font-family:inherit;}
 .spec-name{font-size:15px;font-weight:500;letter-spacing:-.01em;}
 .spec-desc{font-family:var(--font-mono);font-size:11.5px;color:var(--mute-lt);margin-top:4px;}
 .spec-desc .fallback{color:var(--ink);}
-.spec-price{font-size:15px;font-weight:500;white-space:nowrap;text-align:right;}
+.spec-price{
+  font-family:var(--font-mono);font-size:15px;font-weight:500;
+  white-space:nowrap;text-align:right;
+}
+/* 원 단위 전체를 주 표기로 올리고 만원 표기는 보조 줄로 내림 — 열로 비교할
+   땐 자릿수가 같은 원 단위가, 감을 잡을 땐 만원이 편해서 둘 다 남김 */
+.spec-price em{
+  display:block;font-style:normal;font-size:11px;font-weight:400;
+  color:var(--mute-lt);margin-top:3px;
+}
 .spec-price.missing{color:var(--mute-lt);font-weight:400;}
 /* 비중 바 — 참조 디자인 .sp-bar */
 .prop-bar{height:3px;background:var(--paper-2);margin-top:8px;position:relative;overflow:hidden;}
@@ -964,6 +1012,24 @@ input{font-family:inherit;}
 }
 @media(max-width:660px){.bs-total{margin-left:0;text-align:left;}}
 
+/* ── 설정 — 항목별 설명이 길어서 폼 필드(.form-shell)보다 좌우 2열
+   목록이 읽기 편함. 왼쪽은 무엇을 바꾸는지, 오른쪽은 컨트롤 ── */
+.set-list{border:var(--rule-2) solid var(--ink);}
+.set-row{
+  display:grid;grid-template-columns:minmax(0,1fr) 200px;gap:24px;align-items:center;
+  padding:18px;border-bottom:var(--rule-1) solid var(--line-lt);
+}
+.set-row:last-child{border-bottom:none;}
+.set-row .t{font-size:14.5px;font-weight:600;margin-bottom:5px;}
+.set-row .d{font-family:var(--font-mono);font-size:11.5px;color:var(--mute-lt);line-height:1.7;}
+.set-row select{
+  width:100%;background:var(--paper);border:var(--rule-1) solid var(--line-lt);
+  padding:11px 12px;font-size:13.5px;color:var(--ink);
+}
+.set-row select:focus{outline:none;border-color:var(--ink);}
+.set-row .btn-ghost{justify-content:center;}
+@media(max-width:660px){.set-row{grid-template-columns:1fr;}}
+
 /* ── 스크롤 리빌 (참조 디자인 .rv) ── */
 .rv{
   opacity:0;transform:translateY(12px);
@@ -977,12 +1043,17 @@ input{font-family:inherit;}
 /* ── 인쇄 / PDF — 빌드 상세는 견적서로 출력할 수 있어야 함 ── */
 @page{margin:14mm;}
 @media print{
+  /* 이 화면의 판정·합계는 전부 "잉크 배경 + 페이퍼 글자"로 대비를 만드는데,
+     브라우저는 기본적으로 배경을 인쇄하지 않음 — 그대로 두면 흰 종이에 흰
+     글자가 되어 견적서에서 결론만 사라짐. 인쇄 시 배경을 강제로 살림 */
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   body{height:auto;overflow:visible;background:#fff;}
   .app{display:block;height:auto;}
-  .sidebar,.topbar,.detail-head .btn-ghost,.build-summary{display:none;}
+  .sidebar,.topbar,.answer-acts,.build-summary,.cart-panel{display:none;}
   .main{overflow:visible;}
   .page{padding:0;max-width:none;}
   .rv{opacity:1 !important;transform:none !important;}
   .prop-bar i{transition:none;}
-  .spec-row,.strip,.sum,.gauge-card{break-inside:avoid;}
+  .gauge-marker,.gauge-marker-value{transition:none;}
+  .spec-row,.strip,.sum,.gauge-card,.stack-bar,.answer{break-inside:avoid;}
 }

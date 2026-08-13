@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type FavoriteItem } from "../lib/api";
 import PartRow, { type SelectedPart } from "../components/PartRow";
+import Answer, { errorMessage } from "../components/Answer";
+import { manwon, won } from "../lib/format";
 
 function formatAddedAt(iso: string): string {
   return new Date(iso).toLocaleString("ko-KR", {
@@ -55,34 +57,111 @@ export default function FavoritesPage() {
 
   const items: FavoriteItem[] = data ?? [];
 
+  // 가격은 목록을 열 때마다 다시 조회하므로 여기 합계도 매번 새 값 —
+  // 저장된 스냅샷이 아님(DB에 price_history 테이블을 두지 않는 설계)
+  const pricedItems = items.filter((it) => it.price != null);
+  const total = pricedItems.reduce((sum, it) => sum + it.price!, 0);
+  const failedCount = items.length - pricedItems.length;
+  const topItem = pricedItems.reduce<FavoriteItem | null>(
+    (max, it) => (max === null || it.price! > max.price! ? it : max),
+    null
+  );
+
+  const answer = isLoading ? (
+    <Answer
+      state="pending"
+      kick="즐겨찾기"
+      headline={
+        <>
+          관심 부품의 <mark>지금 가격을 조회하는 중</mark>입니다
+        </>
+      }
+      because="즐겨찾기는 상품코드만 저장합니다 — 가격은 목록을 열 때마다 다시 조회합니다"
+    />
+  ) : isError ? (
+    <Answer
+      state="failed"
+      kick="즐겨찾기"
+      headline={
+        <>
+          목록을 <mark>불러오지 못했습니다</mark>
+        </>
+      }
+      because={<>{errorMessage(error)}</>}
+    />
+  ) : items.length === 0 ? (
+    <Answer
+      kick="즐겨찾기"
+      headline={
+        <>
+          등록한 관심 부품이 <mark>아직 없습니다</mark>
+        </>
+      }
+      because="아래에서 부품을 검색해 추가하면, 열 때마다 최신 최저가로 다시 조회합니다"
+    />
+  ) : (
+    <Answer
+      kick="즐겨찾기"
+      headline={
+        <>
+          관심 부품 <mark>{items.length}종</mark> · 합계 {won(total)}원
+        </>
+      }
+      because={
+        <>
+          가격은 목록을 열 때마다 다시 조회합니다 — 저장된 값이 아닙니다
+          {failedCount > 0 && (
+            <>
+              <br />
+              <b>{failedCount}종</b>은 지금 가격을 가져오지 못해 합계에서 빠졌습니다
+            </>
+          )}
+        </>
+      }
+    />
+  );
+
   return (
     <div>
-      <div className="section-label">SAVED PARTS</div>
-      <div className="build-header">
-        <h2>즐겨찾기</h2>
-      </div>
+      {answer}
 
-      <div className="stats-picker">
+      {items.length > 0 && (
+        <div className="strip">
+          <div className="st">
+            <p className="st-k">등록 부품</p>
+            <p className="st-v">{items.length}종</p>
+            <p className="st-s">최대 제한 없음</p>
+          </div>
+          <div className="st">
+            <p className="st-k">합계</p>
+            <p className="st-v">{won(total)}원</p>
+            <p className="st-s">{manwon(total)} · 즉시 최저가</p>
+          </div>
+          <div className="st">
+            <p className="st-k">최고가</p>
+            <p className="st-v">{topItem ? (topItem.title ?? `#${topItem.code}`) : "—"}</p>
+            <p className="st-s">{topItem ? `${won(topItem.price!)}원` : "가격 조회 실패"}</p>
+          </div>
+          <div className="st">
+            <p className="st-k">조회 실패</p>
+            <p className="st-v">{failedCount}종</p>
+            <p className="st-s">{failedCount === 0 ? "전부 정상" : "합계에서 제외됨"}</p>
+          </div>
+        </div>
+      )}
+
+      <div className="stats-picker" style={{ marginTop: 26 }}>
         <PartRow key={pickerKey} category="검색" selected={null} onSelect={handleSelect} />
       </div>
 
       {addMutation.isError && (
-        <div className="status-line error">
-          추가 실패: {addMutation.error instanceof Error ? addMutation.error.message : "알 수 없는 오류"}
-        </div>
+        <div className="status-line error">추가 실패: {errorMessage(addMutation.error)}</div>
       )}
 
-      {isLoading && <div className="status-line">불러오는 중...</div>}
-      {isError && (
-        <div className="status-line error">
-          즐겨찾기를 불러오지 못했습니다: {error instanceof Error ? error.message : "알 수 없는 오류"}
-        </div>
-      )}
-
-      {!isLoading && items.length === 0 && (
+      {!isLoading && !isError && items.length === 0 && (
         <div className="empty-state">
-          <div className="t">즐겨찾기한 부품이 없어요</div>
-          <div className="d">위에서 부품을 검색해 추가해보세요</div>
+          <div className="t">위 검색창에서 부품을 찾아 추가하세요</div>
+          <div className="d">추가한 부품은 열 때마다 최신 최저가로 다시 조회됩니다</div>
         </div>
       )}
 
