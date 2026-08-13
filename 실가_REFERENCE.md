@@ -89,9 +89,18 @@ silga/                (git 리포 루트, 커밋 4개: v0.2 백엔드/v0.3 빌�
 │       ├── components/  AppShell.tsx(사이드바/탑바), PartRow.tsx(단일
 │       │                검색+자동완성 위젯 — StatsPage/FavoritesPage/
 │       │                SearchPage가 재사용), PartSearchPanel.tsx(BuildCreatePage
-│       │                전용 마스터-디테일 검색 패널, 2026-08-08 추가)
-│       ├── pages/        Search/BuildList/BuildCreate/BuildDetail/Placeholder
-│       ├── lib/           api.ts(백엔드 클라이언트), useDebouncedValue.ts
+│       │                전용 마스터-디테일 검색 패널, 2026-08-08 추가),
+│       │                Answer.tsx(전 화면 결론 블록 — 새 화면 헤더는 반드시
+│       │                이걸 쓸 것), BuildCard.tsx(홈/목록 공용 빌드 카드),
+│       │                VerdictAxis.tsx(홈 판정 축) — 2026-08-13 추가
+│       ├── pages/        Home/Search/BuildList/BuildCreate/BuildDetail/
+│       │                Favorites/RecentHistory/Stats/Settings
+│       │                (PlaceholderPage는 7탭 실데이터 연동 완료로 삭제됨)
+│       ├── lib/           api.ts(백엔드 클라이언트), useDebouncedValue.ts,
+│       │                settings.ts, recentProducts.ts, useDeleteBuild.ts,
+│       │                format.ts(가격/날짜 표시 포맷), verdictScale.ts(판정
+│       │                시각화 좌표계 — 상세 게이지와 홈 축이 공유) — 뒤 둘은
+│       │                2026-08-13 추가
 │       └── styles/global.css  디자인 토큰 이식
 ├── scripts/
 │   └── e2e_smoke_test.py       Playwright E2E 스모크 테스트
@@ -160,8 +169,9 @@ DB         SQLite (WAL 모드) — 개인용 트래픽 규모에 충분, 서버 
              순수 SPA가 가볍고 Flutter 이식 시 라우팅 구조 매핑도 더 직관적
 서버상태   TanStack Query (React Query) — REST 캐싱/재검증 직접 구현 안 함
 차트       Recharts — 목업의 손그림 SVG(gauge 제외)를 실 라이브러리로 교체
-           판정 게이지(SVG 반원 다이얼)는 Recharts로 안 되는 커스텀 컴포넌트라
-           목업 그대로 SVG 직접 구현 유지
+           판정 게이지/판정 축은 Recharts로 안 되는 커스텀 컴포넌트라 직접 구현
+           (2026-08-05에 SVG 반원 다이얼 → CSS flat 수평 바로 교체됐고, 지금은
+           SVG도 아님 — .gauge-track/.axis 참조)
 스타일링   바닐라 CSS, 디자인 토큰(REFERENCE.md #디자인-토큰) 그대로 CSS 변수 사용
            → Tailwind 미채택: 이미 커스텀 토큰 시스템이 있어 얹으면 충돌/중복
 
@@ -331,10 +341,15 @@ POST /build/compare  (신규, v0.3 — 원 계약에 없었음)
 POST /builds  (신규, v0.3 — 원 계약에 없었음)
   body: {name, market_price?, items: [{category, code}, ...]}
   → BuildSummary {id, name, market_price, created_at, item_count,
-     total_price, total_price_formatted, verdict, verdict_confidence, ma_window}
+     total_price, total_price_formatted, verdict, verdict_confidence, ma_window,
+     diff_percent}
   ※ builds/build_items DB 테이블은 있었는데 채워넣는 CRUD가 누락돼 있었음
-  ※ 생성 직후엔 verdict/verdict_confidence/ma_window 전부 null (아직 라이브
-    가격 계산 전) — 목록/상세 조회 시점에 채워짐
+  ※ 생성 직후엔 verdict/verdict_confidence/ma_window/diff_percent 전부 null
+    (아직 라이브 가격 계산 전) — 목록/상세 조회 시점에 채워짐
+  ※ diff_percent는 v0.12(2026-08-13) 추가 — BuildDetail.diff_percent와 같은
+    의미(기준가 대비 증감률). list_builds가 판정을 내리며 calc_verdict()로
+    이미 계산하던 값이라 추가 스크래핑 비용 없음. 카드(.bc-diff)에 판정
+    근거를 같이 보여주려고 실어 보냄
 
 GET  /builds?ma_window={7|14|30}  (신규, v0.3)
   → [BuildSummary, ...]  — 저장된 빌드 목록(앱 셸 "내 빌드" 카드 목록)
@@ -474,18 +489,27 @@ verdict 판정 기준가(basis_price) — 이동평균 도입 (2026-08-04, v0.4 
 ---
 
 ## 화면/탭 구조 (app-shell-mockup.html 기준 → frontend/에 실제 구현, 2026-08-03,
-   2026-08-04 홈/통계/최근기록/설정/즐겨찾기 5개 탭 추가 완료로 갱신)
+   2026-08-04 홈/통계/최근기록/설정/즐겨찾기 5개 탭 추가 완료로 갱신,
+   2026-08-13 결론 블록 도입 + 사이드바 접힘 폐기로 갱신)
 ```
-사이드바 (기본 아이콘 레일 72px, 햄버거로 240px 확장)
-├─ 홈       — ✅ 완료, 최근 빌드 4개 카드(GET /builds 재사용) + 빠른 액션
-│              버튼("새 빌드 만들기"/"부품 검색")
-├─ 검색     — ✅ 완료, /search 실데이터 연동
+사이드바 (236px 고정 — 접힘/햄버거는 2026-08-13 폐기. 탭이 7개로 고정이라
+          아이콘만 남으면 "즐겨찾기/최근기록"처럼 뜻이 겹치는 항목을 글리프로
+          구분해야 해서, 접었을 때 얻는 164px보다 잃는 게 큼)
+├─ 홈       — ✅ 완료, 결론 블록 + 4칸 스탯 스트립 + 판정 축(.axis, 저장한
+│              빌드 전부를 상세 게이지와 같은 좌표계에) + 최근 빌드 4개 카드
+│              (GET /builds 한 번으로 전부 계산 — 추가 조회 없음)
+├─ 검색     — ✅ 완료, /search 실데이터 연동 + 견적 카트(8슬롯, 진행 틱,
+│              러닝 소계) → 카트 구성 그대로 POST /builds 가능
 ├─ 빌드     — ✅ 완료, 3단계 흐름 전부 실데이터 연동
 │    ├─ 목록   GET /builds 연동, 적정가/고가/저가 태그 + 총액 실시간 계산
-│    ├─ 생성   카테고리별 자동완성(디바운스 500ms) + POST /builds 저장
+│    │        + 카드에 기준가 대비 증감률(.bc-diff), 판정 필터 탭(받아온
+│    │        목록을 거르는 클라이언트 필터라 재조회 없음)
+│    ├─ 생성   마스터-디테일(왼쪽 부품 행 4열 그리드 / 오른쪽 검색 패널,
+│    │        2026-08-08 재설계·2026-08-13 열 정렬) + POST /builds 저장
 │    │        + 비교 판매가 입력 → "분석하기" → 저장 후 상세로 자동 이동
-│    └─ 상세   GET /builds/{id} 연동, 판정 게이지(SVG 반원 다이얼, diff_percent
-│              기반 니들 각도 동적 계산) + 부품별 breakdown + 합계
+│    └─ 상세   GET /builds/{id} 연동, 판정 게이지(flat 수평 바 .gauge-track,
+│              diff_percent를 ±30% 클램프해 위치 매핑) + 부품별 스펙시트
+│              + 그룹별 스택 바 + 합계
 ├─ 즐겨찾기  — ✅ 완료, PartRow로 검색→즉시 추가(POST /favorites), 목록
 │              (GET /favorites)에서 클릭 시 통계 탭으로 이동해 가격 히스토리
 │              바로 확인, 개별 제거(DELETE /favorites/{code})
@@ -494,7 +518,12 @@ verdict 판정 기준가(basis_price) — 이동평균 도입 (2026-08-04, v0.4 
 ├─ 통계      — ✅ 완료, 오실로스코프풍 라인차트(GET /product/{code}/history)
 │              + PartRow로 부품 검색 + 1/3/6/12개월 탭
 └─ 설정      — ✅ 완료, verdict 이동평균 기간(ma_window, 7/14/30일)
-              드롭다운 + localStorage 저장
+              드롭다운 + localStorage 저장, 최근기록 비우기, API 서버 표시
+              (2026-08-13 .set-list 2열 목록으로 교체)
+              ※ "이 설정을 바꾸면 빌드 N개가 다시 계산된다"의 N은 일부러 안
+                띄움 — N을 알려면 /builds를 불러야 하고 그건 빌드마다 부품
+                가격을 전부 재조회하는 호출임. 설정 화면을 여는 것만으로
+                크롤링을 유발할 수 없음
 
 Playwright E2E 스모크 테스트(scripts/e2e_smoke_test.py)로 검색→자동완성→
 빌드생성→상세→목록 전체 흐름 실브라우저 검증 완료(2026-08-03 시점).
@@ -530,7 +559,13 @@ accent — 없음(모노크롬 원칙). 상태 구분은 색이 아니라 기호
 
 레이아웃 규칙
   border-radius 전면 미사용(카드/버튼/인풋 전부 각짐), box-shadow 글로우
-  전면 미사용 — hairline(1px) 보더로만 위계 표현
+  전면 미사용 — hairline 보더로만 위계 표현
+  룰(선) 두께는 3단 고정 (2026-08-13 도입) — 이 셋 밖의 두께를 쓰지 말 것:
+    --rule-3 (4px) 문서 구분 — 화면 최상단 .answer의 상단 룰 전용
+    --rule-2 (2px) 블록 경계 — .part-rows/.cart-panel/.spec-row-container/
+                   .set-list/.stack-bar/.gauge-track, primary·secondary 버튼
+    --rule-1 (1px) 행 구분/헤어라인 — 그 밖의 모든 선
+    (예외: .gauge-marker의 삼각형처럼 "선이 아닌 도형"의 border는 해당 없음)
   CSS Grid에 "그리드 라인 트릭"(컨테이너 background + gap:1px) 쓸 때 자식
   개수가 고정이 아니면 빈 셀에 컨테이너 배경이 그대로 노출되는 버그 발생
   (build-grid에서 실측 발견) — 아이템 수가 가변인 그리드는 개별 카드에
@@ -538,10 +573,41 @@ accent — 없음(모노크롬 원칙). 상태 구분은 색이 아니라 기호
   자식이 항상 꽉 채워지므로 트릭 사용 가능
 
 시그니처 요소
+  결론 블록 .answer (2026-08-13 도입, 전 화면 공통 헤더)
+    화면 최상단 4px ink 룰 + kick(모노 킥커) + h2(결론 한 문장, 핵심어는
+    <mark>로 잉크 반전) + because(근거 1~2줄) + answer-acts(액션).
+    이전의 .section-label("DASHBOARD") + .build-header h2("홈") 조합을
+    대체함 — 화면 이름만 되풀이해 정보량이 0이었기 때문.
+    ⚠️ state 3종을 반드시 함께 다룰 것: ready / pending / failed.
+    데이터 소스가 스크래퍼라 "결론이 아직 없음/낼 수 없음"이 예외가 아니라
+    정상 상태 중 하나임. 상단 4px 룰은 어느 상태에서나 유지하고(문서 구조가
+    깜빡이면 안 됨) <mark>의 잉크 채움만 밑줄로 낮춘다.
+    구현: frontend/src/components/Answer.tsx — 새 화면을 추가할 때 헤더는
+    이 컴포넌트를 쓸 것(직접 마크업 복제 금지)
+
   판정 게이지 — 예전 SVG 반원 다이얼+니들에서 flat 수평 바(.gauge-track/
   .gauge-zone/.gauge-marker)로 교체. diff_percent를 ±30% 클램프해 바
   0~100% 위치에 매핑, VERDICT_THRESHOLD_PERCENT(±5%) 구간을 음영(.gauge-zone)
-  으로 표시
+  으로 표시. 마커는 페이퍼 심지 + 잉크 테두리 — 통짜 잉크로 두면 저가/고가
+  구간(잉크로 채운 트랙)에서 배경에 묻혀 사라짐. 라벨은 클램프로 양 끝에
+  붙을 때 data-edge="l"/"r"로 안쪽 접기
+
+  홈 판정 축 .axis (2026-08-13) — 저장한 빌드를 상세 게이지와 **같은 좌표계**에
+  전부 올림(lib/verdictScale.ts 공유 — 두 화면이 다른 자를 쓰면 오갈 때 위치
+  감각이 깨지므로 스케일 상수/매핑 함수를 여기 한 곳에만 둘 것).
+    라벨은 hover/포커스한 핀 하나만 노출 — 상시 노출하면 적정 밴드에 빌드가
+    몰릴 때(정상 상태다) 그대로 겹침. 인쇄는 hover가 없으므로 축 아래
+    정렬 목록(.axis-list)으로 폴백(@media print에서만 펼침)
+    눈금·라벨 색 규칙: 자기가 놓인 바닥의 반대색(잉크 트랙 위→페이퍼,
+    페이퍼 밴드 위→잉크). 잉크 위에 잉크 칩을 올리면 경계가 사라짐
+    핀 히트 영역은 눈금 폭(2px)이 아니라 18px — 2px는 마우스로 짚을 수 없음
+    ±30% 밖 빌드는 클램프되어 양 끝에 붙으므로 «/» 글리프로 "범위 밖" 표시
+    (rangeGlyph) — 안 하면 "딱 ±30%"와 구분되지 않아 거짓말이 됨
+
+  돈이 몰린 곳 .stack-bar/.legend (2026-08-13) — 그룹별 금액 비중. 색을 쓸 수
+  없으므로 .fill-solid/.fill-hatch/.fill-line/.fill-open 4패턴으로 구분하고
+  스택 바 자체에 aria-label로 수치를 넣는다. 빗금/세선 간격은 3px 이상 —
+  1~2px로 좁히면 화면 축소·인쇄에서 모아레가 생기거나 통짜 회색으로 뭉개짐
 
 스펙시트 컴포넌트 (2026-08-05 2차 — 참조 디자인 요소 추가 이식)
   .strip/.st        4칸 고정 스탯 스트립(빌드 상세 상단 요약). 셀 수가 항상
@@ -564,8 +630,13 @@ accent — 없음(모노크롬 원칙). 상태 구분은 색이 아니라 기호
 
 인쇄
   빌드 상세는 견적서로 출력 가능해야 함 — @page margin 14mm, 사이드바/탑바/
-  버튼/sticky 요약은 @media print에서 숨김, .spec-row/.strip/.sum은
-  break-inside:avoid
+  버튼/sticky 요약/카트는 @media print에서 숨김, .spec-row/.strip/.sum/
+  .stack-bar/.answer는 break-inside:avoid
+  ⚠️ print-color-adjust:exact 필수 (2026-08-13 추가) — 이 디자인은 결론을
+  전부 "잉크 배경 + 페이퍼 글자"로 표현하는데(.answer h2 mark, .sum,
+  .diff-badge.fill, .bc-tag, .gauge-track, .stack-bar) 브라우저는 기본적으로
+  배경을 인쇄하지 않아서 흰 종이에 흰 글자가 됨. 잉크 채움을 쓰는 요소를
+  새로 추가해도 이 규칙 덕에 자동으로 커버됨(* 셀렉터에 걸어둠)
 ```
 
 ---

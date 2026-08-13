@@ -7,6 +7,8 @@ import PartSearchPanel from "../components/PartSearchPanel";
 import { useMaWindow } from "../lib/settings";
 import { addRecentProduct } from "../lib/recentProducts";
 import { CATEGORIES } from "../lib/specFilters";
+import Answer, { errorMessage } from "../components/Answer";
+import { won } from "../lib/format";
 
 export default function BuildCreatePage() {
   const navigate = useNavigate();
@@ -40,6 +42,7 @@ export default function BuildCreatePage() {
   // 가격을 못 가져온 부품(price=null)은 합계에서 빠지므로 개수를 따로 표기.
   const runningTotal = selectedParts.reduce((sum, p) => sum + (p.price ?? 0), 0);
   const unpricedCount = selectedParts.filter((p) => p.price == null).length;
+  const remaining = CATEGORIES.filter((c) => !parts[c]);
 
   // 부품을 고르면 자동으로 다음 미선택 카테고리로 넘어감(전부 채워지면 패널 닫힘)
   const handlePick = (category: string, item: SearchResultItem) => {
@@ -70,13 +73,37 @@ export default function BuildCreatePage() {
 
   return (
     <div>
-      <div className="section-label">NEW BUILD</div>
-      <div className="detail-head">
-        <Link className="btn-ghost" to="/build">← 목록으로</Link>
-        <h2>새 빌드 만들기</h2>
-      </div>
+      <Answer
+        kick="새 빌드 · 부품 선택"
+        headline={
+          selectedCount === 0 ? (
+            <>
+              부품을 골라 <mark>새 빌드를 만듭니다</mark>
+            </>
+          ) : (
+            <>
+              {CATEGORIES.length}개 중 {selectedCount}개 선택 ·{" "}
+              <mark>지금까지 {won(runningTotal)}원</mark>
+            </>
+          )
+        }
+        because={
+          <>
+            {remaining.length > 0 ? (
+              <>
+                남은 것 <b>{remaining.join(" · ")}</b> — 비어 있어도 저장은 됩니다
+              </>
+            ) : (
+              <>{CATEGORIES.length}종을 모두 골랐습니다</>
+            )}
+            <br />
+            가격은 저장 시점이 아니라 조회할 때마다 다시 계산됩니다
+          </>
+        }
+        actions={<Link className="btn-ghost" to="/build">← 목록으로</Link>}
+      />
 
-      <div className="bc-shell">
+      <div className="bc-shell" style={{ marginTop: 26 }}>
         <div className="bc-left">
           <div className="field">
             <label>빌드 이름</label>
@@ -94,18 +121,21 @@ export default function BuildCreatePage() {
               {CATEGORIES.map((category) => {
                 const part = parts[category];
                 return (
-                  <div
+                  <button
                     key={category}
-                    className={`bc-row${activeCategory === category ? " active" : ""}`}
+                    type="button"
+                    className={`bc-row${part ? " filled" : ""}${activeCategory === category ? " active" : ""}`}
                     onClick={() => setActiveCategory(category)}
                   >
-                    <span className="part-cat">{category}</span>
-                    <span className={`bc-row-text${part ? " filled" : ""}`}>
-                      {part ? part.title : "부품을 검색하세요"}
+                    <span className="cat">{category}</span>
+                    <span className={`nm${part ? "" : " empty"}`}>
+                      {part ? part.title : activeCategory === category ? "고르는 중" : "미선택"}
                     </span>
-                    {part && <span className="bc-row-price">{part.priceFormatted ?? "-"}</span>}
-                    <span className="bc-row-chevron">›</span>
-                  </div>
+                    <span className={`pr${part?.price != null ? "" : " empty"}`}>
+                      {part?.price != null ? won(part.price) : "—"}
+                    </span>
+                    <span className="arw">›</span>
+                  </button>
                 );
               })}
             </div>
@@ -127,9 +157,7 @@ export default function BuildCreatePage() {
           </div>
 
           {mutation.isError && (
-            <div className="status-line error">
-              저장 실패: {mutation.error instanceof Error ? mutation.error.message : "알 수 없는 오류"}
-            </div>
+            <div className="status-line error">저장 실패: {errorMessage(mutation.error)}</div>
           )}
 
           <div className="form-actions">

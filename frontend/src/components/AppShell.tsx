@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 
 const NAV_ITEMS: { path: string; label: string }[] = [
@@ -20,32 +19,26 @@ const TITLES: Record<string, string> = {
   "/settings": "설정",
 };
 
+// 탑바 현재 위치 — /build 하위는 목록/생성/상세가 전부 "빌드"로 뭉뚱그려져
+// 있었는데, 상세에서 뒤로 갈 곳이 목록인지 생성인지 구분이 안 됐음
 function titleFor(pathname: string): string {
+  if (pathname === "/build/new") return "빌드 / 새 빌드";
+  const detail = pathname.match(/^\/build\/(\d+)$/);
+  if (detail) return `빌드 / #${detail[1]}`;
   if (pathname.startsWith("/build")) return "빌드";
   return TITLES[pathname] ?? "실가";
 }
 
 export default function AppShell() {
-  const [expanded, setExpanded] = useState(false);
   const location = useLocation();
 
   return (
     <div className="app">
-      <aside className={`sidebar${expanded ? " expanded" : ""}`}>
+      <aside className="sidebar">
         <div className="side-top">
-          <button
-            className="hamburger"
-            aria-label="메뉴 펼치기/접기"
-            onClick={() => setExpanded((v) => !v)}
-          >
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path d="M2.5 5.5h15M2.5 10h15M2.5 14.5h15" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
-          </button>
-          <div className="brand">
-            <span className="brand-mark">실</span>
-            <span className="brand-word">실가</span>
-          </div>
+          <span className="brand-word">
+            실<em>가</em>
+          </span>
         </div>
 
         <nav className="side-nav">
@@ -72,14 +65,11 @@ export default function AppShell() {
 
       <div className="main">
         <div className="topbar">
-          <span className="seal">
-            <span className="seal-inner">
-              <span className="seal-char">실</span>
-            </span>
+          <span className="tb-word">
+            실<em>가</em>
           </span>
-          <span className="brand">실가</span>
-          <span className="crumb-divider" />
-          <span className="crumb current">{titleFor(location.pathname)}</span>
+          <span className="tb-div" />
+          <span className="tb-here">{titleFor(location.pathname)}</span>
         </div>
         <div className="page">
           <Outlet />

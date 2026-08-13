@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { api, type PriceHistory, type PricePoint } from "../lib/api";
 import PartRow, { type SelectedPart } from "../components/PartRow";
 import { addRecentProduct } from "../lib/recentProducts";
+import Answer, { errorMessage } from "../components/Answer";
+import { manwon, won } from "../lib/format";
 
 const MONTH_OPTIONS = [1, 3, 6, 12] as const;
 type MonthOption = (typeof MONTH_OPTIONS)[number];
@@ -117,14 +119,100 @@ export default function StatsPage() {
     enabled: selected !== null,
   });
 
+  // 평균은 서버가 주지 않아 프론트에서 계산 — min/max만 응답에 있음.
+  // 다나와는 주 단위 포인트를 주므로(실가_HISTORY.md v5) 이 평균도 주 단위
+  // 관측치의 산술평균이지 일 단위 평균이 아님.
+  const points = data?.prices ?? [];
+  const avg =
+    points.length > 0
+      ? Math.round(points.reduce((sum, p) => sum + Number(p.price), 0) / points.length)
+      : null;
+  const current = selected?.price ?? null;
+  const vsAvg = avg != null && current != null && avg > 0 ? ((current - avg) / avg) * 100 : null;
+
+  const answer = (() => {
+    if (!selected) {
+      return (
+        <Answer
+          kick="가격 이력"
+          headline={
+            <>
+              부품을 고르면 <mark>최근 가격 추이</mark>를 봅니다
+            </>
+          }
+          because="가격 이력은 로컬에 쌓지 않고 조회할 때마다 다나와에서 그때그때 가져옵니다"
+        />
+      );
+    }
+    if (isLoading) {
+      return (
+        <Answer
+          state="pending"
+          kick={`가격 이력 · 최근 ${months}개월`}
+          headline={
+            <>
+              {selected.title}의 <mark>가격 이력을 가져오는 중</mark>입니다
+            </>
+          }
+        />
+      );
+    }
+    if (isError) {
+      return (
+        <Answer
+          state="failed"
+          kick={`가격 이력 · 최근 ${months}개월`}
+          headline={
+            <>
+              가격 이력을 <mark>불러오지 못했습니다</mark>
+            </>
+          }
+          because={<>{errorMessage(error)}</>}
+        />
+      );
+    }
+    if (vsAvg == null) {
+      return (
+        <Answer
+          kick={`가격 이력 · 최근 ${months}개월`}
+          headline={
+            <>
+              {selected.title}의 <mark>평균 대비 위치를 계산할 수 없습니다</mark>
+            </>
+          }
+          because="현재가 또는 이력 데이터가 없어 비교 기준이 서지 않습니다"
+        />
+      );
+    }
+    return (
+      <Answer
+        kick={`가격 이력 · 최근 ${months}개월`}
+        headline={
+          <>
+            지금 가격은 {months}개월 평균보다{" "}
+            <mark>
+              {Math.abs(vsAvg).toFixed(1)}% {vsAvg >= 0 ? "높습니다" : "낮습니다"}
+            </mark>
+          </>
+        }
+        because={
+          <>
+            현재 <b>{won(current!)}원</b> · 평균 <b>{won(avg!)}원</b> · 최저{" "}
+            <b>{manwon(Number(data!.min))}</b> · 최고 <b>{manwon(Number(data!.max))}</b>
+            <br />
+            다나와는 주 단위로 가격을 주기 때문에 이 평균도 주 단위 관측치({points.length}개)의
+            평균입니다
+          </>
+        }
+      />
+    );
+  })();
+
   return (
     <div>
-      <div className="section-label">PRICE HISTORY</div>
-      <div className="build-header">
-        <h2>가격 히스토리</h2>
-      </div>
+      {answer}
 
-      <div className="stats-picker">
+      <div className="stats-picker" style={{ marginTop: 26 }}>
         <PartRow category="부품" selected={selected} onSelect={handleSelect} />
       </div>
 
@@ -144,15 +232,8 @@ export default function StatsPage() {
 
       {!selected && (
         <div className="empty-state">
-          <div className="t">부품을 검색하세요</div>
-          <div className="d">최근 가격 추이를 확인할 수 있어요</div>
-        </div>
-      )}
-
-      {selected && isLoading && <div className="status-line">불러오는 중...</div>}
-      {selected && isError && (
-        <div className="status-line error">
-          히스토리를 불러오지 못했습니다: {error instanceof Error ? error.message : "알 수 없는 오류"}
+          <div className="t">위 검색창에서 부품을 고르세요</div>
+          <div className="d">즐겨찾기·최근기록에서 부품을 눌러 들어와도 됩니다</div>
         </div>
       )}
 

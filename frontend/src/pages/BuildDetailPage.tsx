@@ -4,22 +4,17 @@ import { useQuery } from "@tanstack/react-query";
 import { api, type BuildDetail, type BuildItemDetail } from "../lib/api";
 import { useMaWindow } from "../lib/settings";
 import { useDeleteBuild } from "../lib/useDeleteBuild";
-
-// 게이지 위치 매핑: diff_percent를 -GAUGE_RANGE~+GAUGE_RANGE 구간으로 클램프해서
-// 바 위 0~100% 위치로 선형 매핑 (범위 자체는 REFERENCE.md에 수치가 없어 임의로 잡은
-// 시각화용 가정값). 적정가 음영 구간은 services/verdict.py의 VERDICT_THRESHOLD_PERCENT(±5%)를
-// 그대로 반영.
-const GAUGE_RANGE = 30;
-const VERDICT_THRESHOLD_PERCENT = 5;
-
-function markerPosition(diffPercent: number | null): number {
-  if (diffPercent === null) return 50;
-  const clamped = Math.max(-GAUGE_RANGE, Math.min(GAUGE_RANGE, diffPercent));
-  return ((clamped + GAUGE_RANGE) / (GAUGE_RANGE * 2)) * 100;
-}
-
-const ZONE_LEFT = ((-VERDICT_THRESHOLD_PERCENT + GAUGE_RANGE) / (GAUGE_RANGE * 2)) * 100;
-const ZONE_WIDTH = ((VERDICT_THRESHOLD_PERCENT * 2) / (GAUGE_RANGE * 2)) * 100;
+import Answer, { errorMessage } from "../components/Answer";
+import { manwon, shortDate, signedPercent, won } from "../lib/format";
+import {
+  GAUGE_RANGE,
+  VERDICT_THRESHOLD_PERCENT,
+  ZONE_LEFT,
+  ZONE_WIDTH,
+  labelEdge,
+  markerPosition,
+  rangeGlyph,
+} from "../lib/verdictScale";
 
 // 부품을 기능 단위로 묶어서 스펙시트처럼 읽히게 함. 여기 없는 카테고리는
 // 맨 아래 "기타"로 모임 — 카테고리가 늘어나도 누락되지 않게.
@@ -30,27 +25,29 @@ const PART_GROUPS: { label: string; categories: string[] }[] = [
   { label: "섀시 · 전원", categories: ["케이스", "파워"] },
 ];
 
-function groupItems(items: BuildItemDetail[]): { label: string; items: BuildItemDetail[] }[] {
+// 색을 못 쓰므로 그룹 구분은 채움/빗금/세선/외곽선 4패턴 — 그룹이 5개
+// 이상("기타"까지)이면 순환시킴
+const FILLS = ["fill-solid", "fill-hatch", "fill-line", "fill-open"];
+
+type Group = { label: string; items: BuildItemDetail[]; total: number };
+
+function groupItems(items: BuildItemDetail[]): Group[] {
   const used = new Set<BuildItemDetail>();
+  const withTotal = (label: string, matched: BuildItemDetail[]): Group => ({
+    label,
+    items: matched,
+    total: matched.reduce((sum, it) => sum + (it.price ?? 0), 0),
+  });
+
   const groups = PART_GROUPS.map((g) => {
     const matched = items.filter((it) => g.categories.includes(it.category));
     matched.forEach((it) => used.add(it));
-    return { label: g.label, items: matched };
+    return withTotal(g.label, matched);
   }).filter((g) => g.items.length > 0);
 
   const rest = items.filter((it) => !used.has(it));
-  if (rest.length > 0) groups.push({ label: "기타", items: rest });
+  if (rest.length > 0) groups.push(withTotal("기타", rest));
   return groups;
-}
-
-function manwon(value: number): string {
-  return `${(value / 10000).toFixed(1)}만원`;
-}
-
-function verdictTagClass(verdict: string | null): string {
-  if (verdict === "고가") return "verdict-tag high";
-  if (verdict === "저가") return "verdict-tag low";
-  return "verdict-tag";
 }
 
 export default function BuildDetailPage() {
@@ -64,12 +61,33 @@ export default function BuildDetailPage() {
     enabled: Number.isFinite(buildId),
   });
 
-  if (isLoading) return <div className="status-line">불러오는 중...</div>;
+  if (isLoading) {
+    return (
+      <Answer
+        state="pending"
+        kick="판정 · 조회 중"
+        headline={
+          <>
+            부품 가격을 <mark>하나씩 다시 조회하는 중</mark>입니다
+          </>
+        }
+        because="저장된 가격을 쓰지 않고 매번 다나와에 다시 물어봅니다 — 부품 수만큼 걸립니다"
+      />
+    );
+  }
   if (isError || !data) {
     return (
-      <div className="status-line error">
-        빌드를 불러오지 못했습니다: {error instanceof Error ? error.message : "알 수 없는 오류"}
-      </div>
+      <Answer
+        state="failed"
+        kick="판정"
+        headline={
+          <>
+            이 빌드를 <mark>불러오지 못했습니다</mark>
+          </>
+        }
+        because={<>{errorMessage(error)}</>}
+        actions={<Link className="btn-secondary" to="/build">빌드 목록으로</Link>}
+      />
     );
   }
 
@@ -112,93 +130,178 @@ function BuildDetailView({ data }: { data: BuildDetail }) {
     null
   );
   const missingCount = data.items.length - priced.length;
+  const topShare = topItem ? (topItem.price! / data.total_price) * 100 : 0;
 
   let rowIndex = 0;
 
+  const verdictWord =
+    data.verdict === "고가" ? "비쌉니다" : data.verdict === "저가" ? "쌉니다" : null;
+
   return (
     <div>
-      <div className="section-label">BUILD DETAIL</div>
-      <div className="detail-head">
-        <Link className="btn-ghost" to="/build">← 목록으로</Link>
-        <h2>{data.name}</h2>
-        <button className="btn-ghost" style={{ marginLeft: "auto" }} onClick={() => window.print()}>
-          견적서 인쇄
-        </button>
-        <button
-          className="btn-delete"
-          onClick={() => deleteBuild(data.id, data.name)}
-          disabled={isDeleting}
-          aria-label="빌드 삭제"
-          title="빌드 삭제"
-        >
-          ×
-        </button>
-      </div>
+      {data.diff_percent != null ? (
+        <Answer
+          kick={`판정 · ${data.ma_window ?? "N"}일 이동평균 기준`}
+          headline={
+            verdictWord ? (
+              <>
+                이 견적은 기준가보다{" "}
+                <mark>
+                  {Math.abs(data.diff_percent)}% {verdictWord}
+                </mark>
+              </>
+            ) : (
+              <>
+                이 견적은 <mark>기준가와 거의 같습니다</mark>
+              </>
+            )
+          }
+          because={
+            <>
+              {/* 기준가는 항상 verdict_basis_price(이동평균) — compareValue를 쓰면
+                  market_price가 있는 빌드에서 "판매가 = 기준가"로 같은 숫자가
+                  두 번 찍힘 */}
+              {hasMarketPrice ? "판매가" : "실측 합계"}{" "}
+              <b>{won(hasMarketPrice ? data.market_price! : data.total_price)}원</b>
+              {data.verdict_basis_price != null && (
+                <>
+                  {" "}
+                  · 기준가 <b>{won(data.verdict_basis_price)}원</b> · 차이{" "}
+                  <b>
+                    {signedPercent(data.diff_percent)} (
+                    {won(
+                      Math.abs(
+                        (hasMarketPrice ? data.market_price! : data.total_price) -
+                          data.verdict_basis_price
+                      )
+                    )}
+                    원)
+                  </b>
+                </>
+              )}
+              <br />
+              적정 밴드는 ±{VERDICT_THRESHOLD_PERCENT}%
+              {fallbackCodes.size > 0 ? (
+                <>
+                  {" "}
+                  — {data.items.length}개 부품 중 <b>{fallbackCodes.size}개</b>는 이동평균 대신
+                  즉시가로 대체 적용
+                </>
+              ) : (
+                " — 전 부품에 이동평균이 정상 적용됨"
+              )}
+            </>
+          }
+          actions={
+            <>
+              <Link className="btn-ghost" to="/build">← 목록으로</Link>
+              <button className="btn-ghost" onClick={() => window.print()}>견적 인쇄</button>
+              <button
+                className="btn-delete"
+                onClick={() => deleteBuild(data.id, data.name)}
+                disabled={isDeleting}
+                aria-label="빌드 삭제"
+                title="빌드 삭제"
+              >
+                ×
+              </button>
+            </>
+          }
+        />
+      ) : (
+        <Answer
+          state="failed"
+          kick="판정"
+          headline={
+            <>
+              가격을 조회하지 못해 <mark>판정할 수 없습니다</mark>
+            </>
+          }
+          because={
+            <>
+              {data.name} · 부품 {data.items.length}종 중 <b>{missingCount}종</b>의 가격을 가져오지
+              못했습니다
+              <br />
+              다나와 응답이 정상으로 돌아오면 다시 조회할 때 자동으로 판정됩니다
+            </>
+          }
+          actions={
+            <>
+              <Link className="btn-ghost" to="/build">← 목록으로</Link>
+              <button
+                className="btn-delete"
+                onClick={() => deleteBuild(data.id, data.name)}
+                disabled={isDeleting}
+                aria-label="빌드 삭제"
+                title="빌드 삭제"
+              >
+                ×
+              </button>
+            </>
+          }
+        />
+      )}
 
       {isDeleteError && (
-        <div className="status-line error">
-          삭제 실패: {deleteError instanceof Error ? deleteError.message : "알 수 없는 오류"}
-        </div>
+        <div className="status-line error">삭제 실패: {errorMessage(deleteError)}</div>
       )}
 
       <div className="strip">
         <div className="st">
           <p className="st-k">부품 구성</p>
           <p className="st-v">
-            {data.items.length}종
-            {missingCount > 0 && <em>{missingCount}종 가격 조회 실패</em>}
+            {data.items.length}종 · {groups.length}그룹
           </p>
+          <p className="st-s">{missingCount > 0 ? `${missingCount}종 가격 조회 실패` : "누락 없음"}</p>
         </div>
         <div className="st">
-          <p className="st-k">최고가 부품</p>
+          <p className="st-k">최고 비중</p>
           <p className="st-v">
-            {topItem ? topItem.category : "—"}
-            {topItem && (
-              <em>
-                {manwon(topItem.price!)} · 전체의{" "}
-                {((topItem.price! / data.total_price) * 100).toFixed(0)}%
-              </em>
-            )}
+            {topItem ? `${topItem.category} ${topShare.toFixed(1)}%` : "—"}
           </p>
+          <p className="st-s">{topItem ? `${won(topItem.price!)}원` : "가격 조회 실패"}</p>
         </div>
         <div className="st">
           <p className="st-k">판정 기준</p>
-          <p className="st-v">
-            {data.ma_window != null ? `${data.ma_window}일 이동평균` : "—"}
-            {data.verdict_confidence === "low" && <em>일부 부품 즉시가 대체</em>}
-            {data.verdict_confidence === "high" && <em>전 부품 이동평균 적용</em>}
+          <p className="st-v">{data.ma_window != null ? `${data.ma_window}일 이동평균` : "—"}</p>
+          <p className="st-s">
+            {data.verdict_confidence === "low"
+              ? "일부 부품 즉시가 대체"
+              : data.verdict_confidence === "high"
+                ? "전 부품 이동평균 적용"
+                : "설정에서 변경"}
           </p>
         </div>
         <div className="st">
           <p className="st-k">판정</p>
           <p className="st-v">
-            {data.verdict ?? "—"}
-            {data.verdict == null && <em>가격 조회 실패로 판정 불가</em>}
-            {data.diff_percent != null && (
-              <em>
-                {data.diff_percent > 0 ? "+" : ""}
-                {data.diff_percent}% vs {data.market_price != null ? "판매가" : "평균가"}
-              </em>
-            )}
+            {data.verdict != null
+              ? `${data.verdict === "고가" ? "▲" : data.verdict === "저가" ? "▼" : "—"} ${data.verdict}`
+              : "—"}
+          </p>
+          <p className="st-s">
+            {data.diff_percent != null
+              ? `기준가 대비 ${signedPercent(data.diff_percent)}`
+              : "가격 조회 실패로 판정 불가"}
           </p>
         </div>
       </div>
 
       <div className="total-row">
         <div>
-          <p className="total-label">실측 합계</p>
+          <p className="total-label">실측 합계 · 즉시 최저가</p>
           <p className="total-num">
-            {data.total_price.toLocaleString()}<span>원</span>
+            {won(data.total_price)}<span>원</span>
           </p>
         </div>
         <p className="total-meta">
-          다나와 실시간 최저가 기준
+          저장 <b>{shortDate(data.created_at)}</b>
           <br />
-          {new Date(data.created_at).toLocaleDateString("ko-KR")} 저장
+          다나와 실시간 최저가 기준
           {data.verdict_basis_price_formatted && (
             <>
               <br />
-              판정 기준가 {data.verdict_basis_price_formatted}
+              판정 기준가 <b>{data.verdict_basis_price_formatted}</b>
             </>
           )}
         </p>
@@ -210,43 +313,92 @@ function BuildDetailView({ data }: { data: BuildDetail }) {
             <div className="confirm-col">
               <p className="confirm-k">실측 합계</p>
               <p className="confirm-num">
-                {data.total_price.toLocaleString()}<span>원</span>
+                {won(data.total_price)}<span>원</span>
               </p>
             </div>
             <div className="confirm-arrow">→</div>
             <div className="confirm-col">
               <p className="confirm-k">{compareLabel}</p>
               <p className="confirm-num">
-                {compareValue.toLocaleString()}<span>원</span>
+                {won(compareValue)}<span>원</span>
               </p>
             </div>
-          </div>
 
-          <p className={`diff-badge${data.diff_percent < 0 ? " dn" : ""}`}>
-            {data.diff_percent > 0 ? "▲" : data.diff_percent < 0 ? "▼" : "—"}{" "}
-            {Math.abs(compareValue - data.total_price).toLocaleString()}원 ·{" "}
-            {data.diff_percent > 0 ? "+" : ""}
-            {data.diff_percent}%
-          </p>
+            {/* 두 배지의 기준이 서로 다름 — 원 차액은 실측 합계 대비,
+                증감률은 판정 기준가 대비 */}
+            <div className="deltas">
+              <div className="diff-badge">
+                <span className="base">실측 대비 차액</span>
+                <b>
+                  {compareValue > data.total_price ? "▲" : compareValue < data.total_price ? "▼" : "—"}{" "}
+                  {won(Math.abs(compareValue - data.total_price))}원
+                </b>
+              </div>
+              <div className="diff-badge fill">
+                <span className="base">기준가 대비 증감률</span>
+                <b>
+                  {data.verdict === "고가" ? "▲" : data.verdict === "저가" ? "▼" : "—"}{" "}
+                  {signedPercent(data.diff_percent)}
+                </b>
+              </div>
+            </div>
+          </div>
 
           <div className="gauge-track">
             <div className="gauge-zone" style={{ left: `${ZONE_LEFT}%`, width: `${ZONE_WIDTH}%` }} />
             <div className="gauge-marker" style={{ left: `${mounted ? markerPos : 50}%` }} />
-            {data.diff_percent != null && (
-              <span className="gauge-marker-value" style={{ left: `${mounted ? markerPos : 50}%` }}>
-                {data.diff_percent > 0 ? "+" : ""}
-                {data.diff_percent}%
-              </span>
-            )}
+            <span
+              className="gauge-marker-value"
+              data-edge={mounted ? labelEdge(markerPos) : undefined}
+              style={{ left: `${mounted ? markerPos : 50}%` }}
+            >
+              {/* 범위 밖이면 마커가 끝에 클램프되므로 값만 보여주면 "딱 ±30%"와
+                  구분이 안 됨 */}
+              {rangeGlyph(data.diff_percent)} {signedPercent(data.diff_percent)}
+            </span>
           </div>
           <div className="gauge-labels">
-            <span>저가</span>
+            <span>저가 −{GAUGE_RANGE}%</span>
             <span>적정 ±{VERDICT_THRESHOLD_PERCENT}%</span>
-            <span>고가</span>
+            <span>고가 +{GAUGE_RANGE}%</span>
           </div>
-
-          {data.verdict && <div className={verdictTagClass(data.verdict)} style={{ marginTop: 18 }}>{data.verdict} 판정</div>}
         </div>
+      )}
+
+      {groups.length > 1 && data.total_price > 0 && (
+        <>
+          <div className="sec-head">
+            <h3 className="sec-title">돈이 몰린 곳</h3>
+            <span className="sec-note">그룹 {groups.length} · 합계 {won(data.total_price)}원</span>
+          </div>
+          <div
+            className="stack-bar"
+            style={{ marginTop: 26 }}
+            role="img"
+            aria-label={groups
+              .map((g) => `${g.label} ${((g.total / data.total_price) * 100).toFixed(1)}%`)
+              .join(", ")}
+          >
+            {groups.map((g, i) => (
+              <i
+                key={g.label}
+                className={FILLS[i % FILLS.length]}
+                style={{ width: `${(g.total / data.total_price) * 100}%` }}
+              />
+            ))}
+          </div>
+          <div className="legend">
+            {groups.map((g, i) => (
+              <div key={g.label}>
+                <span className={`sw ${FILLS[i % FILLS.length]}`} />
+                {g.label}{" "}
+                <b>
+                  {((g.total / data.total_price) * 100).toFixed(1)}% · {won(g.total)}
+                </b>
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       <div className="sec-head">
@@ -256,7 +408,10 @@ function BuildDetailView({ data }: { data: BuildDetail }) {
 
       {groups.map((group) => (
         <div key={group.label}>
-          <p className="grp">{group.label}</p>
+          <p className="grp">
+            {group.label}
+            <span className="amt">{won(group.total)}</span>
+          </p>
           <div className="spec-row-container">
           {group.items.map((item) => {
             const share = item.price != null ? (item.price / data.total_price) * 100 : 0;
@@ -280,7 +435,8 @@ function BuildDetailView({ data }: { data: BuildDetail }) {
                 </div>
                 <div>
                   <p className={`spec-price${item.price == null ? " missing" : ""}`}>
-                    {item.price != null ? manwon(item.price) : "조회 실패"}
+                    {item.price != null ? won(item.price) : "조회 실패"}
+                    {item.price != null && <em>{manwon(item.price)}</em>}
                   </p>
                   {item.price != null && (
                     <p className="prop-bar">
@@ -297,7 +453,7 @@ function BuildDetailView({ data }: { data: BuildDetail }) {
 
       <div className="sum">
         <span className="sum-k">실측 합계</span>
-        <span className="sum-val">{data.total_price_formatted}</span>
+        <span className="sum-val">{won(data.total_price)}원</span>
       </div>
     </div>
   );

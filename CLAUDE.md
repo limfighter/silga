@@ -104,9 +104,15 @@ backend/app/
   schemas/           Pydantic 요청/응답 모델, API 계약과 1:1 대응
 
 frontend/src/
-  components/        AppShell(사이드바/탑바), PartRow(자동완성 행)
-  pages/             Search, BuildList, BuildCreate, BuildDetail, Placeholder
-  lib/               api.ts(백엔드 클라이언트), useDebouncedValue.ts
+  components/        AppShell(사이드바/탑바), PartRow(자동완성 행),
+                     PartSearchPanel(빌드 생성 전용 검색 패널),
+                     Answer(전 화면 결론 블록), BuildCard, VerdictAxis
+  pages/             Home, Search, BuildList, BuildCreate, BuildDetail,
+                     Favorites, RecentHistory, Stats, Settings
+  lib/               api.ts(백엔드 클라이언트), useDebouncedValue.ts,
+                     settings.ts, recentProducts.ts, useDeleteBuild.ts,
+                     format.ts(표시 포맷), verdictScale.ts(판정 좌표계 —
+                     상세 게이지와 홈 판정 축이 공유, 한쪽만 바꾸지 말 것)
   styles/global.css  디자인 토큰 CSS 변수
 
 scripts/             e2e_smoke_test.py (위 참조)
@@ -165,6 +171,12 @@ Vite SPA (Next.js/SSR 아님 — 백엔드가 이미 별도 FastAPI 서비스로
 Tailwind, CSS-in-JS 미사용. 2026-08-05 사용자 제공 참조 디자인으로 톤 전면
 교체: 종이/잉크(paper/ink) 에디토리얼, 모노크롬(accent color 없음, 상태는
 ▲▼— 기호로 구분), border-radius/box-shadow 글로우 미사용(hairline 보더만).
+선 두께는 `--rule-1/2/3`(1/2/4px) 3단 고정 — 이 셋 밖의 두께를 쓰지 말 것.
+**모든 화면의 헤더는 `components/Answer.tsx`(결론 블록)를 쓴다** — 화면 이름을
+되풀이하는 대신 "그래서 결론이 뭔데"를 첫 줄에 놓는 구조이고, 로딩/실패
+상태(`state="pending"|"failed"`)를 반드시 같이 넘길 것. 데이터 소스가
+스크래퍼라 "판정 불가"가 예외가 아니라 정상 상태 중 하나임. 새 화면에서
+헤더 마크업을 직접 복제하지 말 것.
 Pretendard(본문·헤드라인 전체) + IBM Plex Mono(데이터/코드) — 이전
 Black Han Sans/시안·마젠타·앰버 네온 톤은 폐기. 상세는 REFERENCE.md
 #디자인-토큰 참조.

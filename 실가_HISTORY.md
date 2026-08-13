@@ -2333,3 +2333,89 @@ backend v0.10.1 → v0.11, frontend v0.12.1 → v0.13.
     대기로 바꾸니 정상 확인됨 — 비동기 UI 삭제/갱신을 Playwright로 검증할
     땐 고정 sleep 대신 조건 대기를 쓸 것(다음에도 참고)
   → npm run typecheck 통과, Playwright pageerror 0건
+
+---
+
+### 2026-08-13
+
+#### backend v0.12 / frontend v0.14 — 사용자 제공 C안 목업 전면 적용
+
+[✓] 발단
+    → 사용자가 직접 작성한 목업(8화면 전체, [C] 주석으로 변경분 표시)을
+      리뷰 요청. 리뷰 결과 "넣을 것 10건 / 결정이 필요해 뺄 것 5건"으로
+      정리했고, 사용자가 "1~10 적용, 홈 판정축은 개편안 고려, 검색 견적
+      카트는 넣는 걸로, 셸 교체도 진행, 나머지 두 개는 자율"로 범위 확정
+    → **리뷰 중 낸 오판 정정**: "검색 견적 카트는 신규 기능이라 결정 필요"
+      라고 했으나 실제로는 2026-08-06에 이미 구현돼 있었음(SearchPage.tsx +
+      global.css .cart-panel 계열). 목업이 더한 건 진행 틱 8칸과 러닝 소계
+      두 개뿐 — 결정할 것도, 빌드 생성 입구가 갈릴 일도 없었음
+
+[✓] backend v0.11 → v0.12 — BuildSummary.diff_percent
+    → schemas/build.py에 필드 추가, main.py list_builds에서
+      `verdict, _ = calc_verdict(...)` → `verdict, diff_percent = ...`
+      로 버리던 값을 받아 응답에 실음. 추가 스크래핑 0
+    → 계약에 필드가 추가된 것이므로 두 번째 자리
+
+[✓] frontend v0.13.1 → v0.14
+    → components/Answer.tsx 신규 — 전 화면 공통 결론 블록. state 3종
+      (ready/pending/failed)을 컴포넌트가 직접 다룸. 목업에는 로딩/실패
+      상태가 아예 없었고(.status-line/.empty-state가 CSS만 있고 8화면
+      어디에도 안 쓰임) 이 앱의 데이터 소스는 스크래퍼라 "판정 불가"가
+      정상 상태 중 하나여서 직접 설계해 넣음
+    → components/BuildCard.tsx 신규 — 홈/빌드목록에 복붙돼 있던 카드 추출
+    → lib/format.ts 신규 — won/manwon/shortDate/verdictGlyph/signedPercent
+    → global.css: --rule-1/2/3 두께 토큰 도입 후 전 파일 기계적 치환,
+      .answer/.stack-bar/.legend/.bc-diff/.cart-sum/.set-list/.grp .amt
+      신규, 죽은 블록 제거(.build-header/.detail-head/.verdict/.verdict-tag/
+      .home-actions/.form-shell/.breakdown/.b-row — 전부 TSX 미사용 확인 후)
+    → AppShell: 사이드바 접힘(햄버거) 폐기, 탑바 잉크+블러 → 페이퍼+헤어라인
+
+[✓] 인쇄 배경 소실 버그 (이번 변경 중 유일한 실제 버그)
+    → .answer h2 mark / .sum / .diff-badge.fill / .bc-tag / .gauge-track /
+      .stack-bar가 전부 "잉크 배경 + 페이퍼 글자"인데 브라우저는 기본적으로
+      배경을 인쇄하지 않음 → 흰 종이에 흰 글자로 결론만 사라짐
+    → @media print에 `*{print-color-adjust:exact}` 추가. 앞으로 잉크 채움
+      요소를 새로 만들어도 자동 커버됨
+
+[검증] 다나와가 샌드박스에서 막혀 있어(503) danawa 모듈만 고정 데이터로
+    갈아끼운 스텁 서버를 스크래치패드에 만들어 happy path를 스크린샷 확인
+    (9화면 + 인쇄 미디어). 확인 중 실제 버그 2건을 잡음:
+    → 상세 .because의 "기준가"에 compareValue를 넣어서 market_price가 있는
+      빌드에서 판매가와 같은 숫자가 두 번 찍힘 → verdict_basis_price로 교정
+    → 게이지 마커 말풍선이 위 .deltas 배지와 겹침 → .gauge-track
+      margin-top 22px→50px
+    npm run typecheck / npm run build 통과, Playwright pageerror 0건.
+    **라이브 다나와 검증은 못 함(샌드박스 네트워크 정책)** — 로컬에서
+    실데이터로 한 번 더 확인 필요
+
+#### frontend v0.14.1 — 홈 판정 축(.axis) 추가 (개편안 B 채택)
+
+[✓] 목업 원안(핀마다 라벨 상시 노출, 위/아래 두 줄 번갈아)은 적정 밴드에
+    빌드가 몰리면 그대로 겹쳤음 — 그게 오히려 정상 상태라 더 문제.
+    사용자가 개편안 B 채택: 기본은 눈금만 있는 자(ruler), 라벨은
+    hover/포커스한 핀 하나만. 빌드 개수와 무관하게 안 깨짐
+
+[✓] lib/verdictScale.ts 신규 — GAUGE_RANGE/VERDICT_THRESHOLD_PERCENT/
+    markerPosition/labelEdge/rangeGlyph/ZONE_*. 상세 게이지와 홈 축이
+    "같은 자"를 써야 두 화면을 오갈 때 위치 감각이 유지되므로 한 곳으로
+    모으고 BuildDetailPage도 여기서 가져다 쓰게 정리
+
+[✓] components/VerdictAxis.tsx 신규
+    → 클램프 밖(±30% 초과) 빌드는 값만 보면 "딱 ±30%"와 구분이 안 되므로
+      «/» 글리프 + 굵은 눈금으로 표시
+    → verdict_confidence "low"는 카드(.bc-diff.low)와 같은 파선 규칙을
+      눈금에도 적용
+    → 인쇄 대체 경로(.axis-list): 종이에는 hover도 포커스도 없으므로 축
+      아래에 정렬된 목록을 항상 렌더하고 @media print에서만 펼침
+
+[검증] 최악 케이스를 만든 스텁 시드로 확인 — 적정 밴드에 6개가 몰리고
+    (+0.5/+0.5/+0.6/+1.6/+3.1/+3.6), 범위 밖 1개(+125.8%), low
+    confidence 2개. 확인 중 잡은 것:
+    → 핀 히트 영역이 눈금 폭(2px) 그대로여서 마우스로 짚을 수가 없었음
+      (Playwright도 "not visible"로 판정) → 보이지 않는 18px 폭을 주고
+      눈금을 중앙 정렬
+    → 축 바탕을 paper-2 + 밴드를 paper로 뒀더니 적정 밴드가 사실상
+      안 보였음 → 상세 게이지와 동일하게 잉크 트랙 + 페이퍼 밴드로 통일.
+      눈금/라벨 색도 "자기가 놓인 바닥의 반대색" 규칙으로 정리(잉크 트랙
+      위에 잉크 칩을 올리니 경계가 사라져 글자만 떠 보였음)
+    npm run typecheck / build 통과, Playwright pageerror 0건
