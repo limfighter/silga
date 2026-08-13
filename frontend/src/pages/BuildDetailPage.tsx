@@ -6,30 +6,15 @@ import { useMaWindow } from "../lib/settings";
 import { useDeleteBuild } from "../lib/useDeleteBuild";
 import Answer, { errorMessage } from "../components/Answer";
 import { manwon, shortDate, signedPercent, won } from "../lib/format";
-
-// 게이지 위치 매핑: diff_percent를 -GAUGE_RANGE~+GAUGE_RANGE 구간으로 클램프해서
-// 바 위 0~100% 위치로 선형 매핑 (범위 자체는 REFERENCE.md에 수치가 없어 임의로 잡은
-// 시각화용 가정값). 적정가 음영 구간은 services/verdict.py의 VERDICT_THRESHOLD_PERCENT(±5%)를
-// 그대로 반영.
-const GAUGE_RANGE = 30;
-const VERDICT_THRESHOLD_PERCENT = 5;
-
-function markerPosition(diffPercent: number | null): number {
-  if (diffPercent === null) return 50;
-  const clamped = Math.max(-GAUGE_RANGE, Math.min(GAUGE_RANGE, diffPercent));
-  return ((clamped + GAUGE_RANGE) / (GAUGE_RANGE * 2)) * 100;
-}
-
-// 클램프 때문에 범위 밖 빌드는 마커가 양 끝에 붙음 — 그때 라벨을 가운데
-// 정렬한 채로 두면 트랙 밖으로 잘려나가므로 안쪽으로 접음
-function labelEdge(pos: number): "l" | "r" | undefined {
-  if (pos < 12) return "l";
-  if (pos > 88) return "r";
-  return undefined;
-}
-
-const ZONE_LEFT = ((-VERDICT_THRESHOLD_PERCENT + GAUGE_RANGE) / (GAUGE_RANGE * 2)) * 100;
-const ZONE_WIDTH = ((VERDICT_THRESHOLD_PERCENT * 2) / (GAUGE_RANGE * 2)) * 100;
+import {
+  GAUGE_RANGE,
+  VERDICT_THRESHOLD_PERCENT,
+  ZONE_LEFT,
+  ZONE_WIDTH,
+  labelEdge,
+  markerPosition,
+  rangeGlyph,
+} from "../lib/verdictScale";
 
 // 부품을 기능 단위로 묶어서 스펙시트처럼 읽히게 함. 여기 없는 카테고리는
 // 맨 아래 "기타"로 모임 — 카테고리가 늘어나도 누락되지 않게.
@@ -367,7 +352,9 @@ function BuildDetailView({ data }: { data: BuildDetail }) {
               data-edge={mounted ? labelEdge(markerPos) : undefined}
               style={{ left: `${mounted ? markerPos : 50}%` }}
             >
-              {signedPercent(data.diff_percent)}
+              {/* 범위 밖이면 마커가 끝에 클램프되므로 값만 보여주면 "딱 ±30%"와
+                  구분이 안 됨 */}
+              {rangeGlyph(data.diff_percent)} {signedPercent(data.diff_percent)}
             </span>
           </div>
           <div className="gauge-labels">

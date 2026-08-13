@@ -5,6 +5,7 @@ import { useMaWindow } from "../lib/settings";
 import { useDeleteBuild } from "../lib/useDeleteBuild";
 import Answer, { errorMessage } from "../components/Answer";
 import BuildCard from "../components/BuildCard";
+import VerdictAxis from "../components/VerdictAxis";
 import { manwon, won } from "../lib/format";
 
 const RECENT_BUILD_COUNT = 4;
@@ -156,6 +157,8 @@ export default function HomePage() {
           </div>
         </div>
       )}
+
+      {builds.length > 0 && <VerdictAxis builds={builds} />}
 
       {recentBuilds.length > 0 && (
         <>

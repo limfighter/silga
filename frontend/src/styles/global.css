@@ -917,6 +917,70 @@ input,select{font-family:inherit;}
   margin-left:auto;text-align:right;
 }
 
+/* ── 홈 판정 축 ─────────────────────────────────────────────
+   빌드 상세 게이지와 같은 좌표계(±30%, 적정 ±5%)에 저장된 빌드를 전부 올림.
+   라벨을 상시 노출하면 적정 밴드에 빌드가 몰릴 때(정상 상태다) 그대로
+   겹치므로, 기본은 눈금만 있는 자로 두고 hover/포커스한 핀 하나만 라벨을
+   띄운다 — 빌드 개수와 무관하게 안 깨지는 유일한 방식 */
+/* 트랙/밴드 색은 빌드 상세 게이지(.gauge-track)와 동일하게 — 같은 좌표계를
+   쓰는 이상 시각 언어도 같아야 두 화면을 오갈 때 감각이 이어진다.
+   페이퍼-2 바탕에 페이퍼 밴드로 뒀더니 밴드가 사실상 안 보였음 */
+.axis{
+  position:relative;height:48px;margin-top:26px;
+  background:var(--ink);border:var(--rule-2) solid var(--ink);
+}
+.axis-zone{
+  position:absolute;top:0;bottom:0;background:var(--paper);
+  border-left:var(--rule-2) solid var(--ink);border-right:var(--rule-2) solid var(--ink);
+}
+.axis-mid{position:absolute;top:0;bottom:0;left:50%;width:var(--rule-1);background:var(--line-lt);}
+/* 눈금 자체는 2px지만 그걸 그대로 히트 영역으로 두면 마우스로 짚을 수가
+   없음 — 보이지 않는 18px 폭을 주고 눈금을 그 안에 중앙 정렬한다 */
+.axis-pin{
+  position:absolute;top:0;bottom:0;
+  width:18px;margin-left:-9px;text-decoration:none;
+}
+/* 눈금 색은 자기가 서 있는 바닥의 반대색 — 밴드 밖은 잉크 트랙 위라 페이퍼,
+   밴드 안은 페이퍼 위라 잉크 */
+.axis-pin i{
+  position:absolute;top:0;bottom:0;left:50%;
+  width:2px;margin-left:-1px;background:var(--paper);
+}
+.axis-pin.in i{background:var(--ink);}
+/* 이동평균이 즉시가로 대체된 빌드 — 카드 .bc-diff.low와 같은 파선 규칙 */
+.axis-pin.low i{
+  background:repeating-linear-gradient(180deg,var(--paper) 0 4px,transparent 4px 8px);
+}
+.axis-pin.in.low i{
+  background:repeating-linear-gradient(180deg,var(--ink) 0 4px,transparent 4px 8px);
+}
+/* 클램프로 양 끝에 붙은 핀 — 값만 보면 "딱 ±30%"와 구분이 안 되므로 굵게 */
+.axis-pin.out i{width:4px;margin-left:-2px;}
+/* 라벨도 눈금과 같은 규칙 — 자기가 놓이는 바닥의 반대색이어야 칩으로 읽힌다.
+   잉크 트랙 위에 잉크 칩을 올리면 경계가 사라져 글자만 떠 보였음 */
+.axis-pin b{
+  position:absolute;top:50%;transform:translateY(-50%);
+  font-family:var(--font-mono);font-size:10.5px;font-weight:600;white-space:nowrap;
+  background:var(--paper);color:var(--ink);padding:3px 7px;
+  opacity:0;pointer-events:none;transition:opacity .12s;
+}
+.axis-pin.l b{left:14px;}
+.axis-pin.r b{right:14px;}
+.axis-pin.in b{background:var(--ink);color:var(--paper);}
+.axis-pin:hover,.axis-pin:focus-visible{z-index:2;}
+.axis-pin:hover i,.axis-pin:focus-visible i{width:4px;margin-left:-2px;}
+.axis-pin:hover b,.axis-pin:focus-visible b{opacity:1;}
+.axis-cap{
+  display:flex;justify-content:space-between;margin-top:9px;
+  font-family:var(--font-mono);font-size:10.5px;letter-spacing:.08em;color:var(--mute-lt);
+}
+.axis-hint{
+  margin-top:8px;font-family:var(--font-mono);font-size:11px;color:var(--mute-lt);
+}
+/* 인쇄 대체 경로 — 종이에는 hover도 포커스도 없다. 화면에서는 접근성 트리에
+   남기지 않아도 됨(핀 자체가 aria-label을 갖고 있음) */
+.axis-list{display:none;}
+
 /* ── 돈이 몰린 곳 — 스택 바 + 범례 ──────────────────────────
    색을 못 쓰므로(모노크롬 원칙) 채움/빗금/세선/외곽선 4패턴으로 구분.
    빗금 간격은 3px 이상 — 1~2px로 좁히면 화면 축소·인쇄에서 모아레가 생기거나
@@ -1055,5 +1119,20 @@ input,select{font-family:inherit;}
   .rv{opacity:1 !important;transform:none !important;}
   .prop-bar i{transition:none;}
   .gauge-marker,.gauge-marker-value{transition:none;}
-  .spec-row,.strip,.sum,.gauge-card,.stack-bar,.answer{break-inside:avoid;}
+  /* 판정 축은 hover 라벨이 전제라 종이에서는 눈금만 남음 — 축은 분포를
+     보여주는 그림으로 두고, 어느 핀이 어느 빌드인지는 아래 목록이 맡는다 */
+  .axis-hint{display:none;}
+  .axis-pin b{display:none;}
+  .axis-list{
+    display:block;list-style:none;margin-top:14px;
+    border-top:var(--rule-1) solid var(--line-lt);
+  }
+  .axis-list li{
+    display:grid;grid-template-columns:160px minmax(0,1fr) auto;gap:16px;
+    padding:7px 0;border-bottom:var(--rule-1) solid var(--line-lt);
+    font-size:11.5px;
+  }
+  .axis-list .al-v,.axis-list .al-p{font-family:var(--font-mono);}
+  .axis-list .al-p{text-align:right;color:var(--mute-lt);}
+  .spec-row,.strip,.sum,.gauge-card,.stack-bar,.answer,.axis{break-inside:avoid;}
 }
