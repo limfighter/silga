@@ -331,10 +331,15 @@ POST /build/compare  (신규, v0.3 — 원 계약에 없었음)
 POST /builds  (신규, v0.3 — 원 계약에 없었음)
   body: {name, market_price?, items: [{category, code}, ...]}
   → BuildSummary {id, name, market_price, created_at, item_count,
-     total_price, total_price_formatted, verdict, verdict_confidence, ma_window}
+     total_price, total_price_formatted, verdict, verdict_confidence, ma_window,
+     diff_percent}
   ※ builds/build_items DB 테이블은 있었는데 채워넣는 CRUD가 누락돼 있었음
-  ※ 생성 직후엔 verdict/verdict_confidence/ma_window 전부 null (아직 라이브
-    가격 계산 전) — 목록/상세 조회 시점에 채워짐
+  ※ 생성 직후엔 verdict/verdict_confidence/ma_window/diff_percent 전부 null
+    (아직 라이브 가격 계산 전) — 목록/상세 조회 시점에 채워짐
+  ※ diff_percent는 v0.12(2026-08-13) 추가 — BuildDetail.diff_percent와 같은
+    의미(기준가 대비 증감률). list_builds가 판정을 내리며 calc_verdict()로
+    이미 계산하던 값이라 추가 스크래핑 비용 없음. 카드(.bc-diff)에 판정
+    근거를 같이 보여주려고 실어 보냄
 
 GET  /builds?ma_window={7|14|30}  (신규, v0.3)
   → [BuildSummary, ...]  — 저장된 빌드 목록(앱 셸 "내 빌드" 카드 목록)
@@ -530,7 +535,13 @@ accent — 없음(모노크롬 원칙). 상태 구분은 색이 아니라 기호
 
 레이아웃 규칙
   border-radius 전면 미사용(카드/버튼/인풋 전부 각짐), box-shadow 글로우
-  전면 미사용 — hairline(1px) 보더로만 위계 표현
+  전면 미사용 — hairline 보더로만 위계 표현
+  룰(선) 두께는 3단 고정 (2026-08-13 도입) — 이 셋 밖의 두께를 쓰지 말 것:
+    --rule-3 (4px) 문서 구분 — 화면 최상단 .answer의 상단 룰 전용
+    --rule-2 (2px) 블록 경계 — .part-rows/.cart-panel/.spec-row-container/
+                   .set-list/.stack-bar/.gauge-track, primary·secondary 버튼
+    --rule-1 (1px) 행 구분/헤어라인 — 그 밖의 모든 선
+    (예외: .gauge-marker의 삼각형처럼 "선이 아닌 도형"의 border는 해당 없음)
   CSS Grid에 "그리드 라인 트릭"(컨테이너 background + gap:1px) 쓸 때 자식
   개수가 고정이 아니면 빈 셀에 컨테이너 배경이 그대로 노출되는 버그 발생
   (build-grid에서 실측 발견) — 아이템 수가 가변인 그리드는 개별 카드에
@@ -538,10 +549,29 @@ accent — 없음(모노크롬 원칙). 상태 구분은 색이 아니라 기호
   자식이 항상 꽉 채워지므로 트릭 사용 가능
 
 시그니처 요소
+  결론 블록 .answer (2026-08-13 도입, 전 화면 공통 헤더)
+    화면 최상단 4px ink 룰 + kick(모노 킥커) + h2(결론 한 문장, 핵심어는
+    <mark>로 잉크 반전) + because(근거 1~2줄) + answer-acts(액션).
+    이전의 .section-label("DASHBOARD") + .build-header h2("홈") 조합을
+    대체함 — 화면 이름만 되풀이해 정보량이 0이었기 때문.
+    ⚠️ state 3종을 반드시 함께 다룰 것: ready / pending / failed.
+    데이터 소스가 스크래퍼라 "결론이 아직 없음/낼 수 없음"이 예외가 아니라
+    정상 상태 중 하나임. 상단 4px 룰은 어느 상태에서나 유지하고(문서 구조가
+    깜빡이면 안 됨) <mark>의 잉크 채움만 밑줄로 낮춘다.
+    구현: frontend/src/components/Answer.tsx — 새 화면을 추가할 때 헤더는
+    이 컴포넌트를 쓸 것(직접 마크업 복제 금지)
+
   판정 게이지 — 예전 SVG 반원 다이얼+니들에서 flat 수평 바(.gauge-track/
   .gauge-zone/.gauge-marker)로 교체. diff_percent를 ±30% 클램프해 바
   0~100% 위치에 매핑, VERDICT_THRESHOLD_PERCENT(±5%) 구간을 음영(.gauge-zone)
-  으로 표시
+  으로 표시. 마커는 페이퍼 심지 + 잉크 테두리 — 통짜 잉크로 두면 저가/고가
+  구간(잉크로 채운 트랙)에서 배경에 묻혀 사라짐. 라벨은 클램프로 양 끝에
+  붙을 때 data-edge="l"/"r"로 안쪽 접기
+
+  돈이 몰린 곳 .stack-bar/.legend (2026-08-13) — 그룹별 금액 비중. 색을 쓸 수
+  없으므로 .fill-solid/.fill-hatch/.fill-line/.fill-open 4패턴으로 구분하고
+  스택 바 자체에 aria-label로 수치를 넣는다. 빗금/세선 간격은 3px 이상 —
+  1~2px로 좁히면 화면 축소·인쇄에서 모아레가 생기거나 통짜 회색으로 뭉개짐
 
 스펙시트 컴포넌트 (2026-08-05 2차 — 참조 디자인 요소 추가 이식)
   .strip/.st        4칸 고정 스탯 스트립(빌드 상세 상단 요약). 셀 수가 항상
@@ -564,8 +594,13 @@ accent — 없음(모노크롬 원칙). 상태 구분은 색이 아니라 기호
 
 인쇄
   빌드 상세는 견적서로 출력 가능해야 함 — @page margin 14mm, 사이드바/탑바/
-  버튼/sticky 요약은 @media print에서 숨김, .spec-row/.strip/.sum은
-  break-inside:avoid
+  버튼/sticky 요약/카트는 @media print에서 숨김, .spec-row/.strip/.sum/
+  .stack-bar/.answer는 break-inside:avoid
+  ⚠️ print-color-adjust:exact 필수 (2026-08-13 추가) — 이 디자인은 결론을
+  전부 "잉크 배경 + 페이퍼 글자"로 표현하는데(.answer h2 mark, .sum,
+  .diff-badge.fill, .bc-tag, .gauge-track, .stack-bar) 브라우저는 기본적으로
+  배경을 인쇄하지 않아서 흰 종이에 흰 글자가 됨. 잉크 채움을 쓰는 요소를
+  새로 추가해도 이 규칙 덕에 자동으로 커버됨(* 셀렉터에 걸어둠)
 ```
 
 ---
