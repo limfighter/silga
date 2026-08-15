@@ -1,32 +1,59 @@
-# GCP e2-micro 무료 티어 배포
+# GCP 배포 — 서울(asia-northeast3), 무료 체험 크레딧으로 운용 (2026-08-15)
 
 개인용 단일 VM 배포. 프론트(정적 빌드)+백엔드(FastAPI) 둘 다 이 VM 하나에서
 서빙 — nginx가 정적 파일을 직접 서빙하고 `/api/`만 로컬 uvicorn(127.0.0.1:8000)으로
 리버스 프록시. 도메인/HTTPS 없이 VM 외부 IP로 바로 접속(HTTP)하는 걸 전제로
 작성됨 — 나중에 도메인 생기면 certbot으로 HTTPS만 추가하면 됨.
 
-무료 티어 조건(Always Free, 결제계정당):
-- e2-micro 인스턴스 1개, `us-west1`/`us-central1`/`us-east1` 중 한 리전에서만
-  무료 — 다른 리전 쓰면 그 즉시 과금 대상
+## 리전 선택 — 왜 무료 티어(us-central1)가 아니라 서울인가
+
+Always Free e2-micro는 `us-west1`/`us-central1`/`us-east1` 3개 리전에서만
+적용된다. 서울(`asia-northeast3`)로 옮기면 이 무료 조건이 전부 사라지고
+VM·디스크·외부IP가 실비로 과금된다 — 대신 사용자 응답속도와 다나와
+스크래핑 왕복 지연이 크게 줄어든다(다나와가 국내 서비스라서). 이 트레이드를
+감당하는 건 **GCP 신규 가입 90일 $300 무료 체험 크레딧** — Always Free
+사용량은 이 크레딧을 안 깎지만, 서울에서는 전부 크레딧 소모 대상이다.
+
+같은 결제 계정에서 다른 워크로드(IAP/트레이딩봇)가 이미 하루 4천~1만원대를
+쓰고 있어서 크레딧이 1.5~2개월 내 소진될 전망(2026-08-15 실측 기반 추정,
+정확한 잔액은 콘솔 결제→개요에서 수시 확인 필요) — **이 서울 구성은
+크레딧이 있는 동안만 유효한 임시 배치다.** 크레딧 소진이 가까워지면 "9.
+비용 확인 + 크레딧 소진 전 되돌리기" 절차대로 us-central1 무료 티어로
+되돌릴 것.
+
+비용을 하루 300~500원대로 맞추려고 VM을 24시간이 아니라 **08:00~20:00
+(KST)만 자동 가동**하고, 그 밖의 시간은 필요할 때 수동으로 켠다(둘 다
+아래 "6-1. 인스턴스 스케줄" 참조). 이 조합이 스케줄 12시간을 매일 다
+채워도 약 310원/일 — RAM 2GB(e2-small)로 올리는 안은 24시간 상시 기준
+예산 초과라 보류하고, e2-micro(RAM 1GB)를 유지하는 대신 OOM 방지용
+스왑 파일을 둔다(아래 "2. SSH 접속" 하단 참조).
+
+무료 티어(us-central1)로 되돌릴 때 적용되는 조건(참고용, 지금 서울
+구성에는 해당 없음):
+- e2-micro 인스턴스 1개, `us-west1`/`us-central1`/`us-east1`에서만 무료
 - 영구디스크 30GB까지 무료 — **단 타입이 반드시 Standard(HDD, `pd-standard`)여야
-  함. SSD(`pd-ssd`)나 Balanced(`pd-balanced`)는 무료 아님** — gcloud 최신
-  버전은 `--boot-disk-type`을 안 주면 기본값이 `pd-balanced`라 그냥
-  두면 과금됨. 아래 명령에 `--boot-disk-type=pd-standard`로 명시함
-- 외부 IP는 기본(임시/ephemeral) IP만 무료 — 고정(static) IP를 따로
-  예약하면 무료 아님. 아래 명령은 static IP를 안 씀(기본값 그대로)
-- 네트워크 아웃바운드 월 1GB까지 무료, 그 이상은 소액 과금(개인 사용
-  트래픽이면 거의 안 넘음)
+  함.** gcloud 최신 버전은 `--boot-disk-type`을 안 주면 기본값이
+  `pd-balanced`라 그냥 두면 과금됨
+- **외부 IP는 2024-02-01부터 무료 티어에서 빠짐** — static/ephemeral
+  무관하게 실행 중인 표준 VM에 붙은 외부 IPv4는 시간당 $0.005 과금(월
+  1시간만 무료). us-central1이어도 이 부분은 24시간 기준 약 170원/일이
+  항상 과금됨 — 이 문서에 예전엔 "임시 IP는 무료"라고 적혀 있었는데
+  틀린 서술이었음(2026-08-15 정정)
+- 네트워크 아웃바운드 월 1GB까지 무료, 그 이상은 소액 과금
 
 ## 1. VM 생성 (로컬 PC에서 gcloud 실행)
+
+서울 리전은 무료 티어 대상이 아니라서 30GB(무료 한도)를 채울 이유가
+없음 — 실제 쓸 만큼(20GB)만 잡아서 디스크 비용을 줄인다.
 
 ```bash
 gcloud compute instances create silga-vm \
   --project=<YOUR_PROJECT_ID> \
-  --zone=us-central1-a \
+  --zone=asia-northeast3-a \
   --machine-type=e2-micro \
   --image-family=ubuntu-2204-lts \
   --image-project=ubuntu-os-cloud \
-  --boot-disk-size=30GB \
+  --boot-disk-size=20GB \
   --boot-disk-type=pd-standard \
   --tags=http-server
 ```
@@ -41,10 +68,44 @@ gcloud compute firewall-rules create default-allow-http \
   --direction=INGRESS
 ```
 
+## 1-1. 인스턴스 스케줄 (08:00~20:00 KST 자동 on/off) + 수동 오버라이드
+
+24시간 상시 가동은 이 리전에서 예산(하루 300~500원)을 넘기므로, 매일
+08:00에 자동 시작·20:00에 자동 종료되도록 리소스 정책을 건다(스케줄
+로직을 VM 안에 직접 스크립트로 넣지 않고 GCP 내장 기능을 쓰는 것 —
+관리 포인트를 늘리지 않기 위함):
+
+```bash
+gcloud compute resource-policies create instance-schedule silga-8to20 \
+  --project=<YOUR_PROJECT_ID> \
+  --region=asia-northeast3 \
+  --vm-start-schedule="0 8 * * *" \
+  --vm-stop-schedule="0 20 * * *" \
+  --timezone="Asia/Seoul"
+
+gcloud compute instances add-resource-policies silga-vm \
+  --zone=asia-northeast3-a \
+  --resource-policies=silga-8to20
+```
+
+스케줄 밖(20:00~08:00)에 쓸 일이 있으면 그때그때 수동으로 켜고, 안 쓸
+것 같으면 자동 종료를 기다리지 않고 바로 끈다:
+
+```bash
+# 켜기 (완전 부팅까지 약 20~60초 소요 — e2-micro라 다소 걸림)
+gcloud compute instances start silga-vm --zone=asia-northeast3-a
+
+# 끄기
+gcloud compute instances stop silga-vm --zone=asia-northeast3-a
+```
+
+디스크는 정지 중에도 유지되므로 SQLite DB(`backend/ppe.db`)는 껐다 켜도
+안전함.
+
 ## 2. SSH 접속 + 기본 패키지 설치
 
 ```bash
-gcloud compute ssh silga-vm --zone=us-central1-a
+gcloud compute ssh silga-vm --zone=asia-northeast3-a
 ```
 
 VM 안에서:
@@ -56,6 +117,21 @@ sudo apt install -y git python3-venv python3-pip nginx
 # Node.js 20 LTS (Ubuntu 22.04 기본 apt는 버전이 낮아서 nodesource 사용)
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
+```
+
+### 스왑 파일 설정 (OOM 방지, 강력 권장)
+
+e2-micro는 RAM이 1GB뿐이라 실사용 중 OOM으로 SSH까지 먹통이 된 사례가
+있었음(2026-08-08, `실가_인수인계.md` 참조). 스왑 2GB를 잡아두면
+완전히 막지는 못해도 급격한 OOM kill 빈도를 크게 줄인다:
+
+```bash
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+free -h   # Swap 2.0Gi 확인
 ```
 
 ## 3. 앱 전용 시스템 유저 + 리포 클론
@@ -108,21 +184,39 @@ sudo systemctl reload nginx
 ## 8. 접속 확인
 
 ```bash
-gcloud compute instances describe silga-vm --zone=us-central1-a \
+gcloud compute instances describe silga-vm --zone=asia-northeast3-a \
   --format='get(networkInterfaces[0].accessConfigs[0].natIP)'
 ```
 
 위 IP로 브라우저에서 `http://<IP>/` 접속. `http://<IP>/api/docs`로 백엔드
 Swagger UI도 확인 가능.
 
-## 9. 무료 티어로 실제 청구되는지 확인 (며칠 뒤)
+## 9. 비용 확인 + 크레딧 소진 전 되돌리기
 
-만든 지 하루~이틀 지나면 결제(Billing) → 보고서(Reports)에서 서비스
-필터를 "Compute Engine"만 남기고 확인. `E2 Instance Core/Ram running`,
-`Storage PD Capacity`(Standard) 항목이 뜨면서 비용(₩)이 0으로 나오면
-정상 — 만약 `SSD backed PD Capacity`나 `Balanced PD Capacity`처럼 다른
-디스크 타입 이름이 보이면 위 5번 단계에서 `--boot-disk-type=pd-standard`가
-안 먹은 것이니 인스턴스를 지우고 다시 만들 것.
+서울은 무료 티어가 아니라서 "0원인지" 확인하는 게 아니라 **예상 범위
+(스케줄 12시간 기준 약 310원/일) 안에서 도는지, 크레딧이 얼마나 남았는지**를
+주기적으로 확인해야 한다.
+
+- 결제(Billing) → 개요에서 "남은 크레딧"과 만료일 확인 — 90일 트라이얼
+  만료일과 크레딧 소진 시점 중 먼저 오는 쪽이 실질 데드라인
+- 결제 → 보고서(Reports)에서 서비스 필터를 "Compute Engine"만 남기고
+  일일 비용이 대략 300~500원대인지 확인. 크게 벗어나면(예:
+  `--boot-disk-type` 실수로 `pd-balanced`가 붙었거나, 1-1번 스케줄이
+  안 걸려 24시간 그대로 도는 경우) 1번/1-1번 단계를 재확인
+
+### 크레딧 소진 임박 시: us-central1 무료 티어로 되돌리기
+
+1. DB 백업이 필요하면 먼저 로컬로 내려받기:
+   `gcloud compute scp silga-vm:/opt/silga/backend/ppe.db ./ppe.db.bak --zone=asia-northeast3-a`
+2. 이 문서의 "1. VM 생성"~"8. 접속 확인"을 `--zone=us-central1-a`,
+   `--boot-disk-size=30GB`(무료 한도까지)로 그대로 다시 실행해 새 VM을
+   만든다. 백업한 `ppe.db`가 있으면 새 VM의 `/opt/silga/backend/`에
+   scp로 올려 교체
+3. "1-1. 인스턴스 스케줄"은 제거해도 됨 — us-central1은 24시간 상시가
+   무료라 스케줄을 걸 이유가 없어짐(단, 외부 IP 과금 약 170원/일은
+   리전과 무관하게 계속 남음, 위 "리전 선택" 절 참조)
+4. 서울 VM(`silga-vm`, 존 `asia-northeast3-a`)은 확인 후 삭제:
+   `gcloud compute instances delete silga-vm --zone=asia-northeast3-a`
 
 ## 이후 업데이트
 
