@@ -1013,7 +1013,7 @@ input,select{font-family:inherit;}
 .spec-row{
   display:grid;grid-template-columns:104px 1fr 128px;
   gap:20px;align-items:baseline;
-  padding:18px 0;border-bottom:var(--rule-1) solid var(--line-lt);
+  padding:18px 20px;border-bottom:var(--rule-1) solid var(--line-lt);
   transition:background .18s ease;
 }
 .spec-row:hover{background:var(--paper-2);}
