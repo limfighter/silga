@@ -2555,3 +2555,48 @@ backend v0.10.1 → v0.11, frontend v0.12.1 → v0.13.
     세션 진입 시 콘솔에서 확인하고, 소진 임박이면 되돌리기 절차 실행 우선
 [미결] RAM 1GB 유지로 OOM 근본 해결은 안 됨(스왑으로 완화만) — 크레딧
     잔액에 여유 확인되면 e2-small 재검토 여지
+
+---
+
+### 2026-08-16
+
+#### 서울 리전 마이그레이션 실행 — deploy/README.md 버그 4건 발견/수정
+
+[✓] 계획대로 Cloud Shell에서 명령을 하나씩 실행해 `silga-vm-seoul`
+    (asia-northeast3) 생성부터 데이터 이전, 사이트 접속 확인까지 완료.
+    기존 us-central1 VM(`silga-vm`)의 실 데이터(products 34/builds 5/
+    build_items 40/favorites 1) 전량 이전 검증
+
+[발견/수정] 원본 절차 실행 중 버그 4건 재현, 전부 deploy/README.md에 반영:
+    1. `useradd -m`이 `/etc/skel` 숨김파일로 홈을 채워 뒤이은
+       `git clone`이 "디렉토리 비어있지 않음"으로 실패 — 클론 전 정리
+       단계 추가
+    2. nodesource 스크립트 후 `apt install nodejs`가 의도한 v20 대신
+       Ubuntu 기본 저장소의 v12(npm 없음)를 설치하는 경우 있음 —
+       설치 후 `node -v` 검증 단계 + 재설치 절차 추가
+    3. `/opt/silga`가 `silga` 전용 홈이라 다른 계정으로 `cd` 자체가
+       막혀서, 개별 명령으로 나눠 실행하면 `cd`만 조용히 실패하고
+       나머지 명령이 엉뚱한 디렉토리에서 실행됨 — 백엔드/프론트 셋업을
+       `sudo -u silga bash -c "cd ... && ..."` 한 줄로 묶도록 수정
+    4. 같은 홈 디렉토리 권한 때문에 nginx(www-data)가
+       `frontend/dist`까지 못 들어가 500 에러
+       (`stat() ... Permission denied`, "rewrite or internal
+       redirection cycle") — `backend/`는 잠근 채 `frontend/dist`만
+       `chmod o+x`/`o+rX`로 여는 단계 추가
+
+[발견/수정] SQLite WAL 모드 함정 — `ppe.db` 파일 하나만(4096바이트,
+    사실상 빈 스키마) 옮겼더니 빈 DB처럼 보임. 실데이터(865KB)는
+    `ppe.db-wal`에 있었음. 세 파일(`ppe.db`/`-wal`/`-shm`)을 항상
+    같이 옮기도록 "9. 크레딧 소진 전 되돌리기" 절차의 DB 백업 명령을
+    수정(서비스 정지 → `/tmp` 복사 → scp → 원복 순서)
+
+[✓] 실측 — 부품 1개당 다나와 상세조회(백엔드 직접 호출, nginx 제외):
+    0.54초. us-central1 시절 실측치가 없어 정량 비교는 못 하지만,
+    해외 왕복 지연 없이 부품 8종 빌드도 스크래핑만 5초 안팎으로
+    nginx 180초 타임아웃에 여유
+
+[미결] 기존 us-central1 VM(`silga-vm`)은 안정성 며칠 더 지켜본 뒤 삭제
+    권장, 아직 안 지움
+[미결] 두 리전 VM이 동시에 떠 있는 동안 구분하려고 서울 쪽만
+    `silga-vm-seoul`로 이름을 다르게 둠 — 기존 VM 삭제 후 이름
+    통일 여부는 사용자 판단(재명명 자체가 GCP에서 불가해 재생성 필요)

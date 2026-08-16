@@ -158,6 +158,17 @@ sudo apt install -y git python3-venv python3-pip nginx
 # Node.js 20 LTS (Ubuntu 22.04 기본 apt는 버전이 낮아서 nodesource 사용)
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
+node -v   # v20.x 확인 — v12.x 등 구버전이 나오면 아래로 재설치
+```
+
+**`node -v`가 v20.x가 아니면**(nodesource 저장소 등록이 실패하고 Ubuntu
+기본 저장소의 구버전이 깔린 경우, 2026-08-16 실제 발생) 지우고 다시:
+
+```bash
+sudo apt remove -y nodejs npm
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+node -v && npm -v
 ```
 
 ### 스왑 파일 설정 (OOM 방지, 강력 권장)
@@ -179,15 +190,24 @@ free -h   # Swap 2.0Gi 확인
 
 ```bash
 sudo useradd -r -m -d /opt/silga -s /usr/sbin/nologin silga
+```
+
+**`useradd -m`이 `/etc/skel`의 숨김파일(.bashrc 등)로 홈 디렉토리를 채워서
+"비어있지 않다"고 git이 클론을 거부한다(2026-08-16 실제 발생)** — 클론
+전에 정리부터:
+
+```bash
+sudo find /opt/silga -mindepth 1 -maxdepth 1 -exec rm -rf {} \;
 sudo -u silga git clone https://github.com/limfighter/silga.git /opt/silga
 ```
 
 ## 4. 백엔드 셋업
 
+`/opt/silga`가 `silga` 전용 홈이라 로그인 계정으로 `cd`가 안 됨(권한
+거부) — `sudo -u silga bash -c "..."`로 한 번에 묶어서 실행할 것:
+
 ```bash
-cd /opt/silga/backend
-sudo -u silga python3 -m venv .venv
-sudo -u silga .venv/bin/pip install -r requirements.txt
+sudo -u silga bash -c "cd /opt/silga/backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt"
 ```
 
 ## 5. 프론트엔드 빌드
@@ -197,10 +217,7 @@ sudo -u silga .venv/bin/pip install -r requirements.txt
 안 보니까).
 
 ```bash
-cd /opt/silga/frontend
-echo "VITE_API_BASE=/api" | sudo -u silga tee .env
-sudo -u silga npm install
-sudo -u silga npm run build
+sudo -u silga bash -c "cd /opt/silga/frontend && echo 'VITE_API_BASE=/api' > .env && npm install && npm run build"
 ```
 
 ## 6. systemd 서비스 등록 (백엔드)
@@ -220,6 +237,19 @@ sudo ln -s /etc/nginx/sites-available/silga /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default   # 기본 페이지 제거
 sudo nginx -t   # 문법 확인
 sudo systemctl reload nginx
+```
+
+**nginx(www-data)가 `/opt/silga` 홈 디렉토리 권한 때문에 정적 파일까지
+못 들어가서 500 에러가 나는 경우 있음(2026-08-16 실제 발생, "500
+Internal Server Error" + 에러 로그에 `stat() ... Permission denied`)** —
+`backend/`(DB 포함)는 그대로 잠가두고 `frontend/dist`만 딱 필요한 만큼
+연다:
+
+```bash
+sudo chmod o+x /opt/silga
+sudo chmod o+x /opt/silga/frontend
+sudo chmod -R o+rX /opt/silga/frontend/dist
+sudo nginx -t && sudo systemctl reload nginx
 ```
 
 ## 8. 접속 확인
@@ -247,12 +277,27 @@ Swagger UI도 확인 가능.
 
 ### 크레딧 소진 임박 시: us-central1 무료 티어로 되돌리기
 
-1. DB 백업이 필요하면 먼저 로컬로 내려받기:
-   `gcloud compute scp silga-vm:/opt/silga/backend/ppe.db ./ppe.db.bak --zone=asia-northeast3-a`
+1. DB 백업이 필요하면 먼저 로컬로 내려받기 — **SQLite가 WAL 모드라
+   `ppe.db` 하나만 받으면 최근 데이터가 빠진다(`ppe.db-wal`에 있음,
+   2026-08-16 실제로 이 파일 하나만 받았다가 빈 DB로 보였던 사례 있음).
+   세 파일(`ppe.db`, `ppe.db-wal`, `ppe.db-shm`) 전부 같이 받을 것:**
+   ```bash
+   # 원본 VM에서 먼저 읽기 권한 있는 위치로 복사 (쓰기 중 스냅샷 어긋남 방지로 서비스 잠깐 정지)
+   gcloud compute ssh silga-vm --zone=asia-northeast3-a --command="
+     sudo systemctl stop silga-backend
+     sudo cp /opt/silga/backend/ppe.db /opt/silga/backend/ppe.db-wal /opt/silga/backend/ppe.db-shm /tmp/
+     sudo chmod 644 /tmp/ppe.db /tmp/ppe.db-wal /tmp/ppe.db-shm
+     sudo systemctl start silga-backend
+   "
+   # 로컬(또는 Cloud Shell 홈)로 세 파일 다 내려받기
+   gcloud compute scp silga-vm:/tmp/ppe.db silga-vm:/tmp/ppe.db-wal silga-vm:/tmp/ppe.db-shm ~/ --zone=asia-northeast3-a
+   ```
 2. 이 문서의 "1. VM 생성"~"8. 접속 확인"을 `--zone=us-central1-a`,
    `--boot-disk-size=30GB`(무료 한도까지)로 그대로 다시 실행해 새 VM을
-   만든다. 백업한 `ppe.db`가 있으면 새 VM의 `/opt/silga/backend/`에
-   scp로 올려 교체
+   만든다. 백업한 세 파일이 있으면 새 VM의 `/opt/silga/backend/`에
+   전부 scp로 올리고 `sudo chown silga:silga /opt/silga/backend/ppe.db*`로
+   소유권 맞춰서 교체 (하나라도 빠지면 데이터 유실 — 옮긴 뒤 `sqlite3`나
+   파이썬으로 `SELECT COUNT(*) FROM builds` 등으로 실제 개수 확인 권장)
 3. "1-1. 인스턴스 스케줄"과 "1-2. 외부 IP 고정"은 둘 다 생략해도 됨 —
    us-central1은 24시간 상시가 무료라 스케줄을 걸 이유가 없고, VM이
    안 꺼지니 ephemeral IP도 회수될 일이 없어 그대로 안정적임(단, 외부
