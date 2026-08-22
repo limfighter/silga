@@ -146,6 +146,20 @@ CPU_TYPE_ATTRIBUTES = {
     "라이젠3": "357316-1011496-OR",
 }
 
+# /search?igpu= 값(CPU 전용, category=CPU일 때만 적용) →
+# danawa.get_product_codes(attribute=...) 전달값 매핑(속성코드 15570 =
+# 내장그래픽, "CPU" 검색 결과 필터 사이드바에서 실측 — 2026-08-22).
+# 다나와가 주는 값이 2종뿐이라 트리밍 없이 그대로 채택.
+# 조립 견적에서 의미가 큰 필터 — 별도 GPU를 안 사는 구성(사무용/HTPC)이면
+# "탑재"가 필수 조건이고, 반대로 GPU를 따로 살 거면 인텔 F 모델처럼 내장
+# 그래픽이 빠진 대신 싼 물건을 "미탑재"로 골라낼 수 있음.
+# socket/cpu_type과 서로 다른 속성이라 셋 다 동시 지정 가능(AND).
+# frontend/src/lib/specFilters.ts의 IGPU_OPTIONS와 반드시 키를 맞출 것
+CPU_IGPU_ATTRIBUTES = {
+    "탑재": "15570-90400-OR",
+    "미탑재": "15570-90401-OR",
+}
+
 # /search?chipset= 값(GPU 전용, category=GPU일 때만 적용) →
 # danawa.get_product_codes(attribute=...) 전달값 매핑(속성코드 654 = 칩셋
 # 제조사). "RTX 5070 Ti" 검색 결과 필터 사이드바에서 실측(실가_HISTORY.md
@@ -411,14 +425,19 @@ def search(
         None,
         description="CPU 종류 스펙 필터(코어 울트라9/7/5, 코어i9/i7/i5/i3, 라이젠9/7/5/3) — "
                      "category=CPU일 때만 적용, 그 외 무시. CPU_TYPE_ATTRIBUTES 키와 정확히 "
-                     "일치해야 함. socket과 동시 지정 가능(AND로 결합)",
+                     "일치해야 함. socket/igpu와 동시 지정 가능(AND로 결합)",
+    ),
+    igpu: Optional[str] = Query(
+        None,
+        description="CPU 내장그래픽 유무 스펙 필터(탑재/미탑재) — category=CPU일 때만 적용, "
+                     "그 외 무시. socket/cpu_type과 동시 지정 가능(AND로 결합)",
     ),
 ):
     """
     GET /search?q={keyword, 선택}&category={CATEGORY_LABELS 키, 선택}&memory_gb={GPU 전용}&chipset={GPU 전용}&
         length={GPU 전용}&socket={CPU/메인보드/쿨러 전용}&formfactor={메인보드/케이스/SSD 전용}&
         ram_type={RAM 전용}&wattage={파워 전용}&interface={SSD 전용}&cooler_type={쿨러 전용}&
-        cpu_type={CPU 전용}
+        cpu_type={CPU 전용}&igpu={CPU 전용}
         (스펙 파라미터는 전부 선택, category와 안 맞으면 무시. 같은 category의
         스펙 파라미터를 여러 개 주면 전부 AND로 결합됨 — v0.13) →
         [{code, title, price, price_formatted, img}, ...]
@@ -451,6 +470,7 @@ def search(
         attributes = [
             CPU_SOCKET_ATTRIBUTES.get(socket),
             CPU_TYPE_ATTRIBUTES.get(cpu_type),
+            CPU_IGPU_ATTRIBUTES.get(igpu),
         ]
     elif category == "메인보드":
         attributes = [

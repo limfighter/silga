@@ -33,6 +33,7 @@ const CPU_TYPE_OPTIONS = [
   "라이젠5",
   "라이젠3",
 ];
+const IGPU_OPTIONS = ["탑재", "미탑재"];
 const FORMFACTOR_OPTIONS = ["ATX", "M-ATX", "ITX", "E-ATX"];
 const RAM_TYPE_OPTIONS = ["DDR5", "DDR4"];
 const PSU_WATTAGE_OPTIONS = [
@@ -94,6 +95,15 @@ export const CATEGORY_SPEC_FILTERS: Record<string, SpecFilterDef[]> = {
       options: CPU_TYPE_OPTIONS,
     },
     { specKey: "socket", placeholder: "소켓 전체", title: "소켓으로 좁혀서 검색", options: SOCKET_OPTIONS },
+    {
+      specKey: "igpu",
+      placeholder: "내장그래픽 전체",
+      // 고른 뒤 닫힌 select에는 값만 남아서 "탑재"만 보이면 무슨 탑재인지
+      // 알 수 없음 — 조건 칩에도 같은 문자열이 쓰이므로 항목명을 붙여둔다
+      title: "내장그래픽 유무로 좁혀서 검색(별도 GPU 없이 조립할 때 필수 조건)",
+      options: IGPU_OPTIONS,
+      formatOption: (v) => `내장그래픽 ${v}`,
+    },
   ],
   메인보드: [
     { specKey: "socket", placeholder: "소켓 전체", title: "소켓으로 좁혀서 검색", options: SOCKET_OPTIONS },

@@ -51,6 +51,7 @@ export interface SearchSpecParams {
   interface?: string; // SSD 전용
   coolerType?: string; // 쿨러 전용
   cpuType?: string; // CPU 전용
+  igpu?: string; // CPU 전용 (내장그래픽 탑재/미탑재)
 }
 
 export interface ProductVariant {
@@ -163,6 +164,7 @@ export const api = {
     if (spec?.interface) params.set("interface", spec.interface);
     if (spec?.coolerType) params.set("cooler_type", spec.coolerType);
     if (spec?.cpuType) params.set("cpu_type", spec.cpuType);
+    if (spec?.igpu) params.set("igpu", spec.igpu);
     return request<SearchResultItem[]>(`/search?${params.toString()}`);
   },
 
