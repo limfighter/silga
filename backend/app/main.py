@@ -232,11 +232,64 @@ MAINBOARD_FORMFACTOR_ATTRIBUTES = {
     "ITX": "506-2464-OR",
     "E-ATX": "506-2461-OR",
 }
+
+# /search?chipset= 값(메인보드 전용, category=메인보드일 때만 적용) →
+# danawa.get_product_codes(attribute=...) 전달값 매핑(속성코드 504 = 세부
+# 칩셋, "메인보드" 검색 결과 필터 사이드바에서 실측 — 2026-08-22).
+# chipset은 GPU와 공유하는 파라미터명이지만 값도 딕셔너리도 완전히 다름
+# (GPU는 NVIDIA/AMD/Intel 제조사, 메인보드는 B650 같은 칩셋 모델) —
+# socket과 같은 방식으로 카테고리별 분리 처리(search() 참조).
+# 소켓보다 실구매 기준에 가까운 축(같은 AM5라도 X870E와 A620은 가격대가
+# 완전히 다름) — socket/formfactor와 동시 지정 가능.
+# 실측 84종 중 19종 채택 — 채택한 소켓 4종(AM5/AM4/LGA1851/LGA1700)에
+# 대응하는 현행 유통 칩셋만. 워크스테이션/서버(WRX90·TRX50·X399·W시리즈·
+# Q670E·C시리즈), 구형 단종(AMD 300번대·X470, 인텔 500번대 이하), 임베디드
+# (셀러론 J4005/N4020), AMD 780G, "기타"는 기존 트리밍 원칙대로 제외
+MAINBOARD_CHIPSET_ATTRIBUTES = {
+    # AM5
+    "X870E": "504-987871-OR",
+    "X870": "504-987874-OR",
+    "B850": "504-987880-OR",
+    "B840": "504-987883-OR",
+    "X670E": "504-801685-OR",
+    "X670": "504-801688-OR",
+    "B650E": "504-801691-OR",
+    "B650": "504-801694-OR",
+    "A620": "504-845341-OR",
+    # AM4
+    "X570": "504-402965-OR",
+    "B550": "504-671233-OR",
+    "A520": "504-687766-OR",
+    "B450": "504-258834-OR",
+    # LGA1851
+    "Z890": "504-988132-OR",
+    "B860": "504-988135-OR",
+    "H810": "504-1017868-OR",
+    # LGA1700
+    "Z790": "504-808180-OR",
+    "B760": "504-823213-OR",
+    "H610": "504-757642-OR",
+}
 CASE_FORMFACTOR_ATTRIBUTES = {
     "ATX": "6196-22391-AND",
     "M-ATX": "6196-22392-AND",
     "ITX": "6196-22398-AND",
     "E-ATX": "6196-22394-AND",
+}
+
+# /search?case_size= 값(케이스 전용, category=케이스일 때만 적용) →
+# danawa.get_product_codes(attribute=...) 전달값 매핑(속성코드 974 = 케이스
+# 크기, "케이스" 검색 결과 필터 사이드바에서 실측 — 2026-08-22).
+# formfactor(지원보드규격, 6196)와는 다른 축임에 주의 — formfactor는 "어떤
+# 보드를 넣을 수 있나", case_size는 "케이스 자체가 얼마나 큰가"라서 둘 다
+# 걸 수 있고 실제로 동시 지정된다(AND).
+# 실측 12종 중 4종 채택 — 랙마운트 4종(서버), 슬림/데스크탑/미니타워(LP)는
+# 완제품·사무용 폼팩터라 개인 조립 범위 밖이라 제외
+CASE_SIZE_ATTRIBUTES = {
+    "빅타워": "974-5120-OR",
+    "미들타워": "974-5121-OR",
+    "미니타워": "974-5122-OR",
+    "미니ITX": "974-5128-OR",
 }
 
 # /search?ram_type= 값(RAM 전용, category=RAM일 때만 적용) →
@@ -246,6 +299,36 @@ CASE_FORMFACTOR_ATTRIBUTES = {
 RAM_TYPE_ATTRIBUTES = {
     "DDR5": "277-748099-OR",
     "DDR4": "277-164333-OR",
+}
+
+# /search?capacity= 값(RAM 전용, category=RAM일 때만 적용) →
+# danawa.get_product_codes(attribute=...) 전달값 매핑(속성코드 282 = 메모리
+# 용량, "RAM" 검색 결과 필터 사이드바에서 실측 — 2026-08-22). capacity는
+# SSD와 공유하는 파라미터명이지만 카테고리별로 딕셔너리가 완전히 다름
+# (formfactor를 메인보드/케이스/SSD가 공유하는 것과 같은 방식, search() 참조).
+# 이 값은 "모듈 1개당"이 아니라 **패키지 총 용량**임 — 처음엔 모듈당으로
+# 적었다가 실측으로 정정했음(capacity=8GB + ram_count=4개를 걸면 4x8GB=32GB
+# 킷이 아니라 4x2GB짜리 DDR2/DDR3 구형 패키지 17건이 나옴, 2026-08-22).
+# 실측 16종 중 5종 채택 — 512MB~4GB(구형)와 96GB 이상(서버/워크스테이션)은
+# 개인 조립 PC 범위 밖이라 기존 트리밍 원칙대로 제외. 12GB/24GB는 비표준
+# 구성이라 함께 제외
+RAM_CAPACITY_ATTRIBUTES = {
+    "8GB": "282-1248-OR",
+    "16GB": "282-90210-OR",
+    "32GB": "282-109194-OR",
+    "48GB": "282-836023-OR",
+    "64GB": "282-157451-OR",
+}
+
+# /search?ram_count= 값(RAM 전용, category=RAM일 때만 적용) →
+# danawa.get_product_codes(attribute=...) 전달값 매핑(속성코드 279 = 램개수).
+# capacity가 패키지 총 용량이라, 같은 "32GB"도 32GB 1개짜리와 16GBx2 듀얼채널
+# 킷으로 갈림 — 그 둘을 구분하려면 용량과 짝으로 필요함.
+# 실측 4종 중 8개(서버 구성)만 제외
+RAM_COUNT_ATTRIBUTES = {
+    "1개": "279-1228-OR",
+    "2개": "279-1229-OR",
+    "4개": "279-1231-OR",
 }
 
 # /search?wattage= 값(파워 전용, category=파워일 때만 적용) →
@@ -260,6 +343,21 @@ PSU_WATTAGE_ATTRIBUTES = {
     "800W~899W": "1088-173073-OR",
     "900W~999W": "1088-173074-OR",
     "1000W~1299W": "1088-976690-OR",
+}
+
+# /search?efficiency= 값(파워 전용, category=파워일 때만 적용) →
+# danawa.get_product_codes(attribute=...) 전달값 매핑(속성코드 13033 =
+# 80PLUS인증, "파워" 검색 결과 필터 사이드바에서 실측 — 2026-08-22).
+# 같은 출력이라도 인증 등급이 가격을 크게 가르는 축이라 wattage와 짝.
+# 실측 6종 전부 채택 — 전부 소비자용 등급이라 제외할 값이 없음(다나와가
+# 같이 제공하는 ETA/LAMBDA 인증은 국내 유통에서 표기 빈도가 낮아 미채택)
+PSU_EFFICIENCY_ATTRIBUTES = {
+    "80 PLUS 티타늄": "13033-161490-OR",
+    "80 PLUS 플래티넘": "13033-71555-OR",
+    "80 PLUS 골드": "13033-71554-OR",
+    "80 PLUS 실버": "13033-71553-OR",
+    "80 PLUS 브론즈": "13033-71552-OR",
+    "80 PLUS 스탠다드": "13033-71551-OR",
 }
 
 # /search?interface= 값(SSD 전용, category=SSD일 때만 적용) →
@@ -288,6 +386,22 @@ SSD_FORMFACTOR_ATTRIBUTES = {
     "M.2 2242": "14695-202350-OR",
     "M.2 2230": "14695-656345-OR",
     "2.5인치": "14695-86092-OR",
+}
+
+# /search?capacity= 값(SSD 전용, category=SSD일 때만 적용) →
+# danawa.get_product_codes(attribute=...) 전달값 매핑(속성코드 310085 = 용량,
+# "SSD" 검색 결과 필터 사이드바에서 실측 — 2026-08-22). RAM과 공유하는
+# 파라미터명이지만 딕셔너리도 값 형식도 다름(RAM은 "16GB" 단일 용량,
+# SSD는 다나와가 구간으로 끊어놔서 "1TB~600GB" 형태 그대로 씀).
+# SSD 가격을 가장 크게 가르는 축이라 interface/formfactor보다 우선 노출.
+# 실측 10종 중 5종 채택 — 5TB 이상 3종(서버/대용량)과 128GB 이하 2종
+# (구형 소용량)은 개인 조립 PC 범위 밖이라 제외
+SSD_CAPACITY_ATTRIBUTES = {
+    "256GB~130GB": "310085-610811-OR",
+    "525GB~270GB": "310085-610814-OR",
+    "1TB~600GB": "310085-610817-OR",
+    "2TB~1.1TB": "310085-610820-OR",
+    "4TB~3TB": "310085-610823-OR",
 }
 
 # /search?cooler_type= 값(쿨러 전용, category=쿨러일 때만 적용) →
@@ -386,8 +500,10 @@ def search(
     ),
     chipset: Optional[str] = Query(
         None,
-        description="GPU 칩셋 제조사 스펙 필터(NVIDIA/AMD/Intel) — category=GPU일 때만 적용, "
-                     "그 외에는 무시. memory_gb/length와 동시 지정 가능(AND로 결합)",
+        description="칩셋 스펙 필터 — category=GPU일 때는 칩셋 제조사(NVIDIA/AMD/Intel), "
+                     "category=메인보드일 때는 세부 칩셋(X870E/B650/Z890/B760 등 19종). "
+                     "그 외 category에서는 무시. GPU는 memory_gb/length와, 메인보드는 "
+                     "socket/formfactor와 동시 지정 가능(AND로 결합)",
     ),
     length: Optional[str] = Query(
         None,
@@ -432,12 +548,35 @@ def search(
         description="CPU 내장그래픽 유무 스펙 필터(탑재/미탑재) — category=CPU일 때만 적용, "
                      "그 외 무시. socket/cpu_type과 동시 지정 가능(AND로 결합)",
     ),
+    capacity: Optional[str] = Query(
+        None,
+        description="용량 스펙 필터 — category=RAM일 때는 패키지 총 용량(8GB/16GB/32GB/48GB/64GB. "
+                     "모듈 1개당 용량이 아님 — 32GB + ram_count=2개는 16GBx2 킷을 뜻함), "
+                     "category=SSD일 때는 용량 구간(\"1TB~600GB\" 등 5종). 그 외 category에서는 무시. "
+                     "RAM은 ram_type/ram_count와, SSD는 interface/formfactor와 동시 지정 가능(AND로 결합)",
+    ),
+    ram_count: Optional[str] = Query(
+        None,
+        description="RAM 램개수 스펙 필터(1개/2개/4개, 패키지 구성 모듈 수) — category=RAM일 때만 "
+                     "적용, 그 외 무시. capacity(총 용량)와 같이 걸면 32GB 1개인지 16GBx2인지 구분됨",
+    ),
+    efficiency: Optional[str] = Query(
+        None,
+        description="파워 80PLUS 인증 등급 스펙 필터(80 PLUS 티타늄/플래티넘/골드/실버/브론즈/스탠다드) — "
+                     "category=파워일 때만 적용, 그 외 무시. wattage와 동시 지정 가능(AND로 결합)",
+    ),
+    case_size: Optional[str] = Query(
+        None,
+        description="케이스 크기 스펙 필터(빅타워/미들타워/미니타워/미니ITX) — category=케이스일 때만 "
+                     "적용, 그 외 무시. formfactor(지원 보드 규격)와는 다른 축이라 동시 지정 가능",
+    ),
 ):
     """
     GET /search?q={keyword, 선택}&category={CATEGORY_LABELS 키, 선택}&memory_gb={GPU 전용}&chipset={GPU 전용}&
         length={GPU 전용}&socket={CPU/메인보드/쿨러 전용}&formfactor={메인보드/케이스/SSD 전용}&
         ram_type={RAM 전용}&wattage={파워 전용}&interface={SSD 전용}&cooler_type={쿨러 전용}&
-        cpu_type={CPU 전용}&igpu={CPU 전용}
+        cpu_type={CPU 전용}&igpu={CPU 전용}&capacity={RAM/SSD 전용}&
+        ram_count={RAM 전용}&efficiency={파워 전용}&case_size={케이스 전용}
         (스펙 파라미터는 전부 선택, category와 안 맞으면 무시. 같은 category의
         스펙 파라미터를 여러 개 주면 전부 AND로 결합됨 — v0.13) →
         [{code, title, price, price_formatted, img}, ...]
@@ -475,16 +614,28 @@ def search(
     elif category == "메인보드":
         attributes = [
             MAINBOARD_SOCKET_ATTRIBUTES.get(socket),
+            MAINBOARD_CHIPSET_ATTRIBUTES.get(chipset),
             MAINBOARD_FORMFACTOR_ATTRIBUTES.get(formfactor),
         ]
     elif category == "케이스":
-        attributes = [CASE_FORMFACTOR_ATTRIBUTES.get(formfactor)]
+        attributes = [
+            CASE_SIZE_ATTRIBUTES.get(case_size),
+            CASE_FORMFACTOR_ATTRIBUTES.get(formfactor),
+        ]
     elif category == "RAM":
-        attributes = [RAM_TYPE_ATTRIBUTES.get(ram_type)]
+        attributes = [
+            RAM_TYPE_ATTRIBUTES.get(ram_type),
+            RAM_CAPACITY_ATTRIBUTES.get(capacity),
+            RAM_COUNT_ATTRIBUTES.get(ram_count),
+        ]
     elif category == "파워":
-        attributes = [PSU_WATTAGE_ATTRIBUTES.get(wattage)]
+        attributes = [
+            PSU_WATTAGE_ATTRIBUTES.get(wattage),
+            PSU_EFFICIENCY_ATTRIBUTES.get(efficiency),
+        ]
     elif category == "SSD":
         attributes = [
+            SSD_CAPACITY_ATTRIBUTES.get(capacity),
             SSD_INTERFACE_ATTRIBUTES.get(interface),
             SSD_FORMFACTOR_ATTRIBUTES.get(formfactor),
         ]

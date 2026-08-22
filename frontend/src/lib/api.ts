@@ -52,6 +52,10 @@ export interface SearchSpecParams {
   coolerType?: string; // 쿨러 전용
   cpuType?: string; // CPU 전용
   igpu?: string; // CPU 전용 (내장그래픽 탑재/미탑재)
+  capacity?: string; // RAM(모듈 1개당 용량) / SSD(용량 구간) 공용
+  ramCount?: string; // RAM 전용
+  efficiency?: string; // 파워 전용 (80PLUS 등급)
+  caseSize?: string; // 케이스 전용
 }
 
 export interface ProductVariant {
@@ -165,6 +169,10 @@ export const api = {
     if (spec?.coolerType) params.set("cooler_type", spec.coolerType);
     if (spec?.cpuType) params.set("cpu_type", spec.cpuType);
     if (spec?.igpu) params.set("igpu", spec.igpu);
+    if (spec?.capacity) params.set("capacity", spec.capacity);
+    if (spec?.ramCount) params.set("ram_count", spec.ramCount);
+    if (spec?.efficiency) params.set("efficiency", spec.efficiency);
+    if (spec?.caseSize) params.set("case_size", spec.caseSize);
     return request<SearchResultItem[]>(`/search?${params.toString()}`);
   },
 

@@ -34,6 +34,25 @@ const CPU_TYPE_OPTIONS = [
   "라이젠3",
 ];
 const IGPU_OPTIONS = ["탑재", "미탑재"];
+const RAM_CAPACITY_OPTIONS = ["8GB", "16GB", "32GB", "48GB", "64GB"];
+const RAM_COUNT_OPTIONS = ["1개", "2개", "4개"];
+const SSD_CAPACITY_OPTIONS = ["256GB~130GB", "525GB~270GB", "1TB~600GB", "2TB~1.1TB", "4TB~3TB"];
+const PSU_EFFICIENCY_OPTIONS = [
+  "80 PLUS 티타늄",
+  "80 PLUS 플래티넘",
+  "80 PLUS 골드",
+  "80 PLUS 실버",
+  "80 PLUS 브론즈",
+  "80 PLUS 스탠다드",
+];
+const CASE_SIZE_OPTIONS = ["빅타워", "미들타워", "미니타워", "미니ITX"];
+// 메인보드 세부 칩셋 — 채택 소켓 4종에 대응하는 현행 유통 칩셋만(소켓 순서로 정렬)
+const MAINBOARD_CHIPSET_OPTIONS = [
+  "X870E", "X870", "B850", "B840", "X670E", "X670", "B650E", "B650", "A620",
+  "X570", "B550", "A520", "B450",
+  "Z890", "B860", "H810",
+  "Z790", "B760", "H610",
+];
 const FORMFACTOR_OPTIONS = ["ATX", "M-ATX", "ITX", "E-ATX"];
 const RAM_TYPE_OPTIONS = ["DDR5", "DDR4"];
 const PSU_WATTAGE_OPTIONS = [
@@ -108,6 +127,14 @@ export const CATEGORY_SPEC_FILTERS: Record<string, SpecFilterDef[]> = {
   메인보드: [
     { specKey: "socket", placeholder: "소켓 전체", title: "소켓으로 좁혀서 검색", options: SOCKET_OPTIONS },
     {
+      // GPU와 같은 chipset 파라미터를 쓰지만 값은 완전히 다름(GPU=제조사,
+      // 메인보드=칩셋 모델) — 백엔드도 카테고리별로 다른 딕셔너리를 봄
+      specKey: "chipset",
+      placeholder: "칩셋 전체",
+      title: "세부 칩셋으로 좁혀서 검색(같은 소켓이라도 칩셋에 따라 가격대가 갈림)",
+      options: MAINBOARD_CHIPSET_OPTIONS,
+    },
+    {
       specKey: "formfactor",
       placeholder: "폼팩터 전체",
       title: "폼팩터로 좁혀서 검색",
@@ -115,6 +142,14 @@ export const CATEGORY_SPEC_FILTERS: Record<string, SpecFilterDef[]> = {
     },
   ],
   케이스: [
+    {
+      // formfactor(장착 가능한 보드 크기)와는 다른 축 — 이쪽은 케이스 자체의
+      // 크기 등급이라 둘 다 동시에 걸 수 있음
+      specKey: "caseSize",
+      placeholder: "크기 전체",
+      title: "케이스 크기로 좁혀서 검색",
+      options: CASE_SIZE_OPTIONS,
+    },
     {
       specKey: "formfactor",
       placeholder: "지원 폼팩터 전체",
@@ -124,11 +159,37 @@ export const CATEGORY_SPEC_FILTERS: Record<string, SpecFilterDef[]> = {
   ],
   RAM: [
     { specKey: "ramType", placeholder: "규격 전체", title: "DDR 규격으로 좁혀서 검색", options: RAM_TYPE_OPTIONS },
+    {
+      specKey: "capacity",
+      placeholder: "용량 전체",
+      title: "패키지 총 용량으로 좁혀서 검색(모듈 1개당 용량이 아님)",
+      options: RAM_CAPACITY_OPTIONS,
+    },
+    {
+      specKey: "ramCount",
+      placeholder: "개수 전체",
+      title: "구성 모듈 개수로 좁혀서 검색 — 용량과 같이 걸면 32GB 1개인지 16GBx2인지 구분됨",
+      options: RAM_COUNT_OPTIONS,
+      formatOption: (v) => `램 ${v}`,
+    },
   ],
   파워: [
     { specKey: "wattage", placeholder: "출력 전체", title: "정격출력으로 좁혀서 검색", options: PSU_WATTAGE_OPTIONS },
+    {
+      specKey: "efficiency",
+      placeholder: "인증 전체",
+      title: "80PLUS 인증 등급으로 좁혀서 검색(같은 출력이라도 등급이 가격을 가름)",
+      options: PSU_EFFICIENCY_OPTIONS,
+    },
   ],
   SSD: [
+    {
+      // SSD는 용량이 가격을 가장 크게 가르는 축이라 인터페이스/폼팩터보다 앞
+      specKey: "capacity",
+      placeholder: "용량 전체",
+      title: "용량 구간으로 좁혀서 검색",
+      options: SSD_CAPACITY_OPTIONS,
+    },
     {
       specKey: "interface",
       placeholder: "인터페이스",
