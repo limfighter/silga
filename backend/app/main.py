@@ -117,6 +117,35 @@ CPU_SOCKET_ATTRIBUTES = {
     "LGA1700": "41-748240-OR",
 }
 
+# /search?cpu_type= 값(CPU 전용, category=CPU일 때만 적용) →
+# danawa.get_product_codes(attribute=...) 전달값 매핑(속성코드 357316 =
+# "CPU 종류", "CPU" 검색 결과 필터 사이드바에서 실측 — 2026-08-22).
+# 다나와 CPU 카테고리엔 성격이 다른 필터 그룹이 28개나 있는데, 그중 소켓
+# 다음으로 실구매 기준에 가까운 축이라 골랐음("코어i5 정도면 얼마" 식으로
+# 등급부터 좁히는 게 소켓보다 자연스러움). socket과 서로 다른 속성이라
+# 동시 지정 가능(AND) — v0.13에서 콤마 결합이 열린 덕에 "AM5 + 라이젠7"
+# 같은 조합이 실제로 먹힌다(이 조합이 콤마 AND 실측의 첫 검증 케이스였음,
+# 실가_HISTORY.md 2026-08-22 참조).
+# 실측 34종 중 11종만 채택 — 기존 트리밍 원칙(개인 조립 PC 범위)대로
+# 워크스테이션/서버(스레드리퍼·스레드리퍼PRO·제온 4종·EPYC·코어X),
+# 기업용 PRO 라인(라이젠 3·5·7·9 PRO), 구형 단종(코어2듀오·코어2쿼드·
+# 페넘·AMD A·AMD FX·애슬론(Zen)), 저가 사무용 라인(펜티엄·펜티엄 G·
+# 펜티엄 골드·셀러론), 분류 불명("프로세서")은 제외.
+# frontend/src/lib/specFilters.ts의 CPU_TYPE_OPTIONS와 반드시 키를 맞출 것
+CPU_TYPE_ATTRIBUTES = {
+    "코어 울트라9": "357316-1010557-OR",
+    "코어 울트라7": "357316-1010560-OR",
+    "코어 울트라5": "357316-1010563-OR",
+    "코어i9": "357316-1010566-OR",
+    "코어i7": "357316-1010569-OR",
+    "코어i5": "357316-1010572-OR",
+    "코어i3": "357316-1010575-OR",
+    "라이젠9": "357316-1011487-OR",
+    "라이젠7": "357316-1011490-OR",
+    "라이젠5": "357316-1011493-OR",
+    "라이젠3": "357316-1011496-OR",
+}
+
 # /search?chipset= 값(GPU 전용, category=GPU일 때만 적용) →
 # danawa.get_product_codes(attribute=...) 전달값 매핑(속성코드 654 = 칩셋
 # 제조사). "RTX 5070 Ti" 검색 결과 필터 사이드바에서 실측(실가_HISTORY.md
@@ -378,11 +407,18 @@ def search(
         description="쿨러 제품 종류 스펙 필터(CPU 쿨러/시스템 쿨러/VGA 쿨러/M.2 SSD 쿨러/써멀그리스) — "
                      "category=쿨러일 때만 적용, 그 외 무시. socket과 동시 지정 가능(AND로 결합)",
     ),
+    cpu_type: Optional[str] = Query(
+        None,
+        description="CPU 종류 스펙 필터(코어 울트라9/7/5, 코어i9/i7/i5/i3, 라이젠9/7/5/3) — "
+                     "category=CPU일 때만 적용, 그 외 무시. CPU_TYPE_ATTRIBUTES 키와 정확히 "
+                     "일치해야 함. socket과 동시 지정 가능(AND로 결합)",
+    ),
 ):
     """
     GET /search?q={keyword, 선택}&category={CATEGORY_LABELS 키, 선택}&memory_gb={GPU 전용}&chipset={GPU 전용}&
         length={GPU 전용}&socket={CPU/메인보드/쿨러 전용}&formfactor={메인보드/케이스/SSD 전용}&
-        ram_type={RAM 전용}&wattage={파워 전용}&interface={SSD 전용}&cooler_type={쿨러 전용}
+        ram_type={RAM 전용}&wattage={파워 전용}&interface={SSD 전용}&cooler_type={쿨러 전용}&
+        cpu_type={CPU 전용}
         (스펙 파라미터는 전부 선택, category와 안 맞으면 무시. 같은 category의
         스펙 파라미터를 여러 개 주면 전부 AND로 결합됨 — v0.13) →
         [{code, title, price, price_formatted, img}, ...]
@@ -412,7 +448,10 @@ def search(
             GPU_LENGTH_ATTRIBUTES.get(length),
         ]
     elif category == "CPU":
-        attributes = [CPU_SOCKET_ATTRIBUTES.get(socket)]
+        attributes = [
+            CPU_SOCKET_ATTRIBUTES.get(socket),
+            CPU_TYPE_ATTRIBUTES.get(cpu_type),
+        ]
     elif category == "메인보드":
         attributes = [
             MAINBOARD_SOCKET_ATTRIBUTES.get(socket),

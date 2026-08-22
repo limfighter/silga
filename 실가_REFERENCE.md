@@ -282,7 +282,7 @@ GET  /search?q={keyword, 선택}&category={선택}&memory_gb={GPU}&chipset={GPU}
     전부 실제 상품 li HTML로 직접 검증 완료(실가_HISTORY.md 2026-08-05 참조)
   ※ 스펙 파라미터(memory_gb/chipset/socket/formfactor/ram_type/wattage/
     interface는 v0.5, cooler_type은 v0.7, formfactor의 SSD 적용은 v0.8,
-    length는 v0.9 추가) — category와 달리 다나와 서버측 요청 자체를
+    length는 v0.9, cpu_type은 v0.14 추가) — category와 달리 다나와 서버측 요청 자체를
     좁히는 필터. danawa.get_product_codes(attribute=...)로 "{속성코드}-
     {값코드}-OR"(또는 케이스만 -AND, 동작상 차이 없음) 형식 문자열을 다나와
     요청 URL에 그대로 전달(다나와 상세검색 필터 체크박스 클릭 시 실측 URL에서
@@ -303,6 +303,7 @@ GET  /search?q={keyword, 선택}&category={선택}&memory_gb={GPU}&chipset={GPU}
     | wattage     | 파워          | "800W~899W" 등          | PSU_WATTAGE_ATTRIBUTES           |
     | interface   | SSD           | SATA3/PCIe3.0x4/PCIe4.0x4/PCIe5.0x4 | SSD_INTERFACE_ATTRIBUTES |
     | cooler_type | 쿨러          | CPU 쿨러/시스템 쿨러/VGA 쿨러/M.2 SSD 쿨러/써멀그리스 | COOLER_TYPE_ATTRIBUTES (다나와 "쿨러/튜닝" 카테고리엔 CPU 쿨러·케이스팬·써멀그리스·조명기기가 다 섞여 있어 category 필터만으론 안 걸러짐 — 이 카테고리에 특히 필요한 필터) |
+    | cpu_type    | CPU           | 코어 울트라9/7/5, 코어i9/i7/i5/i3, 라이젠9/7/5/3 (11종) | CPU_TYPE_ATTRIBUTES (다나와 "CPU 종류" 그룹, 속성코드 357316. 소켓보다 실구매 기준에 가까운 등급 축 — socket과 동시 지정 가능. 실측 34종 중 워크스테이션/서버·PRO 라인·구형 단종·저가 사무용 라인은 기존 트리밍 원칙대로 제외) |
 
     **같은 category 안에 스펙 파라미터가 여러 개 있는 경우(GPU: memory_gb+
     chipset+length, 메인보드: socket+formfactor, 쿨러: cooler_type+socket,

@@ -20,6 +20,19 @@ const GPU_LENGTH_OPTIONS = [
   "360mm~",
 ];
 const SOCKET_OPTIONS = ["AM5", "AM4", "LGA1851", "LGA1700"];
+const CPU_TYPE_OPTIONS = [
+  "코어 울트라9",
+  "코어 울트라7",
+  "코어 울트라5",
+  "코어i9",
+  "코어i7",
+  "코어i5",
+  "코어i3",
+  "라이젠9",
+  "라이젠7",
+  "라이젠5",
+  "라이젠3",
+];
 const FORMFACTOR_OPTIONS = ["ATX", "M-ATX", "ITX", "E-ATX"];
 const RAM_TYPE_OPTIONS = ["DDR5", "DDR4"];
 const PSU_WATTAGE_OPTIONS = [
@@ -71,7 +84,15 @@ export const CATEGORY_SPEC_FILTERS: Record<string, SpecFilterDef[]> = {
       options: GPU_LENGTH_OPTIONS,
     },
   ],
+  // CPU는 등급(종류)부터 좁히는 게 소켓보다 실구매 기준에 가까워서 종류를
+  // 앞에 둔다 — 둘은 서로 다른 속성이라 동시 적용됨(AND)
   CPU: [
+    {
+      specKey: "cpuType",
+      placeholder: "종류 전체",
+      title: "CPU 등급(종류)으로 좁혀서 검색",
+      options: CPU_TYPE_OPTIONS,
+    },
     { specKey: "socket", placeholder: "소켓 전체", title: "소켓으로 좁혀서 검색", options: SOCKET_OPTIONS },
   ],
   메인보드: [

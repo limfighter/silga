@@ -50,6 +50,7 @@ export interface SearchSpecParams {
   wattage?: string; // 파워 전용
   interface?: string; // SSD 전용
   coolerType?: string; // 쿨러 전용
+  cpuType?: string; // CPU 전용
 }
 
 export interface ProductVariant {
@@ -161,6 +162,7 @@ export const api = {
     if (spec?.wattage) params.set("wattage", spec.wattage);
     if (spec?.interface) params.set("interface", spec.interface);
     if (spec?.coolerType) params.set("cooler_type", spec.coolerType);
+    if (spec?.cpuType) params.set("cpu_type", spec.cpuType);
     return request<SearchResultItem[]>(`/search?${params.toString()}`);
   },
 
