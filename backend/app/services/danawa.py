@@ -18,7 +18,20 @@ danawa.py — 실가 프로젝트 데이터소스 모듈
 import html
 import re
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, SoupStrainer
+
+# 파서는 lxml 고정 — 검색 결과 페이지가 2.4MB나 돼서 기본 html.parser로는
+# 파싱에만 1.5초가 걸렸음(2026-08-22 실측). lxml + 아래 SoupStrainer 조합으로
+# 0.45초. 파서를 바꾸면 깨진 HTML 해석이 달라질 수 있는 게 위험 요소라,
+# 검색 페이지 6종(CPU/RAM/SSD/메인보드/파워/케이스) × 상세 페이지 2종을
+# html.parser 결과와 전수 대조해 완전 동일함을 확인하고 교체함.
+_PARSER = "lxml"
+
+# get_product_codes가 실제로 쓰는 건 상품목록 div 하나뿐인데 2.4MB 문서 전체를
+# 파싱하고 있었음 — 이 div만 파싱하도록 좁힘. 가격(min_price_{code} input)은
+# li 밖을 find_next로 훑어 찾는 구조라 잘려나갈까 봐 따로 확인했는데, 이 div
+# 안에 들어 있어서 그대로 동작함(2026-08-22 실측 확인)
+_PRODLIST_ONLY = SoupStrainer("div", {"class": "main_prodlist main_prodlist_list"})
 
 
 def _get_header(host: str, referer: str = None):
@@ -71,7 +84,7 @@ def get_product_codes(keyword: str, category_label: str = None, attribute: str =
     if response.status_code != 200:
         response.raise_for_status()
 
-    bs = BeautifulSoup(response.text, "html.parser")
+    bs = BeautifulSoup(response.text, _PARSER, parse_only=_PRODLIST_ONLY)
     prodlist = bs.find("div", {"class": "main_prodlist main_prodlist_list"})
     product_list = (prodlist or None) and prodlist.select_one("ul.product_list")
     # PATCHED: width_change 클래스가 카테고리별로 없는 경우가 있어 prod_item만으로 매칭
@@ -144,7 +157,7 @@ def get_product(product_code: int) -> dict:
     if response.status_code != 200:
         response.raise_for_status()
 
-    bs = BeautifulSoup(response.text, "html.parser")
+    bs = BeautifulSoup(response.text, _PARSER)
     summary_info = bs.select_one("div.summary_info")
     top_summary = (summary_info or None) and summary_info.select_one("div.top_summary")
     detail_summary = (summary_info or None) and summary_info.select_one("div.detail_summary")
