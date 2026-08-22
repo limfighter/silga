@@ -282,7 +282,8 @@ GET  /search?q={keyword, 선택}&category={선택}&memory_gb={GPU}&chipset={GPU}
     전부 실제 상품 li HTML로 직접 검증 완료(실가_HISTORY.md 2026-08-05 참조)
   ※ 스펙 파라미터(memory_gb/chipset/socket/formfactor/ram_type/wattage/
     interface는 v0.5, cooler_type은 v0.7, formfactor의 SSD 적용은 v0.8,
-    length는 v0.9 추가) — category와 달리 다나와 서버측 요청 자체를
+    length는 v0.9, cpu_type은 v0.14, igpu는 v0.15, capacity/ram_count/
+    efficiency/case_size와 chipset의 메인보드 적용은 v0.16 추가) — category와 달리 다나와 서버측 요청 자체를
     좁히는 필터. danawa.get_product_codes(attribute=...)로 "{속성코드}-
     {값코드}-OR"(또는 케이스만 -AND, 동작상 차이 없음) 형식 문자열을 다나와
     요청 URL에 그대로 전달(다나와 상세검색 필터 체크박스 클릭 시 실측 URL에서
@@ -295,7 +296,7 @@ GET  /search?q={keyword, 선택}&category={선택}&memory_gb={GPU}&chipset={GPU}
     | 파라미터    | 적용 category | 값 예시               | 매핑 딕셔너리(main.py)         |
     |-------------|---------------|------------------------|----------------------------------|
     | memory_gb   | GPU           | 16 (GB)                | GPU_MEMORY_ATTRIBUTES            |
-    | chipset     | GPU           | NVIDIA/AMD/Intel        | GPU_CHIPSET_ATTRIBUTES           |
+    | chipset     | GPU, 메인보드   | GPU: NVIDIA/AMD/Intel(칩셋 제조사), 메인보드: X870E/B650/Z890/B760 등 19종(세부 칩셋 모델) | GPU_CHIPSET_ATTRIBUTES / MAINBOARD_CHIPSET_ATTRIBUTES (같은 파라미터명이지만 의미도 값도 완전히 다름 — socket·formfactor와 같은 방식으로 카테고리별 분리 처리. 메인보드 칩셋은 채택 소켓 4종에 대응하는 현행 유통분만, 워크스테이션/서버·구형 단종·임베디드 제외) |
     | length      | GPU           | "300~309mm"/"360mm~" 등(10mm 단위 구간, 7개) | GPU_LENGTH_ATTRIBUTES (케이스 장착 호환성 참고용 — 구간 결합 미지원이라 정확한 "이하/이상" 필터는 아님, 근사치로만 사용) |
     | socket      | CPU, 메인보드, 쿨러 | AM5/AM4/LGA1851/LGA1700| CPU_SOCKET_ATTRIBUTES / MAINBOARD_SOCKET_ATTRIBUTES / COOLER_SOCKET_ATTRIBUTES (카테고리마다 다나와 내부 코드 자체가 달라 값도 다름 — 절대 재사용 불가. 쿨러는 "그 쿨러가 지원하는 소켓" 의미이고, 인텔(6805)/AMD(6806) 필터 그룹이 나뉘어 있어 값에 따라 속성코드까지 갈림) |
     | formfactor  | 메인보드, 케이스, SSD | 메인보드/케이스: ATX/M-ATX/ITX/E-ATX, SSD: M.2 2280/M.2 2242/M.2 2230/2.5인치 | MAINBOARD_FORMFACTOR_ATTRIBUTES / CASE_FORMFACTOR_ATTRIBUTES / SSD_FORMFACTOR_ATTRIBUTES (메인보드=자기 크기, 케이스=장착 가능한 보드 크기, SSD=드라이브 규격 — 의미가 다름) |
@@ -303,17 +304,34 @@ GET  /search?q={keyword, 선택}&category={선택}&memory_gb={GPU}&chipset={GPU}
     | wattage     | 파워          | "800W~899W" 등          | PSU_WATTAGE_ATTRIBUTES           |
     | interface   | SSD           | SATA3/PCIe3.0x4/PCIe4.0x4/PCIe5.0x4 | SSD_INTERFACE_ATTRIBUTES |
     | cooler_type | 쿨러          | CPU 쿨러/시스템 쿨러/VGA 쿨러/M.2 SSD 쿨러/써멀그리스 | COOLER_TYPE_ATTRIBUTES (다나와 "쿨러/튜닝" 카테고리엔 CPU 쿨러·케이스팬·써멀그리스·조명기기가 다 섞여 있어 category 필터만으론 안 걸러짐 — 이 카테고리에 특히 필요한 필터) |
+    | cpu_type    | CPU           | 코어 울트라9/7/5, 코어i9/i7/i5/i3, 라이젠9/7/5/3 (11종) | CPU_TYPE_ATTRIBUTES (다나와 "CPU 종류" 그룹, 속성코드 357316. 소켓보다 실구매 기준에 가까운 등급 축 — socket과 동시 지정 가능. 실측 34종 중 워크스테이션/서버·PRO 라인·구형 단종·저가 사무용 라인은 기존 트리밍 원칙대로 제외) |
+    | capacity    | RAM, SSD      | RAM: 8GB/16GB/32GB/48GB/64GB(**패키지 총 용량** — 모듈 1개당이 아님, 실측으로 확인), SSD: "1TB~600GB" 등 구간 5종 | RAM_CAPACITY_ATTRIBUTES / SSD_CAPACITY_ATTRIBUTES (카테고리별 별도 딕셔너리. RAM은 ram_count와 같이 걸어야 32GB 1개인지 16GBx2인지 구분됨) |
+    | ram_count   | RAM           | 1개/2개/4개             | RAM_COUNT_ATTRIBUTES (패키지 구성 모듈 수) |
+    | efficiency  | 파워          | 80 PLUS 티타늄/플래티넘/골드/실버/브론즈/스탠다드 | PSU_EFFICIENCY_ATTRIBUTES (실측 6종 전량 채택 — 전부 소비자용 등급이라 제외분 없음. 다나와가 같이 주는 ETA/LAMBDA 인증은 국내 표기 빈도가 낮아 미채택) |
+    | case_size   | 케이스        | 빅타워/미들타워/미니타워/미니ITX | CASE_SIZE_ATTRIBUTES (케이스 자체의 크기 등급 — formfactor(장착 가능한 보드 규격)와는 다른 축이라 동시 지정 가능) |
+    | igpu        | CPU           | 탑재/미탑재            | CPU_IGPU_ATTRIBUTES (내장그래픽 유무, 속성코드 15570. 다나와가 주는 값이 2종뿐이라 트리밍 없음. 별도 GPU 없이 조립할 땐 "탑재"가 필수 조건, GPU를 따로 살 땐 인텔 F 모델처럼 내장그래픽이 빠진 대신 싼 물건을 "미탑재"로 골라냄) |
 
     **같은 category 안에 스펙 파라미터가 여러 개 있는 경우(GPU: memory_gb+
     chipset+length, 메인보드: socket+formfactor, 쿨러: cooler_type+socket,
-    SSD: interface+formfactor) 동시에 못 씀** — attribute 인자가 값 하나만
-    받을 수 있어서(다중 attribute 결합 규칙 미검증 — GPU length로 실제
-    콤마/파이프/파라미터 반복 다 시도해봤으나 전부 실패 확인, 실가_HISTORY.md
-    2026-08-06 참조) chipset(GPU는 memory_gb보다도 우선)/socket/cooler_type/
-    interface가 우선 적용되고 나머지는 무시됨(main.py::search()의 `A or B or C`
-    체이닝 참조). 프론트(PartRow)는 이 제약을 반영해 같은 카테고리의 스펙
-    select를 상호 배타로 구현(하나 고르면 다른 하나 자동 해제) — API를 직접
-    호출하는 쪽(AI 라우터 등)도 이 우선순위를 알아야 함
+    SSD: interface+formfactor) 전부 동시에 적용된다(AND)** — backend v0.13부터.
+    서로 다른 속성코드를 콤마로 이어(`654-3518-OR,663-188705-OR`) attribute=
+    파라미터에 넘기면 다나와가 AND로 처리하는 것을 2026-08-22 라이브 실측으로
+    확인(실가_HISTORY.md 참조). v0.12까지는 attribute 값을 하나만 보낼 수 있다고
+    보고 `A or B or C` 체이닝으로 chipset/socket/cooler_type/interface를 우선
+    적용하고 나머지를 버렸는데, 그 제약 자체가 오판이었음 — 2026-08-06에
+    "결합 불가"로 결론냈던 실측은 같은 속성(GPU length 682) 두 구간을 묶으려던
+    것이었고, 같은 속성끼리는 AND가 아니라 OR이 되는 데다 결과가 페이지 상한
+    40건에 잘려 판별이 안 됐던 것으로 보인다.
+    ※ 콤마 조인 규칙: **서로 다른 속성코드 = AND, 같은 속성코드의 값 여러 개 =
+      OR**. 우리 계약은 파라미터당 값 하나만 받으므로 후자는 발생하지 않음
+      (한 파라미터가 값을 여러 개 받도록 확장한다면 그때는 OR임을 유의)
+    ※ 프론트는 lib/specFilters.ts의 useSpecFilters() 훅이 카테고리별 select
+      상태를 객체 하나로 들고 있고, select끼리 더 이상 상호 배타가 아님
+      (SearchPage / PartSearchPanel / PartRow가 이 훅을 공유)
+    ※ 검색 결과는 **다나와가 한 번에 40건까지만 반환**한다(limit 파라미터로
+      늘릴 수 없음, 2026-08-22 실측). 40건이 꽉 차서 오면 잘린 것이므로 건수를
+      단정하면 안 되고, 조건을 더 걸어 좁히는 것이 유일한 방법 — 프론트
+      SearchPage는 이때 건수를 "40건+"로 표기함
   ※ 다른 카테고리/스펙으로 더 확장하려면 매번 그 카테고리 자체의 필터
     사이드바에서 다시 확보해야 함(체크박스 클릭 → 바뀐 URL의 attribute= 값
     확인) — 카테고리 간 attribute 코드는 절대 재사용 불가로 확인됨(예: CPU

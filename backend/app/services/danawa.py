@@ -56,9 +56,12 @@ def get_product_codes(keyword: str, category_label: str = None, attribute: str =
         필터 체크박스 클릭 시 URL에 그대로 붙는 "{속성코드}-{값코드}-OR" 형식
         문자열(예: "663-188705-OR" = GPU 메모리 용량 16GB) 하나를 그대로 넘기면
         요청 URL에 attribute= 파라미터로 포함됨. category_label과 달리 이건
-        요청 자체를 좁히는 다나와 서버측 필터 — 값 하나만 지원(다중 선택 시
-        결합 규칙 미검증이라 리스트/콤마 조합은 아직 지원 안 함). None이면
-        기존과 동일하게 미적용
+        요청 자체를 좁히는 다나와 서버측 필터. 콤마로 이어 붙이면 여러 조건을
+        같이 걸 수 있음(예: "41-801631-OR,357316-1011490-OR") — 서로 다른
+        속성코드끼리는 AND, 같은 속성코드의 값 여러 개는 OR로 동작하는 것을
+        2026-08-22 라이브 실측으로 확인(실가_HISTORY.md 참조). 조립할 문자열은
+        호출부(main.py::search())가 만들고 여기서는 받은 값을 그대로 전달함.
+        None이면 기존과 동일하게 미적용
     """
     from urllib.parse import quote
     url = "https://search.danawa.com/dsearch.php?query={}&tab=main".format(quote(keyword))

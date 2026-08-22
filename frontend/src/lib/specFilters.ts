@@ -1,8 +1,9 @@
+import { useEffect, useState } from "react";
 import type { SearchSpecParams } from "./api";
 
 // 빌드 구성 카테고리 8종 — backend/app/main.py CATEGORY_LABELS 키와 정확히
-// 일치해야 함. PartRow(빌드 생성/검색 화면)와 BuildCreatePage가 공유하는
-// 단일 소스 — 여기서만 바뀌면 양쪽 다 반영됨.
+// 일치해야 함. SearchPage(부품 검색 탭)와 BuildCreatePage(빌드 생성)가
+// 공유하는 단일 소스 — 여기서만 바뀌면 양쪽 다 반영됨.
 export const CATEGORIES = ["CPU", "GPU", "메인보드", "RAM", "SSD", "케이스", "파워", "쿨러"];
 
 // 아래 옵션 배열들은 backend/app/main.py의 대응 ATTRIBUTES 딕셔너리 키와
@@ -19,6 +20,39 @@ const GPU_LENGTH_OPTIONS = [
   "360mm~",
 ];
 const SOCKET_OPTIONS = ["AM5", "AM4", "LGA1851", "LGA1700"];
+const CPU_TYPE_OPTIONS = [
+  "코어 울트라9",
+  "코어 울트라7",
+  "코어 울트라5",
+  "코어i9",
+  "코어i7",
+  "코어i5",
+  "코어i3",
+  "라이젠9",
+  "라이젠7",
+  "라이젠5",
+  "라이젠3",
+];
+const IGPU_OPTIONS = ["탑재", "미탑재"];
+const RAM_CAPACITY_OPTIONS = ["8GB", "16GB", "32GB", "48GB", "64GB"];
+const RAM_COUNT_OPTIONS = ["1개", "2개", "4개"];
+const SSD_CAPACITY_OPTIONS = ["256GB~130GB", "525GB~270GB", "1TB~600GB", "2TB~1.1TB", "4TB~3TB"];
+const PSU_EFFICIENCY_OPTIONS = [
+  "80 PLUS 티타늄",
+  "80 PLUS 플래티넘",
+  "80 PLUS 골드",
+  "80 PLUS 실버",
+  "80 PLUS 브론즈",
+  "80 PLUS 스탠다드",
+];
+const CASE_SIZE_OPTIONS = ["빅타워", "미들타워", "미니타워", "미니ITX"];
+// 메인보드 세부 칩셋 — 채택 소켓 4종에 대응하는 현행 유통 칩셋만(소켓 순서로 정렬)
+const MAINBOARD_CHIPSET_OPTIONS = [
+  "X870E", "X870", "B850", "B840", "X670E", "X670", "B650E", "B650", "A620",
+  "X570", "B550", "A520", "B450",
+  "Z890", "B860", "H810",
+  "Z790", "B760", "H610",
+];
 const FORMFACTOR_OPTIONS = ["ATX", "M-ATX", "ITX", "E-ATX"];
 const RAM_TYPE_OPTIONS = ["DDR5", "DDR4"];
 const PSU_WATTAGE_OPTIONS = [
@@ -42,11 +76,12 @@ export interface SpecFilterDef {
   formatOption?: (value: string) => string;
 }
 
-// 카테고리별 스펙 필터 select 구성. 같은 카테고리 안의 필터끼리는 항상
-// 상호 배타(하나 고르면 나머지는 자동으로 풀림) — 백엔드가 attribute 값을
-// 하나만 받을 수 있어서(다중 결합 규칙 미검증) 동시 적용이 안 되기 때문
-// (backend/app/main.py::search() 참조). PartRow(빌드 생성)와 SearchPage
-// (부품 검색)가 이 정의를 공유함.
+// 카테고리별 스펙 필터 select 구성. 같은 카테고리 안의 필터는 동시에 걸 수
+// 있음 — 백엔드가 서로 다른 속성코드를 콤마로 이어 다나와에 AND로 넘긴다
+// (backend/app/main.py::search() 참조). backend v0.12까지는 attribute 값을
+// 하나만 보낼 수 있어서 select끼리 상호 배타였음.
+// select 상태 관리는 아래 useSpecFilters()가 담당하고, SearchPage /
+// PartSearchPanel / PartRow가 이 정의와 훅을 함께 공유함.
 export const CATEGORY_SPEC_FILTERS: Record<string, SpecFilterDef[]> = {
   GPU: [
     {
@@ -69,11 +104,36 @@ export const CATEGORY_SPEC_FILTERS: Record<string, SpecFilterDef[]> = {
       options: GPU_LENGTH_OPTIONS,
     },
   ],
+  // CPU는 등급(종류)부터 좁히는 게 소켓보다 실구매 기준에 가까워서 종류를
+  // 앞에 둔다 — 둘은 서로 다른 속성이라 동시 적용됨(AND)
   CPU: [
+    {
+      specKey: "cpuType",
+      placeholder: "종류 전체",
+      title: "CPU 등급(종류)으로 좁혀서 검색",
+      options: CPU_TYPE_OPTIONS,
+    },
     { specKey: "socket", placeholder: "소켓 전체", title: "소켓으로 좁혀서 검색", options: SOCKET_OPTIONS },
+    {
+      specKey: "igpu",
+      placeholder: "내장그래픽 전체",
+      // 고른 뒤 닫힌 select에는 값만 남아서 "탑재"만 보이면 무슨 탑재인지
+      // 알 수 없음 — 조건 칩에도 같은 문자열이 쓰이므로 항목명을 붙여둔다
+      title: "내장그래픽 유무로 좁혀서 검색(별도 GPU 없이 조립할 때 필수 조건)",
+      options: IGPU_OPTIONS,
+      formatOption: (v) => `내장그래픽 ${v}`,
+    },
   ],
   메인보드: [
     { specKey: "socket", placeholder: "소켓 전체", title: "소켓으로 좁혀서 검색", options: SOCKET_OPTIONS },
+    {
+      // GPU와 같은 chipset 파라미터를 쓰지만 값은 완전히 다름(GPU=제조사,
+      // 메인보드=칩셋 모델) — 백엔드도 카테고리별로 다른 딕셔너리를 봄
+      specKey: "chipset",
+      placeholder: "칩셋 전체",
+      title: "세부 칩셋으로 좁혀서 검색(같은 소켓이라도 칩셋에 따라 가격대가 갈림)",
+      options: MAINBOARD_CHIPSET_OPTIONS,
+    },
     {
       specKey: "formfactor",
       placeholder: "폼팩터 전체",
@@ -83,6 +143,14 @@ export const CATEGORY_SPEC_FILTERS: Record<string, SpecFilterDef[]> = {
   ],
   케이스: [
     {
+      // formfactor(장착 가능한 보드 크기)와는 다른 축 — 이쪽은 케이스 자체의
+      // 크기 등급이라 둘 다 동시에 걸 수 있음
+      specKey: "caseSize",
+      placeholder: "크기 전체",
+      title: "케이스 크기로 좁혀서 검색",
+      options: CASE_SIZE_OPTIONS,
+    },
+    {
       specKey: "formfactor",
       placeholder: "지원 폼팩터 전체",
       title: "장착 가능한 메인보드 폼팩터로 좁혀서 검색",
@@ -91,11 +159,37 @@ export const CATEGORY_SPEC_FILTERS: Record<string, SpecFilterDef[]> = {
   ],
   RAM: [
     { specKey: "ramType", placeholder: "규격 전체", title: "DDR 규격으로 좁혀서 검색", options: RAM_TYPE_OPTIONS },
+    {
+      specKey: "capacity",
+      placeholder: "용량 전체",
+      title: "패키지 총 용량으로 좁혀서 검색(모듈 1개당 용량이 아님)",
+      options: RAM_CAPACITY_OPTIONS,
+    },
+    {
+      specKey: "ramCount",
+      placeholder: "개수 전체",
+      title: "구성 모듈 개수로 좁혀서 검색 — 용량과 같이 걸면 32GB 1개인지 16GBx2인지 구분됨",
+      options: RAM_COUNT_OPTIONS,
+      formatOption: (v) => `램 ${v}`,
+    },
   ],
   파워: [
     { specKey: "wattage", placeholder: "출력 전체", title: "정격출력으로 좁혀서 검색", options: PSU_WATTAGE_OPTIONS },
+    {
+      specKey: "efficiency",
+      placeholder: "인증 전체",
+      title: "80PLUS 인증 등급으로 좁혀서 검색(같은 출력이라도 등급이 가격을 가름)",
+      options: PSU_EFFICIENCY_OPTIONS,
+    },
   ],
   SSD: [
+    {
+      // SSD는 용량이 가격을 가장 크게 가르는 축이라 인터페이스/폼팩터보다 앞
+      specKey: "capacity",
+      placeholder: "용량 전체",
+      title: "용량 구간으로 좁혀서 검색",
+      options: SSD_CAPACITY_OPTIONS,
+    },
     {
       specKey: "interface",
       placeholder: "인터페이스",
@@ -128,3 +222,41 @@ export const CATEGORY_SPEC_FILTERS: Record<string, SpecFilterDef[]> = {
     },
   ],
 };
+
+/**
+ * 스펙 필터 select들의 상태. 같은 로직이 SearchPage / PartSearchPanel /
+ * PartRow에 3벌로 복붙돼 있던 것을 하나로 모은 것 — memoryGb만 number로
+ * 캐스팅해야 하는 예외도 여기 한 곳에만 둔다.
+ *
+ * 반환하는 spec 객체를 그대로 api.search()에 넘기면 됨. 여러 키가 채워져
+ * 있으면 백엔드가 전부 AND로 결합한다.
+ */
+export function useSpecFilters(category: string) {
+  const [spec, setSpec] = useState<SearchSpecParams>({});
+  const defs = CATEGORY_SPEC_FILTERS[category] ?? [];
+
+  // 카테고리를 바꾸면 이전 카테고리 조건은 버린다(GPU에서 칩셋을 걸어둔 채
+  // CPU 탭으로 넘어가면 그 값은 CPU에서 의미가 없고 백엔드에서도 무시됨)
+  useEffect(() => setSpec({}), [category]);
+
+  const setValue = (key: keyof SearchSpecParams, raw: string) =>
+    setSpec((prev) => {
+      const next = { ...prev };
+      if (!raw) delete next[key];
+      else if (key === "memoryGb") next.memoryGb = Number(raw);
+      else next[key] = raw;
+      return next;
+    });
+
+  // 지금 걸려 있는 조건 목록 — 라벨은 select에 표시되는 문자열(formatOption
+  // 적용분)과 같은 값을 쓴다. 라벨은 필터끼리 겹칠 수 있어서 React key로는
+  // specKey를 쓰라고 같이 넘김
+  const activeLabels = defs
+    .filter((d) => spec[d.specKey] != null)
+    .map((d) => {
+      const v = String(spec[d.specKey]);
+      return { key: d.specKey, label: d.formatOption ? d.formatOption(v) : v };
+    });
+
+  return { defs, spec, setValue, clear: () => setSpec({}), activeLabels };
+}
