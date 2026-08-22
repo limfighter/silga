@@ -1,14 +1,19 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type SearchResultItem, type SearchSpecParams } from "../lib/api";
-import { CATEGORIES, CATEGORY_SPEC_FILTERS } from "../lib/specFilters";
+import { api, type SearchResultItem } from "../lib/api";
+import { CATEGORIES, useSpecFilters } from "../lib/specFilters";
 import type { SelectedPart } from "../components/PartRow";
 import { addRecentProduct } from "../lib/recentProducts";
 import Answer, { errorMessage } from "../components/Answer";
 import { manwon, won } from "../lib/format";
 
 type SortKey = "popular" | "low" | "high";
+
+// 다나와 검색 결과는 한 페이지 40건이 상한(limit 파라미터로 못 늘림 —
+// 2026-08-22 실측). 40건이 꽉 차서 오면 실제로는 더 있는데 잘린 것이므로
+// 건수를 그대로 "40건"이라고 단정하면 안 된다.
+const PAGE_LIMIT = 40;
 
 // 인기상품순은 API가 준 순서 그대로(다나와 정렬 기준 위임), 가격순은
 // 프론트에서 재정렬. 가격 조회 실패(price null) 상품은 정렬 기준이 없어
@@ -26,7 +31,6 @@ export default function SearchPage() {
   const queryClient = useQueryClient();
 
   const [category, setCategory] = useState<string>(CATEGORIES[0]);
-  const [specValue, setSpecValue] = useState<{ key: keyof SearchSpecParams; value: string } | null>(null);
   const [input, setInput] = useState("");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("popular");
@@ -35,19 +39,19 @@ export default function SearchPage() {
   );
   const [buildName, setBuildName] = useState("");
 
-  const specDefs = CATEGORY_SPEC_FILTERS[category] ?? [];
-  const spec: SearchSpecParams | undefined = specValue
-    ? { [specValue.key]: specValue.key === "memoryGb" ? Number(specValue.value) : specValue.value }
-    : undefined;
+  // 같은 카테고리의 스펙 필터를 동시에 걸 수 있음(백엔드가 AND로 결합).
+  // 카테고리 전환 시 조건 초기화도 훅이 처리함
+  const { defs: specDefs, spec, setValue, clear, activeLabels } = useSpecFilters(category);
 
   // q가 비어 있으면 백엔드가 category 기본 키워드로 대신 검색 — 검색 버튼을
   // 안 눌러도 카테고리 선택만으로 기본 목록이 뜨도록 하기 위함
   const { data, isFetching, isError, error } = useQuery({
-    queryKey: ["search", query, category, specValue],
+    queryKey: ["search", query, category, spec],
     queryFn: () => api.search(query || undefined, category, spec),
   });
 
   const results = useMemo(() => sortResults(data ?? [], sort), [data, sort]);
+  const capped = results.length >= PAGE_LIMIT;
 
   const submit = () => setQuery(input.trim());
 
@@ -87,6 +91,21 @@ export default function SearchPage() {
     mutation.mutate({ name: buildName.trim(), items });
   };
 
+  // 걸려 있는 조건을 결론 블록 근거 줄에 그대로 노출 — 별도 칩 UI를 만들지
+  // 않고 .because(이미 모노스페이스)에 얹는다
+  const condLine =
+    activeLabels.length > 0 ? (
+      <>
+        {" "}
+        · 조건{" "}
+        {activeLabels.map((c) => (
+          <span className="cond" key={c.key}>
+            {c.label}
+          </span>
+        ))}
+      </>
+    ) : null;
+
   const answer = (() => {
     const cartLine =
       cartCount > 0 ? (
@@ -106,7 +125,7 @@ export default function SearchPage() {
               {category} <mark>목록을 불러오는 중</mark>입니다
             </>
           }
-          because={<>다나와 실시간 최저가 조회{cartLine}</>}
+          because={<>다나와 실시간 최저가 조회{condLine}{cartLine}</>}
         />
       );
     }
@@ -135,8 +154,15 @@ export default function SearchPage() {
           }
           because={
             <>
-              검색어나 스펙 필터를 줄여보세요{cartLine}
+              검색어나 스펙 필터를 줄여보세요{condLine}{cartLine}
             </>
+          }
+          actions={
+            activeLabels.length > 0 ? (
+              <button className="spec-clear" onClick={clear}>
+                조건 지우기
+              </button>
+            ) : undefined
           }
         />
       );
@@ -146,7 +172,9 @@ export default function SearchPage() {
         kick={`부품 검색 · ${category}`}
         headline={
           <>
-            {category} <mark>{results.length}건</mark>
+            {category} <mark>
+              {results.length}건{capped ? "+" : ""}
+            </mark>
             {priceLow != null && priceHigh != null && (
               <>
                 {" "}
@@ -160,6 +188,8 @@ export default function SearchPage() {
             다나와 실시간 최저가 ·{" "}
             {sort === "popular" ? "인기상품순" : sort === "low" ? "낮은가격순" : "높은가격순"}
             {query.length === 0 && ` · 검색어 없이 ${category} 기본 목록`}
+            {condLine}
+            {capped && " · 다나와가 한 번에 주는 40건까지만 표시 — 조건을 더 걸면 좁혀집니다"}
             {cartLine}
           </>
         }
@@ -176,10 +206,7 @@ export default function SearchPage() {
           <button
             key={c}
             className={`category-tab${c === category ? " active" : ""}`}
-            onClick={() => {
-              setCategory(c);
-              setSpecValue(null);
-            }}
+            onClick={() => setCategory(c)}
           >
             {c}
             {cart[c] && <i className="ct-dot" />}
@@ -206,10 +233,8 @@ export default function SearchPage() {
                 <select
                   key={def.specKey}
                   className="part-spec-filter"
-                  value={specValue?.key === def.specKey ? specValue.value : ""}
-                  onChange={(e) =>
-                    setSpecValue(e.target.value ? { key: def.specKey, value: e.target.value } : null)
-                  }
+                  value={String(spec[def.specKey] ?? "")}
+                  onChange={(e) => setValue(def.specKey, e.target.value)}
                   title={def.title}
                 >
                   <option value="">{def.placeholder}</option>
@@ -220,6 +245,9 @@ export default function SearchPage() {
                   ))}
                 </select>
               ))}
+              {activeLabels.length > 0 && (
+                <button className="spec-clear" onClick={clear}>조건 지우기</button>
+              )}
             </div>
           )}
 

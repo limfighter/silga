@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api, type SearchResultItem, type SearchSpecParams } from "../lib/api";
+import { api, type SearchResultItem } from "../lib/api";
 import { useDebouncedValue } from "../lib/useDebouncedValue";
-import { CATEGORY_SPEC_FILTERS } from "../lib/specFilters";
+import { useSpecFilters } from "../lib/specFilters";
 
 export interface SelectedPart {
   code: number;
@@ -27,15 +27,13 @@ export default function PartRow({
   const [input, setInput] = useState("");
   const debounced = useDebouncedValue(input, 500); // 매너 크롤링 — 타건마다 호출 방지
   const [focused, setFocused] = useState(false);
-  const [specValue, setSpecValue] = useState<{ key: keyof SearchSpecParams; value: string } | null>(null);
-
-  const specDefs = CATEGORY_SPEC_FILTERS[category] ?? [];
-  const spec: SearchSpecParams | undefined = specValue
-    ? { [specValue.key]: specValue.key === "memoryGb" ? Number(specValue.value) : specValue.value }
-    : undefined;
+  // 현재 이 컴포넌트를 쓰는 StatsPage/FavoritesPage는 category로 "부품"/"검색"
+  // 을 넘겨서 specDefs가 항상 비어 있음(스펙 select가 렌더되지 않음) — 실제
+  // 카테고리로 쓰이게 될 때를 위해 다른 화면과 같은 훅으로 맞춰만 둔다
+  const { defs: specDefs, spec, setValue } = useSpecFilters(category);
 
   const { data, isFetching } = useQuery({
-    queryKey: ["search", debounced, category, specValue],
+    queryKey: ["search", debounced, category, spec],
     queryFn: () => api.search(debounced, category, spec),
     enabled: debounced.trim().length > 1 && focused,
   });
@@ -82,10 +80,8 @@ export default function PartRow({
             <select
               key={def.specKey}
               className="part-spec-filter"
-              value={specValue?.key === def.specKey ? specValue.value : ""}
-              onChange={(e) =>
-                setSpecValue(e.target.value ? { key: def.specKey, value: e.target.value } : null)
-              }
+              value={String(spec[def.specKey] ?? "")}
+              onChange={(e) => setValue(def.specKey, e.target.value)}
               title={def.title}
             >
               <option value="">{def.placeholder}</option>

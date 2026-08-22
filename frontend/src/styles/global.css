@@ -183,6 +183,12 @@ input,select{font-family:inherit;}
   margin-top:14px;line-height:1.8;
 }
 .answer .because b{color:var(--ink);font-weight:500;}
+/* 검색 화면에서 지금 걸려 있는 스펙 조건 — .because가 이미 모노스페이스라
+   글꼴은 물려받고 헤어라인 박스만 씌운다 */
+.answer .because .cond{
+  border:var(--rule-1) solid var(--line-lt);color:var(--ink);
+  padding:1px 6px;margin-right:5px;white-space:nowrap;
+}
 .answer-acts{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;align-items:center;}
 
 /* 결론이 아직/영영 없을 때 — 이 앱의 데이터 소스는 예고 없이 DOM이 바뀌는
@@ -652,7 +658,16 @@ input,select{font-family:inherit;}
 }
 .search-box input:focus{outline:none;border-color:var(--ink);}
 
-.search-spec-filters{display:flex;gap:8px;margin-bottom:20px;}
+/* 카테고리당 select가 최대 3개(GPU)라 지금은 한 줄에 들어가지만, 필터가
+   늘어나면 넘치므로 .bc-panel-specs와 같이 wrap 허용 */
+.search-spec-filters{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;align-items:center;}
+/* 조건을 여러 개 걸 수 있게 되면서 하나씩 "전체"로 되돌리는 게 번거로워짐 */
+.spec-clear{
+  background:none;border:var(--rule-1) solid var(--line-lt);color:var(--mute-lt);
+  padding:9px 12px;font-size:12.5px;
+  transition:border-color .15s,color .15s;
+}
+.spec-clear:hover{border-color:var(--ink);color:var(--ink);}
 
 /* ── 검색 화면 카테고리 탭 (검색+견적 카트 플로우 진입점) ── */
 .category-tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px;}

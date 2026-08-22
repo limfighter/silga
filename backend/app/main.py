@@ -82,9 +82,11 @@ CATEGORY_DEFAULT_QUERY = {
 # 형식은 다나와 상세검색 필터 체크박스 클릭 시 실측 URL에서 그대로 가져온 값
 # (속성코드 663 = GPU 메모리 용량, 실가_HISTORY.md 2026-08-05 참조). 이 필터는
 # category_label과 달리 다나와 서버측 요청 자체를 좁히는 필터라 사후 필터링이
-# 아님 — 다중 선택(예: 12GB+16GB 동시)은 결합 규칙 미검증이라 미지원, 값 하나만 허용.
+# 아님 — 같은 속성 안에서 값 여러 개(예: 12GB+16GB)를 콤마로 이으면 AND가 아니라
+# OR로 동작하는 것이 2026-08-22 실측으로 확인됐으나, 파라미터당 값 하나만 받는
+# 현재 계약은 그대로 유지(다른 속성끼리의 AND 결합만 지원 — search() 참조).
 # 1GB 미만·1~3GB·5GB(구형 저용량)와 72/80/94/96GB(데이터센터급)는 실측은
-# 됐지만 개인 조립 PC 범위 밖이라 제외 — frontend/src/components/PartRow.tsx의
+# 됐지만 개인 조립 PC 범위 밖이라 제외 — frontend/src/lib/specFilters.ts의
 # GPU_MEMORY_OPTIONS와 반드시 키를 맞출 것(2026-08-05 리뷰에서 여기 dict에만
 # 1/2/3/5GB가 남아있고 프론트엔 없던 불일치 발견해서 정정함)
 GPU_MEMORY_ATTRIBUTES = {
@@ -120,8 +122,8 @@ CPU_SOCKET_ATTRIBUTES = {
 # 제조사). "RTX 5070 Ti" 검색 결과 필터 사이드바에서 실측(실가_HISTORY.md
 # 2026-08-05 참조) — FuriosaAI(AI 가속기 칩 제조사, 일반 소비자용
 # 그래픽카드 아님)는 제외하고 실제 소비자용 그래픽카드 제조사 3개만 채택.
-# memory_gb와 동시 지정 시 다중 attribute 결합 규칙이 미검증이라 둘 다
-# 적용하지 않고 chipset을 우선 적용(아래 search() 참조)
+# memory_gb/length와 동시 지정 가능 — 셋 다 서로 다른 속성이라 콤마로 이어
+# AND로 결합됨(v0.13부터, 아래 search() 참조)
 GPU_CHIPSET_ATTRIBUTES = {
     "NVIDIA": "654-3518-OR",
     "AMD": "654-3517-OR",
@@ -138,9 +140,12 @@ GPU_CHIPSET_ATTRIBUTES = {
 # 빼고 하이픈으로 바꾼 "682-3993-OR" 형식이 기존 attribute= 파라미터에
 # 그대로 먹힘 확인(140~149mm 필터 → GT1030/GT730 등 초소형 카드만,
 # 360mm~ 필터 → RTX 5080/5090 등 초대형 카드만 반환되는 것으로 실측 확인).
-# 콤마/파이프/파라미터 반복 전부 시도했으나 여러 구간을 하나로 묶는 다중
-# attribute 결합은 안 됨 확인(기존 "다중 attribute 결합 규칙 미검증" 제약과
-# 동일) — 그래서 PSU_WATTAGE_ATTRIBUTES와 같은 방식으로 다나와가 제공하는
+# 콤마/파이프/파라미터 반복 전부 시도했으나 여러 구간을 하나로 묶는 결합은
+# 실패했음. 2026-08-22 CPU 코드로 재확인한 결과 콤마 조인은 서로 다른 속성끼리
+# AND, 같은 속성끼리 OR로 동작하며, 당시 실패는 같은 속성(682) 두 구간을 묶으려
+# 한 데다 결과가 페이지 상한 40건에 잘려 판별이 안 됐던 것으로 보임 — 길이 구간
+# 결합 자체는 재실측하지 않았으므로 지금도 미지원으로 둔다. 그래서
+# PSU_WATTAGE_ATTRIBUTES와 같은 방식으로 다나와가 제공하는
 # 10mm 단위 구간(전체 23개) 중 현재 시장 판매 카드가 몰려 있는 실사용
 # 범위(190~369mm)에서 7개만 골라 채택. 140~189mm(구형 로우프로파일
 # 업무용 카드 GT710/GT730급, 개인 게이밍 조립 범위 밖)는 제외 — 기존
@@ -232,10 +237,9 @@ SSD_INTERFACE_ATTRIBUTES = {
 # 분리 처리(아래 search() 참조) — attribute 코드 자체는 SSD 전용(14695),
 # 재사용 아님. Mini SATA(mSATA, 구형 노트북용)·PCIe 카드(애드인 카드,
 # 소수 규격)·기타(불명확)는 제외 — M.2(22110, 서버/엔터프라이즈용)도 개인
-# 조립 PC 범위 밖이라 제외하고 소비자용 4개만 채택. interface와 동시 지정
-# 시 interface 우선 적용(둘 다 SSD 자체 성격을 정의하는 축이라 우선순위
-# 기준 명확한 원칙은 없음 — SSD 성능/세대를 더 직접적으로 나타내는
-# interface를 우선한 것으로 결정)
+# 조립 PC 범위 밖이라 제외하고 소비자용 4개만 채택. interface와는 서로 다른
+# 속성이라 동시 지정 가능 — 콤마로 이어 AND로 결합됨(v0.13부터. 그전에는
+# interface를 우선 적용하고 formfactor를 버렸음)
 SSD_FORMFACTOR_ATTRIBUTES = {
     "M.2 2280": "14695-202347-OR",
     "M.2 2242": "14695-202350-OR",
@@ -253,8 +257,8 @@ SSD_FORMFACTOR_ATTRIBUTES = {
 # 팬컨트롤러/써멀패드·퍼티/조명기기/방열판/팬 부속품/튜닝 용품은 개인 조립
 # PC의 부품 견적 범위 밖이라 기존 트리밍 원칙대로 제외하고 5종만 채택.
 # 키는 우리 API 계약 값이라 다나와 라벨과 꼭 같지는 않음("써멀그리스"의
-# 다나와 원 라벨은 "써멀컴파운드(그리스)") — frontend/src/components/
-# PartRow.tsx의 COOLER_TYPE_OPTIONS와 반드시 키를 맞출 것
+# 다나와 원 라벨은 "써멀컴파운드(그리스)") — frontend/src/lib/specFilters.ts의
+# COOLER_TYPE_OPTIONS와 반드시 키를 맞출 것
 COOLER_TYPE_ATTRIBUTES = {
     "CPU 쿨러": "687-4015-OR",
     "시스템 쿨러": "687-4017-OR",
@@ -340,20 +344,20 @@ def search(
     chipset: Optional[str] = Query(
         None,
         description="GPU 칩셋 제조사 스펙 필터(NVIDIA/AMD/Intel) — category=GPU일 때만 적용, "
-                     "그 외에는 무시. memory_gb와 동시 지정 시 chipset 우선 적용",
+                     "그 외에는 무시. memory_gb/length와 동시 지정 가능(AND로 결합)",
     ),
     length: Optional[str] = Query(
         None,
         description="GPU 가로(길이) 스펙 필터(예: 300~309mm, 360mm~) — category=GPU일 때만 적용, "
                      "GPU_LENGTH_ATTRIBUTES 키와 정확히 일치해야 함, 그 외 무시. "
-                     "chipset/memory_gb와 동시 지정 시 그쪽이 우선 적용",
+                     "chipset/memory_gb와 동시 지정 가능(AND로 결합)",
     ),
     formfactor: Optional[str] = Query(
         None,
         description="폼팩터 스펙 필터 — category=메인보드/케이스일 때는 ATX/M-ATX/ITX/E-ATX "
                      "(메인보드=자기 크기, 케이스=장착 가능한 보드 크기), category=SSD일 때는 "
                      "M.2 2280/M.2 2242/M.2 2230/2.5인치. 그 외 category에서는 무시. "
-                     "메인보드는 socket과, SSD는 interface와 동시 지정 시 그쪽이 우선 적용",
+                     "메인보드는 socket과, SSD는 interface와 동시 지정 가능(AND로 결합)",
     ),
     ram_type: Optional[str] = Query(
         None,
@@ -367,19 +371,20 @@ def search(
     interface: Optional[str] = Query(
         None,
         description="SSD 인터페이스 스펙 필터(SATA3/PCIe3.0x4/PCIe4.0x4/PCIe5.0x4) — "
-                     "category=SSD일 때만 적용, 그 외 무시. formfactor와 동시 지정 시 interface 우선 적용",
+                     "category=SSD일 때만 적용, 그 외 무시. formfactor와 동시 지정 가능(AND로 결합)",
     ),
     cooler_type: Optional[str] = Query(
         None,
         description="쿨러 제품 종류 스펙 필터(CPU 쿨러/시스템 쿨러/VGA 쿨러/M.2 SSD 쿨러/써멀그리스) — "
-                     "category=쿨러일 때만 적용, 그 외 무시. socket과 동시 지정 시 cooler_type 우선 적용",
+                     "category=쿨러일 때만 적용, 그 외 무시. socket과 동시 지정 가능(AND로 결합)",
     ),
 ):
     """
     GET /search?q={keyword, 선택}&category={CATEGORY_LABELS 키, 선택}&memory_gb={GPU 전용}&chipset={GPU 전용}&
         length={GPU 전용}&socket={CPU/메인보드/쿨러 전용}&formfactor={메인보드/케이스/SSD 전용}&
         ram_type={RAM 전용}&wattage={파워 전용}&interface={SSD 전용}&cooler_type={쿨러 전용}
-        (스펙 파라미터는 전부 선택, category와 안 맞으면 무시) →
+        (스펙 파라미터는 전부 선택, category와 안 맞으면 무시. 같은 category의
+        스펙 파라미터를 여러 개 주면 전부 AND로 결합됨 — v0.13) →
         [{code, title, price, price_formatted, img}, ...]
 
     q 생략 시 category의 CATEGORY_DEFAULT_QUERY 키워드로 대신 검색(검색 버튼을
@@ -392,27 +397,44 @@ def search(
             raise HTTPException(status_code=400, detail="q 또는 유효한 category가 필요합니다")
 
     category_label = CATEGORY_LABELS.get(category) if category else None
-    attribute = None
+    # 같은 category 안의 스펙 필터는 동시 적용된다 — 서로 다른 속성코드를
+    # 콤마로 이으면 다나와가 AND로 처리함(2026-08-22 CPU 코드로 라이브 실측:
+    # 소켓AM5+라이젠7 결과가 두 단독 결과의 교집합과 정확히 일치, 3개 결합도
+    # 동일, 소켓AM4+6코어는 반환 20건 전부 두 조건 동시 만족. 실가_HISTORY.md
+    # 참조). v0.12까지는 `A or B` 체이닝으로 하나만 적용하고 나머지를 버렸음.
+    # 주의: 같은 속성코드의 값 여러 개를 이으면 AND가 아니라 OR이 되는데,
+    # 파라미터당 값 하나만 받는 현재 계약에서는 그 경우가 생기지 않음.
+    attributes: list[Optional[str]] = []
     if category == "GPU":
-        attribute = (
-            GPU_CHIPSET_ATTRIBUTES.get(chipset)
-            or GPU_MEMORY_ATTRIBUTES.get(memory_gb)
-            or GPU_LENGTH_ATTRIBUTES.get(length)
-        )
+        attributes = [
+            GPU_CHIPSET_ATTRIBUTES.get(chipset),
+            GPU_MEMORY_ATTRIBUTES.get(memory_gb),
+            GPU_LENGTH_ATTRIBUTES.get(length),
+        ]
     elif category == "CPU":
-        attribute = CPU_SOCKET_ATTRIBUTES.get(socket)
+        attributes = [CPU_SOCKET_ATTRIBUTES.get(socket)]
     elif category == "메인보드":
-        attribute = MAINBOARD_SOCKET_ATTRIBUTES.get(socket) or MAINBOARD_FORMFACTOR_ATTRIBUTES.get(formfactor)
+        attributes = [
+            MAINBOARD_SOCKET_ATTRIBUTES.get(socket),
+            MAINBOARD_FORMFACTOR_ATTRIBUTES.get(formfactor),
+        ]
     elif category == "케이스":
-        attribute = CASE_FORMFACTOR_ATTRIBUTES.get(formfactor)
+        attributes = [CASE_FORMFACTOR_ATTRIBUTES.get(formfactor)]
     elif category == "RAM":
-        attribute = RAM_TYPE_ATTRIBUTES.get(ram_type)
+        attributes = [RAM_TYPE_ATTRIBUTES.get(ram_type)]
     elif category == "파워":
-        attribute = PSU_WATTAGE_ATTRIBUTES.get(wattage)
+        attributes = [PSU_WATTAGE_ATTRIBUTES.get(wattage)]
     elif category == "SSD":
-        attribute = SSD_INTERFACE_ATTRIBUTES.get(interface) or SSD_FORMFACTOR_ATTRIBUTES.get(formfactor)
+        attributes = [
+            SSD_INTERFACE_ATTRIBUTES.get(interface),
+            SSD_FORMFACTOR_ATTRIBUTES.get(formfactor),
+        ]
     elif category == "쿨러":
-        attribute = COOLER_TYPE_ATTRIBUTES.get(cooler_type) or COOLER_SOCKET_ATTRIBUTES.get(socket)
+        attributes = [
+            COOLER_TYPE_ATTRIBUTES.get(cooler_type),
+            COOLER_SOCKET_ATTRIBUTES.get(socket),
+        ]
+    attribute = ",".join(a for a in attributes if a) or None
     try:
         results = danawa.get_product_codes(q, category_label=category_label, attribute=attribute)
     except requests.RequestException:

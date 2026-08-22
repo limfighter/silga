@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api, type SearchResultItem, type SearchSpecParams } from "../lib/api";
+import { api, type SearchResultItem } from "../lib/api";
 import { useDebouncedValue } from "../lib/useDebouncedValue";
-import { CATEGORY_SPEC_FILTERS } from "../lib/specFilters";
+import { useSpecFilters } from "../lib/specFilters";
 
 // BuildCreatePage 전용 마스터-디테일 검색 패널 — 왼쪽에서 고른 카테고리
 // 하나에 대한 검색만 담당(패널 자체는 한 번에 하나만 렌더링됨, 기존
@@ -19,17 +19,13 @@ export default function PartSearchPanel({
 }) {
   const [query, setQuery] = useState("");
   const debounced = useDebouncedValue(query, 500); // 매너 크롤링 — 타건마다 호출 방지
-  const [specValue, setSpecValue] = useState<{ key: keyof SearchSpecParams; value: string } | null>(null);
-
-  const specDefs = CATEGORY_SPEC_FILTERS[category] ?? [];
-  const spec: SearchSpecParams | undefined = specValue
-    ? { [specValue.key]: specValue.key === "memoryGb" ? Number(specValue.value) : specValue.value }
-    : undefined;
+  // 같은 카테고리의 스펙 필터를 동시에 걸 수 있음(백엔드가 AND로 결합)
+  const { defs: specDefs, spec, setValue, clear, activeLabels } = useSpecFilters(category);
 
   // query가 비어있어도 category 기본 목록이 바로 뜸(검색어 없이도 기본
   // 크롤링 결과를 보여주는 /search 동작을 그대로 활용 — SearchPage와 동일 패턴)
   const { data, isFetching } = useQuery({
-    queryKey: ["search", debounced, category, specValue],
+    queryKey: ["search", debounced, category, spec],
     queryFn: () => api.search(debounced || undefined, category, spec),
   });
 
@@ -46,10 +42,8 @@ export default function PartSearchPanel({
             <select
               key={def.specKey}
               className="bc-spec-filter"
-              value={specValue?.key === def.specKey ? specValue.value : ""}
-              onChange={(e) =>
-                setSpecValue(e.target.value ? { key: def.specKey, value: e.target.value } : null)
-              }
+              value={String(spec[def.specKey] ?? "")}
+              onChange={(e) => setValue(def.specKey, e.target.value)}
               title={def.title}
             >
               <option value="">{def.placeholder}</option>
@@ -60,6 +54,9 @@ export default function PartSearchPanel({
               ))}
             </select>
           ))}
+          {activeLabels.length > 0 && (
+            <button className="spec-clear" onClick={clear}>조건 지우기</button>
+          )}
         </div>
       )}
 

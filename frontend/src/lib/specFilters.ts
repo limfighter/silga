@@ -1,8 +1,9 @@
+import { useEffect, useState } from "react";
 import type { SearchSpecParams } from "./api";
 
 // 빌드 구성 카테고리 8종 — backend/app/main.py CATEGORY_LABELS 키와 정확히
-// 일치해야 함. PartRow(빌드 생성/검색 화면)와 BuildCreatePage가 공유하는
-// 단일 소스 — 여기서만 바뀌면 양쪽 다 반영됨.
+// 일치해야 함. SearchPage(부품 검색 탭)와 BuildCreatePage(빌드 생성)가
+// 공유하는 단일 소스 — 여기서만 바뀌면 양쪽 다 반영됨.
 export const CATEGORIES = ["CPU", "GPU", "메인보드", "RAM", "SSD", "케이스", "파워", "쿨러"];
 
 // 아래 옵션 배열들은 backend/app/main.py의 대응 ATTRIBUTES 딕셔너리 키와
@@ -42,11 +43,12 @@ export interface SpecFilterDef {
   formatOption?: (value: string) => string;
 }
 
-// 카테고리별 스펙 필터 select 구성. 같은 카테고리 안의 필터끼리는 항상
-// 상호 배타(하나 고르면 나머지는 자동으로 풀림) — 백엔드가 attribute 값을
-// 하나만 받을 수 있어서(다중 결합 규칙 미검증) 동시 적용이 안 되기 때문
-// (backend/app/main.py::search() 참조). PartRow(빌드 생성)와 SearchPage
-// (부품 검색)가 이 정의를 공유함.
+// 카테고리별 스펙 필터 select 구성. 같은 카테고리 안의 필터는 동시에 걸 수
+// 있음 — 백엔드가 서로 다른 속성코드를 콤마로 이어 다나와에 AND로 넘긴다
+// (backend/app/main.py::search() 참조). backend v0.12까지는 attribute 값을
+// 하나만 보낼 수 있어서 select끼리 상호 배타였음.
+// select 상태 관리는 아래 useSpecFilters()가 담당하고, SearchPage /
+// PartSearchPanel / PartRow가 이 정의와 훅을 함께 공유함.
 export const CATEGORY_SPEC_FILTERS: Record<string, SpecFilterDef[]> = {
   GPU: [
     {
@@ -128,3 +130,41 @@ export const CATEGORY_SPEC_FILTERS: Record<string, SpecFilterDef[]> = {
     },
   ],
 };
+
+/**
+ * 스펙 필터 select들의 상태. 같은 로직이 SearchPage / PartSearchPanel /
+ * PartRow에 3벌로 복붙돼 있던 것을 하나로 모은 것 — memoryGb만 number로
+ * 캐스팅해야 하는 예외도 여기 한 곳에만 둔다.
+ *
+ * 반환하는 spec 객체를 그대로 api.search()에 넘기면 됨. 여러 키가 채워져
+ * 있으면 백엔드가 전부 AND로 결합한다.
+ */
+export function useSpecFilters(category: string) {
+  const [spec, setSpec] = useState<SearchSpecParams>({});
+  const defs = CATEGORY_SPEC_FILTERS[category] ?? [];
+
+  // 카테고리를 바꾸면 이전 카테고리 조건은 버린다(GPU에서 칩셋을 걸어둔 채
+  // CPU 탭으로 넘어가면 그 값은 CPU에서 의미가 없고 백엔드에서도 무시됨)
+  useEffect(() => setSpec({}), [category]);
+
+  const setValue = (key: keyof SearchSpecParams, raw: string) =>
+    setSpec((prev) => {
+      const next = { ...prev };
+      if (!raw) delete next[key];
+      else if (key === "memoryGb") next.memoryGb = Number(raw);
+      else next[key] = raw;
+      return next;
+    });
+
+  // 지금 걸려 있는 조건 목록 — 라벨은 select에 표시되는 문자열(formatOption
+  // 적용분)과 같은 값을 쓴다. 라벨은 필터끼리 겹칠 수 있어서 React key로는
+  // specKey를 쓰라고 같이 넘김
+  const activeLabels = defs
+    .filter((d) => spec[d.specKey] != null)
+    .map((d) => {
+      const v = String(spec[d.specKey]);
+      return { key: d.specKey, label: d.formatOption ? d.formatOption(v) : v };
+    });
+
+  return { defs, spec, setValue, clear: () => setSpec({}), activeLabels };
+}

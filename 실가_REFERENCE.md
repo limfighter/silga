@@ -306,14 +306,25 @@ GET  /search?q={keyword, 선택}&category={선택}&memory_gb={GPU}&chipset={GPU}
 
     **같은 category 안에 스펙 파라미터가 여러 개 있는 경우(GPU: memory_gb+
     chipset+length, 메인보드: socket+formfactor, 쿨러: cooler_type+socket,
-    SSD: interface+formfactor) 동시에 못 씀** — attribute 인자가 값 하나만
-    받을 수 있어서(다중 attribute 결합 규칙 미검증 — GPU length로 실제
-    콤마/파이프/파라미터 반복 다 시도해봤으나 전부 실패 확인, 실가_HISTORY.md
-    2026-08-06 참조) chipset(GPU는 memory_gb보다도 우선)/socket/cooler_type/
-    interface가 우선 적용되고 나머지는 무시됨(main.py::search()의 `A or B or C`
-    체이닝 참조). 프론트(PartRow)는 이 제약을 반영해 같은 카테고리의 스펙
-    select를 상호 배타로 구현(하나 고르면 다른 하나 자동 해제) — API를 직접
-    호출하는 쪽(AI 라우터 등)도 이 우선순위를 알아야 함
+    SSD: interface+formfactor) 전부 동시에 적용된다(AND)** — backend v0.13부터.
+    서로 다른 속성코드를 콤마로 이어(`654-3518-OR,663-188705-OR`) attribute=
+    파라미터에 넘기면 다나와가 AND로 처리하는 것을 2026-08-22 라이브 실측으로
+    확인(실가_HISTORY.md 참조). v0.12까지는 attribute 값을 하나만 보낼 수 있다고
+    보고 `A or B or C` 체이닝으로 chipset/socket/cooler_type/interface를 우선
+    적용하고 나머지를 버렸는데, 그 제약 자체가 오판이었음 — 2026-08-06에
+    "결합 불가"로 결론냈던 실측은 같은 속성(GPU length 682) 두 구간을 묶으려던
+    것이었고, 같은 속성끼리는 AND가 아니라 OR이 되는 데다 결과가 페이지 상한
+    40건에 잘려 판별이 안 됐던 것으로 보인다.
+    ※ 콤마 조인 규칙: **서로 다른 속성코드 = AND, 같은 속성코드의 값 여러 개 =
+      OR**. 우리 계약은 파라미터당 값 하나만 받으므로 후자는 발생하지 않음
+      (한 파라미터가 값을 여러 개 받도록 확장한다면 그때는 OR임을 유의)
+    ※ 프론트는 lib/specFilters.ts의 useSpecFilters() 훅이 카테고리별 select
+      상태를 객체 하나로 들고 있고, select끼리 더 이상 상호 배타가 아님
+      (SearchPage / PartSearchPanel / PartRow가 이 훅을 공유)
+    ※ 검색 결과는 **다나와가 한 번에 40건까지만 반환**한다(limit 파라미터로
+      늘릴 수 없음, 2026-08-22 실측). 40건이 꽉 차서 오면 잘린 것이므로 건수를
+      단정하면 안 되고, 조건을 더 걸어 좁히는 것이 유일한 방법 — 프론트
+      SearchPage는 이때 건수를 "40건+"로 표기함
   ※ 다른 카테고리/스펙으로 더 확장하려면 매번 그 카테고리 자체의 필터
     사이드바에서 다시 확보해야 함(체크박스 클릭 → 바뀐 URL의 attribute= 값
     확인) — 카테고리 간 attribute 코드는 절대 재사용 불가로 확인됨(예: CPU
