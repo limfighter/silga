@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { api, type BuildSummary } from "../lib/api";
+import { type BuildSummary } from "../lib/api";
 import { useMaWindow } from "../lib/settings";
+import { useBuilds } from "../lib/useBuilds";
 import { useDeleteBuild } from "../lib/useDeleteBuild";
 import Answer, { errorMessage } from "../components/Answer";
 import BuildCard from "../components/BuildCard";
@@ -15,14 +15,10 @@ export default function BuildListPage() {
   const [maWindow] = useMaWindow();
   const [filter, setFilter] = useState<Filter>("전체");
 
-  const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["builds", maWindow],
-    queryFn: () => api.listBuilds(maWindow),
-  });
+  // 구조 먼저 / 가격 나중 — lib/useBuilds.ts 참조
+  const { builds, isLoading, isPricesPending, isError, error } = useBuilds(maWindow);
 
   const { deleteBuild } = useDeleteBuild();
-
-  const builds = data ?? [];
   const countOf = (f: Filter) =>
     f === "전체" ? builds.length : builds.filter((b) => b.verdict === f).length;
   // 판정 필터는 순수 클라이언트 필터 — 이미 받아온 목록을 거르기만 하므로
@@ -43,10 +39,10 @@ export default function BuildListPage() {
           kick={`내 빌드 · ${maWindow}일 이동평균 기준`}
           headline={
             <>
-              저장한 빌드의 <mark>지금 가격을 조회하는 중</mark>입니다
+              저장한 빌드를 <mark>불러오는 중</mark>입니다
             </>
           }
-          because="빌드마다 부품 가격을 하나씩 다시 물어보기 때문에 몇 초 걸립니다"
+          because="DB에서 바로 읽는 단계라 금방 끝납니다"
         />
       );
     }
@@ -74,6 +70,23 @@ export default function BuildListPage() {
             </>
           }
           because="부품을 골라 빌드를 만들면 조회할 때마다 실시간 최저가로 다시 계산합니다"
+          actions={<Link className="btn-primary" to="/build/new">+ 새 빌드 만들기</Link>}
+        />
+      );
+    }
+    // 카드는 이미 떠 있고 가격만 오는 중 — 확정된 개수는 그대로 말하고
+    // 총액/판정만 대기로 둔다
+    if (isPricesPending) {
+      return (
+        <Answer
+          state="pending"
+          kick={`내 빌드 · ${maWindow}일 이동평균 기준`}
+          headline={
+            <>
+              빌드 {builds.length}개 · <mark>지금 가격을 조회하는 중</mark>입니다
+            </>
+          }
+          because="부품 최저가를 하나씩 다시 물어보는 중이라 몇 초 걸립니다 — 총액과 판정은 조회가 끝나면 채워집니다"
           actions={<Link className="btn-primary" to="/build/new">+ 새 빌드 만들기</Link>}
         />
       );
@@ -109,7 +122,10 @@ export default function BuildListPage() {
               className={`sort-tab${f === filter ? " active" : ""}`}
               onClick={() => setFilter(f)}
             >
-              {f === "적정가" ? "적정" : f} {countOf(f)}
+              {/* 가격 대기 중엔 전부 0으로 보이는데, 판정이 없는 게 아니라
+                  아직 안 온 것이므로 개수를 숨긴다 */}
+              {f === "적정가" ? "적정" : f}
+              {!isPricesPending && ` ${countOf(f)}`}
             </button>
           ))}
         </div>
@@ -117,7 +133,12 @@ export default function BuildListPage() {
 
       <div className="build-grid" style={{ marginTop: 26 }}>
         {shown.map((build) => (
-          <BuildCard key={build.id} build={build} onDelete={deleteBuild} />
+          <BuildCard
+            key={build.id}
+            build={build}
+            onDelete={deleteBuild}
+            pricesPending={isPricesPending}
+          />
         ))}
 
         {filter === "전체" && (

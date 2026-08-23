@@ -113,6 +113,20 @@ export interface BuildSummary {
   diff_percent: number | null;
 }
 
+// GET /builds/prices 응답 — BuildSummary의 가격/판정 필드만 떼어낸 것.
+// id로 매칭해서 구조 응답에 덮어쓴다(backend v0.18)
+export interface BuildPrice {
+  id: number;
+  // BuildSummary의 동명 필드를 그대로 떼어낸 것이라 타입도 그쪽에서 끌어온다
+  // — 따로 적어두면 verdict 리터럴 유니온 같은 게 조용히 어긋남
+  total_price: BuildSummary["total_price"];
+  total_price_formatted: BuildSummary["total_price_formatted"];
+  verdict: BuildSummary["verdict"];
+  verdict_confidence: BuildSummary["verdict_confidence"];
+  ma_window: BuildSummary["ma_window"];
+  diff_percent: BuildSummary["diff_percent"];
+}
+
 export interface BuildItemDetail {
   category: string;
   code: number;
@@ -188,6 +202,14 @@ export const api = {
 
   listBuilds: (maWindow: number) =>
     request<BuildSummary[]>(`/builds?ma_window=${maWindow}`),
+
+  // 구조(DB만, 즉시)와 가격(스크래핑)을 나눠 받는 2단계 로딩 — lib/useBuilds.ts
+  // 참조. listBuilds는 한 방에 다 받는 기존 방식으로 남겨둠(backend v0.18)
+  listBuildStructure: () =>
+    request<BuildSummary[]>(`/builds?with_prices=false`),
+
+  listBuildPrices: (maWindow: number) =>
+    request<BuildPrice[]>(`/builds/prices?ma_window=${maWindow}`),
 
   getBuild: (id: number, maWindow: number) =>
     request<BuildDetail>(`/builds/${id}?ma_window=${maWindow}`),

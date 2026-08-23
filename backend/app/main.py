@@ -31,6 +31,7 @@ from app.schemas.estimate import (
 from app.schemas.compare import ProductCompareResponse, VerdictBasisItem
 from app.schemas.build import (
     BuildCreateRequest,
+    BuildPrice,
     BuildSummary,
     BuildDetail,
     BuildItemDetail,
@@ -1110,9 +1111,77 @@ def create_build(payload: BuildCreateRequest, db: Session = Depends(get_db)):
     )
 
 
+def _build_price_summary(build, ma_window: int, price_memo: dict, ma_memo: dict):
+    """빌드 하나의 즉시가/판정 계산 — 스크래핑이 필요한 부분 전부.
+
+    GET /builds(with_prices=true)와 GET /builds/prices가 공유한다. 둘이 같은
+    값을 내야 하므로 로직을 한 곳에만 둔 것.
+    """
+    items = [EstimateItem(code=bi.product_code, category=bi.category) for bi in build.items]
+    total_price, breakdown = _compute_estimate(items, price_memo) if items else (0, [])
+
+    verdict = None
+    confidence = None
+    diff_percent = None
+    if total_price and items:
+        basis_price, confidence, _ = _get_cached_verdict_basis(
+            build.id, ma_window, items, breakdown, ma_memo
+        )
+        if basis_price:
+            # market_price(비교 판매가)를 입력 안 했으면 즉시가를 대신 넣어서
+            # "이동평균 대비 지금 가격이 비싼지/싼지"로 판정 — 비교할 완제품
+            # 시세를 몰라도 판정이 항상 뜨도록(2026-08-08 결정, 실가_인수인계.md 참조)
+            verdict, diff_percent = calc_verdict(basis_price, build.market_price or total_price)
+
+    return {
+        "total_price": total_price or None,
+        "total_price_formatted": format_won(total_price) if total_price else None,
+        "verdict": verdict,
+        "verdict_confidence": confidence if verdict else None,
+        "ma_window": ma_window if verdict else None,
+        "diff_percent": diff_percent,
+    }
+
+
+# 주의: 이 라우트는 반드시 /builds/{build_id}보다 먼저 정의돼야 함 —
+# 뒤에 두면 "prices"가 build_id로 잡혀서 422가 난다
+@app.get("/builds/prices", response_model=list[BuildPrice])
+def list_build_prices(
+    ma_window: int = Query(14, description="판정 기준 이동평균 기간(일), 7/14/30 중 하나"),
+    db: Session = Depends(get_db),
+):
+    """
+    GET /builds/prices?ma_window={7|14|30} → [{id, total_price, ..., verdict, ...}]
+
+    GET /builds?with_prices=false로 구조를 먼저 받아 화면을 그린 뒤, 스크래핑이
+    필요한 값만 이걸로 따로 받아 카드에 채워 넣는 용도(v0.18). 홈 화면이 집계에
+    저장된 빌드를 전부 쓰기 때문에, 한 응답에 묶여 있으면 이름·부품수처럼 DB에서
+    바로 나오는 값까지 스크래핑이 끝날 때까지 기다려야 했음.
+
+    스크래핑은 여기서도 서버가 순차로 돈다 — 프론트가 빌드마다 요청을 쪼개
+    보내면 브라우저가 동시에 날려서 매너 크롤링 원칙(동시 병렬 지양)을 깨기
+    때문에, 요청을 나누는 게 아니라 "구조 / 가격" 두 단계로만 나눈 것.
+    총 요청 수와 소요 시간은 그대로이고 첫 화면이 뜨는 시점만 당겨진다.
+    """
+    ma_window = _validate_ma_window(ma_window)
+    price_memo: dict = {}
+    ma_memo: dict = {}
+    return [
+        BuildPrice(id=build.id, **_build_price_summary(build, ma_window, price_memo, ma_memo))
+        for build in db.query(Build).all()
+    ]
+
+
 @app.get("/builds", response_model=list[BuildSummary])
 def list_builds(
     ma_window: int = Query(14, description="판정 기준 이동평균 기간(일), 7/14/30 중 하나"),
+    with_prices: bool = Query(
+        True,
+        description="false면 스크래핑을 아예 안 하고 DB에 있는 구조(이름/부품수/"
+                     "저장일)만 즉시 반환 — 가격·판정 필드는 전부 null이 되며, "
+                     "이어서 GET /builds/prices로 채워 넣는다(v0.18). 기본 true라 "
+                     "기존 호출부는 영향 없음",
+    ),
     db: Session = Depends(get_db),
 ):
     """
@@ -1134,6 +1203,10 @@ def list_builds(
     있었음. 홈 화면이 집계(판정 분포/총액/부품 수/판정 축)에 전체 빌드를
     쓰기 때문에 빌드가 늘수록 이 낭비가 그대로 체감 지연이 됨.
     캐시가 아니라 요청 단위 중복 제거라 TTL이 없고, 응답이 끝나면 사라짐.
+
+    with_prices=false면 위 스크래핑을 통째로 건너뛰고 DB만 읽어 즉시 응답한다
+    (v0.18) — 프론트는 이걸로 카드를 먼저 그리고 GET /builds/prices로 가격을
+    채운다. 기본값이 true라 AI 라우터 등 기존 호출부는 그대로.
     """
     ma_window = _validate_ma_window(ma_window)
 
@@ -1143,35 +1216,19 @@ def list_builds(
     ma_memo: dict = {}
 
     for build in builds:
-        items = [EstimateItem(code=bi.product_code, category=bi.category) for bi in build.items]
-        total_price, breakdown = _compute_estimate(items, price_memo) if items else (0, [])
-
-        verdict = None
-        confidence = None
-        diff_percent = None
-        if total_price and items:
-            basis_price, confidence, _ = _get_cached_verdict_basis(
-                build.id, ma_window, items, breakdown, ma_memo
-            )
-            if basis_price:
-                # market_price(비교 판매가)를 입력 안 했으면 즉시가를 대신 넣어서
-                # "이동평균 대비 지금 가격이 비싼지/싼지"로 판정 — 비교할 완제품
-                # 시세를 몰라도 판정이 항상 뜨도록(2026-08-08 결정, 실가_인수인계.md 참조)
-                verdict, diff_percent = calc_verdict(basis_price, build.market_price or total_price)
-
+        prices = (
+            _build_price_summary(build, ma_window, price_memo, ma_memo)
+            if with_prices
+            else {}
+        )
         results.append(
             BuildSummary(
                 id=build.id,
                 name=build.name,
                 market_price=build.market_price,
                 created_at=build.created_at,
-                item_count=len(items),
-                total_price=total_price or None,
-                total_price_formatted=format_won(total_price) if total_price else None,
-                verdict=verdict,
-                verdict_confidence=confidence if verdict else None,
-                ma_window=ma_window if verdict else None,
-                diff_percent=diff_percent,
+                item_count=len(build.items),
+                **prices,
             )
         )
 

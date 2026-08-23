@@ -450,6 +450,10 @@ input,select{font-family:inherit;}
   margin-left:8px;
   white-space:nowrap;
 }
+/* 구조만 먼저 온 상태의 가격 자리 — "조회 실패"와 같은 크기로 보이면 안 되고,
+   숫자가 들어올 자리라는 것만 낮은 톤으로 알린다 */
+.bc-price-pending{color:var(--mute-lt);font-size:14px;letter-spacing:.02em;}
+
 /* 다나와가 한 번에 40건까지만 주므로 다음 페이지를 사용자가 눌러서 받는다 */
 .btn-more{
   display:block;
