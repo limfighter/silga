@@ -384,6 +384,20 @@ RAM_TYPE_ATTRIBUTES = {
     "DDR4": "277-164333-OR",
 }
 
+# /search?ram_device= 값(RAM 전용) → 속성코드 278 = 사용 장치.
+# 편의 필터가 아니라 정확성 문제라서 넣었다 — 이 필터가 없을 때
+# category=RAM&ram_type=DDR5 결과 40건에 "삼성전자 노트북 DDR5-5600"(SO-DIMM)과
+# "삼성전자 DDR5-5600 ECC/REG"(서버용)가 섞여 나오는 것을 실측 확인(2026-08-23).
+# 데스크탑 빌드에 그게 담기면 합계·판정이 통째로 틀어진다.
+# 노트북용/서버용을 빼지 않고 그대로 두는 건 다른 카테고리의 트리밍 기준과
+# 다른데, 여기서는 그 값들이 "제외 대상"이 아니라 "골라서 배제하는 수단"이라
+# 목록에 있어야 쓸 수 있기 때문. 기본값은 전체(=필터 미적용)라 기존 동작은 그대로.
+RAM_DEVICE_ATTRIBUTES = {
+    "데스크탑용": "278-1223-OR",
+    "노트북용": "278-1224-OR",
+    "서버용": "278-1225-OR",
+}
+
 # /search?capacity= 값(RAM 전용, category=RAM일 때만 적용) →
 # danawa.get_product_codes(attribute=...) 전달값 매핑(속성코드 282 = 메모리
 # 용량, "RAM" 검색 결과 필터 사이드바에서 실측 — 2026-08-22). capacity는
@@ -589,7 +603,7 @@ def _validate_ma_window(ma_window: int) -> int:
 # 그대로 노출되는 값이라, AI 라우터가 이 API를 tool로 볼 때 보이는 버전이 됨.
 # 초기값 0.1.0이 v0.16까지 방치돼 있던 걸 2026-08-23에 정정. 두 번째 자리
 # 이상을 올릴 때 이 줄과 frontend/package.json도 같이 올릴 것
-app = FastAPI(title="실가 backend", version="0.20.0")
+app = FastAPI(title="실가 backend", version="0.21.0")
 
 
 @app.on_event("startup")
@@ -682,6 +696,12 @@ def search(
     ram_type: Optional[str] = Query(
         None,
         description="RAM 규격 스펙 필터(DDR5/DDR4) — category=RAM일 때만 적용, 그 외 무시",
+    ),
+    ram_device: Optional[str] = Query(
+        None,
+        description="RAM 사용 장치 스펙 필터(데스크탑용/노트북용/서버용) — category=RAM일 때만 "
+                     "적용, 그 외 무시. 미지정 시 노트북용(SO-DIMM)·서버용(ECC/REG)이 함께 "
+                     "나오므로 데스크탑 빌드를 구성할 때는 지정하는 편이 안전함",
     ),
     wattage: Optional[str] = Query(
         None,
@@ -805,6 +825,7 @@ def search(
     elif category == "RAM":
         attributes = [
             RAM_TYPE_ATTRIBUTES.get(ram_type),
+            RAM_DEVICE_ATTRIBUTES.get(ram_device),
             RAM_CAPACITY_ATTRIBUTES.get(capacity),
             RAM_COUNT_ATTRIBUTES.get(ram_count),
         ]

@@ -106,6 +106,7 @@ const MAINBOARD_CHIPSET_OPTIONS = [
 ];
 const FORMFACTOR_OPTIONS = ["ATX", "M-ATX", "ITX", "E-ATX"];
 const RAM_TYPE_OPTIONS = ["DDR5", "DDR4"];
+const RAM_DEVICE_OPTIONS = ["데스크탑용", "노트북용", "서버용"];
 const PSU_WATTAGE_OPTIONS = [
   "450W~499W",
   "500W~599W",
@@ -241,6 +242,15 @@ export const CATEGORY_SPEC_FILTERS: Record<string, SpecFilterDef[]> = {
   ],
   RAM: [
     { specKey: "ramType", placeholder: "규격 전체", title: "DDR 규격으로 좁혀서 검색", options: RAM_TYPE_OPTIONS },
+    {
+      // 편의가 아니라 정확성 — 안 걸면 노트북용(SO-DIMM)과 서버용(ECC/REG)이
+      // 데스크탑 검색에 섞여 나온다(DDR5 40건 중 2건 실측). 그게 빌드에 담기면
+      // 합계·판정이 통째로 틀어지므로 규격 바로 다음에 둔다
+      specKey: "ramDevice",
+      placeholder: "사용 장치 전체",
+      title: "사용 장치로 좁혀서 검색 — 안 고르면 노트북용·서버용이 섞여 나옵니다",
+      options: RAM_DEVICE_OPTIONS,
+    },
     {
       specKey: "capacity",
       placeholder: "용량 전체",

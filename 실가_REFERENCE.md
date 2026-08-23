@@ -286,7 +286,7 @@ sammy310/Danawa-Crawler (MIT):
 GET  /search?q={keyword, 선택}&category={선택}&page={선택}
      &memory_gb={GPU}&chipset={GPU}&gpu_chip={GPU}&length={GPU}
      &socket={CPU|메인보드|쿨러}&cpu_type={CPU}&igpu={CPU}
-     &formfactor={메인보드|케이스|SSD|파워}&ram_type={RAM}&capacity={RAM|SSD}&ram_count={RAM}
+     &formfactor={메인보드|케이스|SSD|파워}&ram_type={RAM}&ram_device={RAM}&capacity={RAM|SSD}&ram_count={RAM}
      &case_size={케이스}&max_vga_length={케이스}&max_cooler_height={케이스}
      &wattage={파워}&efficiency={파워}&cable_type={파워}
      &interface={SSD}&cooler_type={쿨러}&cooling={쿨러}&height={쿨러}
@@ -310,6 +310,11 @@ GET  /search?q={keyword, 선택}&category={선택}&page={선택}
     케이스의 max_vga_length/max_cooler_height는 "케이스가 받아주는 최대치"라
     GPU의 length(카드 자체 길이), 쿨러의 height(쿨러 자체 높이)와 반대편
     축이다 — 이름이 비슷하다고 합치지 말 것 (v0.20, 2026-08-23)
+  ※ ram_device(v0.21, 2026-08-23)만은 편의가 아니라 정확성 장치다 — 안 걸면
+    노트북용(SO-DIMM)과 서버용(ECC/REG)이 데스크탑 검색에 섞여 나온다
+    (category=RAM&ram_type=DDR5 40건 중 2건 실측). 그게 빌드에 담기면
+    합계·판정이 통째로 틀어지므로 데스크탑 조립 흐름에서는 지정하는 편이
+    안전하다. 기본값(미지정)은 기존과 동일하게 전체
   ※ category(v0.5, 2026-08-05 추가) — 검색어가 다른 카테고리 상품과 겹칠 때
     결과를 좁히는 선택적 필터. 값은 backend/app/main.py의 CATEGORY_LABELS 키
     (CPU/GPU/메인보드/RAM/SSD/케이스/파워/쿨러)와 정확히 일치해야 적용됨

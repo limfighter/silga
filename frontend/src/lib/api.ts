@@ -50,6 +50,7 @@ export interface SearchSpecParams {
   length?: string; // GPU 전용
   formfactor?: string; // 메인보드/케이스/SSD 전용
   ramType?: string; // RAM 전용
+  ramDevice?: string; // RAM 전용 (데스크탑/노트북/서버 — 미지정 시 SO-DIMM·ECC가 섞임)
   wattage?: string; // 파워 전용
   interface?: string; // SSD 전용
   coolerType?: string; // 쿨러 전용
@@ -189,6 +190,7 @@ export const api = {
     if (spec?.length) params.set("length", spec.length);
     if (spec?.formfactor) params.set("formfactor", spec.formfactor);
     if (spec?.ramType) params.set("ram_type", spec.ramType);
+    if (spec?.ramDevice) params.set("ram_device", spec.ramDevice);
     if (spec?.wattage) params.set("wattage", spec.wattage);
     if (spec?.interface) params.set("interface", spec.interface);
     if (spec?.coolerType) params.set("cooler_type", spec.coolerType);
