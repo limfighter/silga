@@ -734,7 +734,7 @@ def _fetch_lowest_price(code: int):
     return data.get("title"), price_int
 
 
-def _compute_estimate(items: list[EstimateItem]):
+def _compute_estimate(items: list[EstimateItem], price_memo: dict | None = None):
     """
     POST /estimate, POST /build/compare가 공유하는 견적 계산 로직.
 
@@ -742,6 +742,15 @@ def _compute_estimate(items: list[EstimateItem]):
     (요청 간격 5~10초, 동시 병렬 지양)을 지키려면 부품 수가 많은 빌드일수록
     응답이 느려짐. 개인용 규모라 지금은 별도 스로틀링/캐싱 없이 그대로 감.
     부품 수가 많아져서 체감 지연이 문제되면 그때 재검토.
+
+    price_memo를 넘기면 상품코드별 조회 결과를 그 dict에 적재하고 재사용함
+    — 캐시가 아니라 "한 번의 HTTP 요청 안에서 같은 상품을 두 번 긁지 않기"
+    위한 중복 제거라 TTL도 프로세스 간 공유도 없음(가격 자체를 축적하지
+    않는다는 DB 설계 원칙과 무관). GET /builds가 저장된 빌드를 전부 순회하는
+    구조라, 같은 부품이 여러 빌드에 들어 있으면 그만큼 중복 조회가 나던 것을
+    막으려고 도입(2026-08-22). 실패(None, None)도 같이 적재함 — 다나와가
+    죽었을 때 같은 코드로 timeout을 반복해서 맞는 게 더 나쁘기 때문.
+    덤으로 한 응답 안의 모든 빌드가 같은 시점 가격을 보게 되는 이점도 있음.
 
     부품 하나의 danawa 연결이 끊겨도(requests.RequestException) 전체 요청을
     실패시키지 않고 그 부품만 가격 정보 없음(title/price=None)으로 처리하고
@@ -754,10 +763,15 @@ def _compute_estimate(items: list[EstimateItem]):
     total_price = 0
 
     for item in items:
-        try:
-            title, price = _fetch_lowest_price(item.code)
-        except requests.RequestException:
-            title, price = None, None
+        if price_memo is not None and item.code in price_memo:
+            title, price = price_memo[item.code]
+        else:
+            try:
+                title, price = _fetch_lowest_price(item.code)
+            except requests.RequestException:
+                title, price = None, None
+            if price_memo is not None:
+                price_memo[item.code] = (title, price)
         breakdown.append(
             BreakdownItem(category=item.category, title=title, price=price)
         )
@@ -793,7 +807,12 @@ def _fetch_ma_price(code: int, ma_window: int):
     return compute_ma_price(variance["prices"], ma_window)
 
 
-def _compute_verdict_basis(items: list[EstimateItem], breakdown: list[BreakdownItem], ma_window: int):
+def _compute_verdict_basis(
+    items: list[EstimateItem],
+    breakdown: list[BreakdownItem],
+    ma_window: int,
+    ma_memo: dict | None = None,
+):
     """
     판정(verdict) 기준가 계산. 부품별로 이동평균(ma_window일)이 유효하면 그
     값을, 무효(신상품이라 데이터 부족 등)하면 breakdown의 즉시가로 대체
@@ -804,6 +823,9 @@ def _compute_verdict_basis(items: list[EstimateItem], breakdown: list[BreakdownI
     breakdown은 _compute_estimate()가 이미 계산해둔 즉시가를 그대로
     재사용 — fallback용으로 danawa.get_product()를 다시 호출하지 않기
     위함(중복 스크래핑 방지).
+
+    ma_memo는 _compute_estimate의 price_memo와 같은 목적(요청 단위 중복
+    제거)이며 (code, ma_window)로 키를 잡는다.
     """
     basis_total = 0
     has_price = False
@@ -811,7 +833,13 @@ def _compute_verdict_basis(items: list[EstimateItem], breakdown: list[BreakdownI
     basis_breakdown = []
 
     for item, bd in zip(items, breakdown):
-        ma_price = _fetch_ma_price(item.code, ma_window)
+        memo_key = (item.code, ma_window)
+        if ma_memo is not None and memo_key in ma_memo:
+            ma_price = ma_memo[memo_key]
+        else:
+            ma_price = _fetch_ma_price(item.code, ma_window)
+            if ma_memo is not None:
+                ma_memo[memo_key] = ma_price
         if ma_price is not None:
             price, source = ma_price, "ma"
         else:
@@ -829,7 +857,11 @@ def _compute_verdict_basis(items: list[EstimateItem], breakdown: list[BreakdownI
 
 
 def _get_cached_verdict_basis(
-    build_id: int, ma_window: int, items: list[EstimateItem], breakdown: list[BreakdownItem]
+    build_id: int,
+    ma_window: int,
+    items: list[EstimateItem],
+    breakdown: list[BreakdownItem],
+    ma_memo: dict | None = None,
 ):
     """
     GET /builds, GET /builds/{id} 전용 캐시(같은 캐시를 공유). 저장된
@@ -847,7 +879,7 @@ def _get_cached_verdict_basis(
     if cached and now - cached[0] < _VERDICT_BASIS_CACHE_TTL_SECONDS:
         return cached[1]
 
-    result = _compute_verdict_basis(items, breakdown, ma_window)
+    result = _compute_verdict_basis(items, breakdown, ma_window, ma_memo)
     _verdict_basis_cache[cache_key] = (now, result)
     return result
 
@@ -1079,21 +1111,32 @@ def list_builds(
     계산하되 (build_id, ma_window) 단위 5분 캐시(_get_cached_verdict_basis)를
     씀 — 이동평균 도입으로 부품당 스크래핑이 2배 늘어난 부담을 덜기 위함
     (2026-08-04 결정, 실가_인수인계.md 참조).
+
+    여기에 더해 이 응답 하나를 만드는 동안만 유효한 중복 제거 dict 두 개를
+    빌드 전체에 걸쳐 공유함(2026-08-22) — 빌드마다 따로 순회하는 구조라
+    같은 부품이 여러 빌드에 들어 있으면 그 수만큼 다나와를 중복으로 긁고
+    있었음. 홈 화면이 집계(판정 분포/총액/부품 수/판정 축)에 전체 빌드를
+    쓰기 때문에 빌드가 늘수록 이 낭비가 그대로 체감 지연이 됨.
+    캐시가 아니라 요청 단위 중복 제거라 TTL이 없고, 응답이 끝나면 사라짐.
     """
     ma_window = _validate_ma_window(ma_window)
 
     builds = db.query(Build).all()
     results = []
+    price_memo: dict = {}
+    ma_memo: dict = {}
 
     for build in builds:
         items = [EstimateItem(code=bi.product_code, category=bi.category) for bi in build.items]
-        total_price, breakdown = _compute_estimate(items) if items else (0, [])
+        total_price, breakdown = _compute_estimate(items, price_memo) if items else (0, [])
 
         verdict = None
         confidence = None
         diff_percent = None
         if total_price and items:
-            basis_price, confidence, _ = _get_cached_verdict_basis(build.id, ma_window, items, breakdown)
+            basis_price, confidence, _ = _get_cached_verdict_basis(
+                build.id, ma_window, items, breakdown, ma_memo
+            )
             if basis_price:
                 # market_price(비교 판매가)를 입력 안 했으면 즉시가를 대신 넣어서
                 # "이동평균 대비 지금 가격이 비싼지/싼지"로 판정 — 비교할 완제품
