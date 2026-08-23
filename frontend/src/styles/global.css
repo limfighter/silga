@@ -890,6 +890,72 @@ input,select{font-family:inherit;}
 .chart-stats div span{display:block;color:var(--mute-lt);font-size:10.5px;letter-spacing:.06em;margin-bottom:3px;text-transform:uppercase;}
 .chart-stats .min,.chart-stats .max{color:var(--ink);}
 
+/* 추세 요약 — 차트에도 Answer.tsx의 "결론 먼저" 규칙을 적용한 한 줄 */
+.ch-summary{
+  font-size:15px;font-weight:600;line-height:1.5;
+  padding-bottom:18px;margin-bottom:22px;
+  border-bottom:var(--rule-2) solid var(--ink);
+}
+.ch-summary .num{font-family:var(--font-mono);font-variant-numeric:tabular-nums;}
+.ch-summary .sub{
+  display:block;font-size:12.5px;font-weight:400;color:var(--mute-lt);
+  font-family:var(--font-mono);margin-top:5px;
+}
+
+/* y축 금액 라벨. SVG가 preserveAspectRatio="none"으로 가로를 늘려 그리므로
+   <text>를 안에 넣으면 글자까지 늘어난다 — 그래서 HTML로 얹고 격자선 y좌표
+   (StatsPage.tsx의 GRID_Y)에 맞춰 절대배치한다 */
+.ch-plot{position:relative;padding-left:62px;}
+.ch-yaxis{
+  position:absolute;left:0;top:0;width:56px;height:260px;
+  font-family:var(--font-mono);font-size:10.5px;color:var(--mute-lt);
+  font-variant-numeric:tabular-nums;text-align:right;
+}
+.ch-yaxis i{position:absolute;right:0;transform:translateY(-50%);font-style:normal;white-space:nowrap;}
+.ch-plot svg{display:block;}
+
+/* 관측 기록 표 — 기본 접힘, 눌러야 펼쳐진다. 닫혀 있어도 접근성 트리에는
+   남으므로 SVG만으로는 읽을 게 없는 스크린리더의 대체 경로가 된다 */
+.ch-table-wrap{margin-top:22px;border-top:var(--rule-1) solid var(--line-lt);padding-top:16px;}
+.ch-table-wrap summary{
+  cursor:pointer;font-family:var(--font-mono);font-size:12px;color:var(--mute-lt);
+  list-style:none;display:flex;align-items:center;gap:8px;
+}
+.ch-table-wrap summary::-webkit-details-marker{display:none;}
+.ch-table-wrap summary::before{content:"+";display:inline-block;width:1em;font-weight:600;color:var(--ink);}
+.ch-table-wrap[open] summary::before{content:"−";}
+.ch-table-wrap summary:hover{color:var(--ink);}
+.ch-table{width:100%;border-collapse:collapse;margin-top:14px;font-family:var(--font-mono);font-size:12.5px;font-variant-numeric:tabular-nums;}
+.ch-table caption{text-align:left;font-size:11px;color:var(--mute-lt);padding-bottom:8px;letter-spacing:.06em;text-transform:uppercase;}
+.ch-table th{
+  text-align:right;font-weight:500;color:var(--mute-lt);font-size:10.5px;
+  letter-spacing:.06em;text-transform:uppercase;
+  border-bottom:var(--rule-1) solid var(--line-lt);padding:0 0 7px;
+}
+.ch-table th:first-child{text-align:left;}
+.ch-table td{text-align:right;padding:7px 0;border-bottom:var(--rule-1) solid var(--paper-2);}
+.ch-table td:first-child{text-align:left;color:var(--mute-lt);}
+.ch-table tr:last-child td{border-bottom:none;}
+.ch-table tr.mark td{font-weight:600;}
+.ch-table tr.mark td:first-child{color:var(--ink);}
+.ch-table .tag{font-size:10px;letter-spacing:.06em;border:var(--rule-1) solid var(--line-lt);padding:1px 5px;margin-left:7px;color:var(--mute-lt);}
+
+/* 관측 3점 이하 — 점 2개를 이으면 뭐든 완벽한 직선이라 추세가 아니다 */
+.ch-sparse{display:flex;flex-wrap:wrap;gap:var(--rule-1);background:var(--line-lt);border:var(--rule-1) solid var(--line-lt);}
+.ch-sparse > div{flex:1 1 180px;background:var(--paper);padding:20px 22px;}
+.ch-sparse .d{font-family:var(--font-mono);font-size:11px;color:var(--mute-lt);letter-spacing:.06em;margin-bottom:8px;}
+.ch-sparse .v{font-family:var(--font-mono);font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.01em;}
+.ch-sparse .c{font-family:var(--font-mono);font-size:12px;color:var(--mute-lt);margin-top:6px;}
+.ch-why{
+  margin-top:16px;font-size:12.5px;color:var(--mute-lt);
+  padding-left:14px;border-left:var(--rule-2) solid var(--line-lt);
+}
+
+@media (max-width:640px){
+  .ch-plot{padding-left:50px;}
+  .ch-yaxis{width:44px;}
+}
+
 .recent-list{display:flex;flex-direction:column;gap:var(--rule-1);background:var(--line-lt);border:var(--rule-1) solid var(--line-lt);}
 .recent-row{
   display:flex;justify-content:space-between;align-items:center;gap:14px;

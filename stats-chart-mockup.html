@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>통계 차트 목업</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ───────────────────────────────────────────────────────────────
+   실가 통계 화면 차트 개선 목업 (2026-08-23)
+
+   현행 StatsPage.tsx::HistoryChart 의 두 가지 구멍을 메우는 안.
+     ① 관측 3점 이하일 때도 꺾은선을 그림 → 착시
+     ② SVG만 있고 데이터 테이블/요약이 없음 → 스크린리더가 읽을 게 없음
+        (VerdictAxis 는 이미 .axis-list 로 같은 문제를 풀어놨음 — 일관성 구멍)
+   덤: 격자선 4줄에 금액 라벨이 없어 눈금이 얼마인지 알 수 없음
+
+   토큰은 frontend/src/styles/global.css 현행값 그대로.
+   기존 app-shell-mockup.html / silga-mockup.html 은 2026-08-05 개편
+   이전(다크/네온) 톤이라 참조하지 않았음.
+   ─────────────────────────────────────────────────────────────── */
+:root{
+  --ink:#0B0B0B; --ink-2:#171716; --line-dk:#2E2E2B;
+  --paper:#F4F3EF; --paper-2:#E7E5DF; --line-lt:#D2CFC7;
+  --mute-dk:#8C8A83; --mute-lt:#6B6963;
+  --font-body:'Pretendard Variable','Pretendard',-apple-system,BlinkMacSystemFont,sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,monospace;
+  --rule-1:1px; --rule-2:2px; --rule-3:4px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  background:var(--paper); color:var(--ink);
+  font-family:var(--font-body); font-size:14px; line-height:1.6;
+  padding:48px 32px 96px;
+}
+.wrap{max-width:1080px;margin:0 auto;}
+
+/* 목업 문서용 껍데기 — 실제 앱에는 안 들어감 */
+.doc-head{border-bottom:var(--rule-3) solid var(--ink);padding-bottom:20px;margin-bottom:8px;}
+.doc-head h1{font-size:26px;font-weight:700;letter-spacing:-.02em;}
+.doc-head p{color:var(--mute-lt);font-size:13.5px;margin-top:8px;}
+.case{margin-top:56px;}
+.case-tag{
+  font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--mute-lt);
+  border-bottom:var(--rule-1) solid var(--line-lt);
+  padding-bottom:6px;margin-bottom:6px;display:block;
+}
+.case-title{font-size:18px;font-weight:700;margin-bottom:4px;}
+.case-note{color:var(--mute-lt);font-size:13px;margin-bottom:20px;max-width:64ch;}
+.case-note b{color:var(--ink);font-weight:600;}
+.verdict-line{
+  font-family:var(--font-mono);font-size:12px;color:var(--mute-lt);
+  margin-top:14px;padding-left:14px;border-left:var(--rule-2) solid var(--line-lt);
+}
+
+/* ─── 실제 앱 클래스 (global.css 대응) ─── */
+.chart-card{background:var(--paper);border:var(--rule-1) solid var(--line-lt);padding:32px;}
+.chart-legend{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;flex-wrap:wrap;gap:12px;}
+.chart-legend .name{font-size:15px;font-weight:600;color:var(--ink);}
+.chart-legend .name span{color:var(--mute-lt);font-weight:400;font-size:13px;display:block;margin-top:2px;font-family:var(--font-mono);}
+.chart-stats{display:flex;gap:24px;font-family:var(--font-mono);font-size:13px;font-variant-numeric:tabular-nums;}
+.chart-stats div span{display:block;color:var(--mute-lt);font-size:10.5px;letter-spacing:.06em;margin-bottom:3px;text-transform:uppercase;}
+.chart-stats b{font-weight:600;}
+.empty-state{border:var(--rule-1) dashed var(--line-lt);padding:44px 24px;text-align:center;color:var(--mute-lt);}
+.empty-state .t{font-size:15px;color:var(--ink);font-weight:600;margin-bottom:6px;}
+.empty-state .d{font-size:12px;color:var(--mute-lt);font-family:var(--font-mono);}
+
+/* ─── 신규 ① 추세 요약 한 줄 — Answer.tsx 의 "결론 먼저" 규칙을 차트에도 ─── */
+.ch-summary{
+  font-size:15px;font-weight:600;line-height:1.5;
+  padding-bottom:18px;margin-bottom:22px;
+  border-bottom:var(--rule-2) solid var(--ink);
+}
+.ch-summary .num{font-family:var(--font-mono);font-variant-numeric:tabular-nums;}
+.ch-summary .sub{
+  display:block;font-size:12.5px;font-weight:400;color:var(--mute-lt);
+  font-family:var(--font-mono);margin-top:5px;
+}
+
+/* ─── 신규 ② y축 금액 라벨 ───
+   현행 SVG 는 preserveAspectRatio="none" 으로 가로를 늘려 그리기 때문에
+   <text> 를 SVG 안에 넣으면 글자까지 함께 늘어난다. 그래서 라벨은
+   HTML 로 절대배치하고 SVG 는 지금의 stretch 동작을 그대로 둔다. */
+.ch-plot{position:relative;padding-left:62px;}
+.ch-yaxis{
+  position:absolute;left:0;top:0;width:56px;height:260px;
+  font-family:var(--font-mono);font-size:10.5px;color:var(--mute-lt);
+  font-variant-numeric:tabular-nums;text-align:right;
+}
+.ch-yaxis i{position:absolute;right:0;transform:translateY(-50%);font-style:normal;white-space:nowrap;}
+.ch-plot svg{display:block;}
+
+/* ─── 신규 ③ 데이터 테이블 — VerdictAxis 의 .axis-list 와 같은 역할 ─── */
+.ch-table-wrap{margin-top:22px;border-top:var(--rule-1) solid var(--line-lt);padding-top:16px;}
+.ch-table-wrap summary{
+  cursor:pointer;font-family:var(--font-mono);font-size:12px;color:var(--mute-lt);
+  list-style:none;display:flex;align-items:center;gap:8px;
+}
+.ch-table-wrap summary::-webkit-details-marker{display:none;}
+.ch-table-wrap summary::before{content:"+";display:inline-block;width:1em;font-weight:600;color:var(--ink);}
+.ch-table-wrap[open] summary::before{content:"−";}
+.ch-table-wrap summary:hover{color:var(--ink);}
+table.ch-table{width:100%;border-collapse:collapse;margin-top:14px;font-family:var(--font-mono);font-size:12.5px;font-variant-numeric:tabular-nums;}
+table.ch-table caption{text-align:left;font-size:11px;color:var(--mute-lt);padding-bottom:8px;letter-spacing:.06em;text-transform:uppercase;}
+table.ch-table th{
+  text-align:right;font-weight:500;color:var(--mute-lt);font-size:10.5px;
+  letter-spacing:.06em;text-transform:uppercase;
+  border-bottom:var(--rule-1) solid var(--line-lt);padding:0 0 7px;
+}
+table.ch-table th:first-child{text-align:left;}
+table.ch-table td{text-align:right;padding:7px 0;border-bottom:var(--rule-1) solid var(--paper-2);}
+table.ch-table td:first-child{text-align:left;color:var(--mute-lt);}
+table.ch-table tr:last-child td{border-bottom:none;}
+table.ch-table tr.mark td{font-weight:600;}
+table.ch-table tr.mark td:first-child{color:var(--ink);}
+.tag{font-size:10px;letter-spacing:.06em;border:var(--rule-1) solid var(--line-lt);padding:1px 5px;margin-left:7px;color:var(--mute-lt);}
+
+/* ─── 신규 ④ 관측 3점 이하 — 선 대신 수치 ─── */
+.ch-sparse{display:flex;flex-wrap:wrap;gap:var(--rule-1);background:var(--line-lt);border:var(--rule-1) solid var(--line-lt);}
+.ch-sparse > div{flex:1 1 180px;background:var(--paper);padding:20px 22px;}
+.ch-sparse .d{font-family:var(--font-mono);font-size:11px;color:var(--mute-lt);letter-spacing:.06em;margin-bottom:8px;}
+.ch-sparse .v{font-family:var(--font-mono);font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.01em;}
+.ch-sparse .c{font-family:var(--font-mono);font-size:12px;color:var(--mute-lt);margin-top:6px;}
+.ch-why{
+  margin-top:16px;font-size:12.5px;color:var(--mute-lt);
+  padding-left:14px;border-left:var(--rule-2) solid var(--line-lt);
+}
+
+@media (max-width:640px){
+  body{padding:32px 18px 64px;}
+  .chart-card{padding:20px;}
+  .ch-plot{padding-left:50px;}
+  .ch-yaxis{width:44px;}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="doc-head">
+    <h1>통계 화면 차트 — 개선안 목업</h1>
+    <p>
+      현행 <code>StatsPage.tsx :: HistoryChart</code> 대비 세 가지를 더한다.
+      ① 추세 요약 한 줄 · ② y축 금액 라벨 · ③ 접히는 데이터 테이블,
+      그리고 ④ 관측이 3점 이하면 꺾은선 대신 수치로 보여준다.
+      색은 쓰지 않고 기호(▲▼—)와 굵기만으로 구분한다.
+    </p>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <section class="case">
+    <span class="case-tag">A · 현재 (as-is)</span>
+    <h2 class="case-title">지금 화면</h2>
+    <p class="case-note">
+      선과 격자만 있다. 격자선 4줄이 각각 얼마인지 알 수 없고,
+      스크린리더 입장에서는 <b>빈 그림 한 장</b>이다.
+    </p>
+
+    <div class="chart-card">
+      <div class="chart-legend">
+        <div class="name">
+          RTX 5070 Ti 16GB
+          <span>2026.05.24 — 2026.08.23</span>
+        </div>
+        <div class="chart-stats">
+          <div><span>최저</span><b>104.6만원</b></div>
+          <div><span>최고</span><b>117.8만원</b></div>
+          <div><span>현재</span><b>106.3만원</b></div>
+        </div>
+      </div>
+      <svg viewBox="0 0 1000 260" width="100%" height="260" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="gradA" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#0B0B0B" stop-opacity="0.1"/>
+            <stop offset="100%" stop-color="#0B0B0B" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <g stroke="#D2CFC7" stroke-width="1">
+          <line x1="0" y1="20" x2="1000" y2="20"/><line x1="0" y1="80" x2="1000" y2="80"/>
+          <line x1="0" y1="140" x2="1000" y2="140"/><line x1="0" y1="200" x2="1000" y2="200"/>
+        </g>
+        <polygon points="0,20 90.9,37.7 181.8,69.1 272.7,97.7 363.6,129.1 454.5,146.8 545.5,137.3 636.4,161.8 727.3,183.6 818.2,200 909.1,193.2 1000,176.8 1000,260 0,260" fill="url(#gradA)"/>
+        <polyline points="0,20 90.9,37.7 181.8,69.1 272.7,97.7 363.6,129.1 454.5,146.8 545.5,137.3 636.4,161.8 727.3,183.6 818.2,200 909.1,193.2 1000,176.8" fill="none" stroke="#0B0B0B" stroke-width="2"/>
+      </svg>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <section class="case">
+    <span class="case-tag">B · 제안 · 관측 4점 이상</span>
+    <h2 class="case-title">추세 요약 + y축 라벨 + 데이터 테이블</h2>
+    <p class="case-note">
+      결론을 첫 줄에 놓는 <b>Answer.tsx 규칙</b>을 차트에도 적용했다.
+      테이블은 기본 접힘 — 화면은 안 어지럽히면서 접근성 트리에는 남는다.
+    </p>
+
+    <div class="chart-card">
+      <div class="chart-legend">
+        <div class="name">
+          RTX 5070 Ti 16GB
+          <span>2026.05.24 — 2026.08.23 · 관측 12건</span>
+        </div>
+        <div class="chart-stats">
+          <div><span>최저</span><b>104.6만원</b></div>
+          <div><span>최고</span><b>117.8만원</b></div>
+          <div><span>현재</span><b>106.3만원</b></div>
+        </div>
+      </div>
+
+      <p class="ch-summary">
+        3개월간 <span class="num">−9.8%</span> 내렸고, 지금은 바닥에서 <span class="num">+1.6%</span> 올라온 자리입니다.
+        <span class="sub">최고 117.8만원 (05.24) → 최저 104.6만원 (08.08) → 현재 106.3만원 (08.23)</span>
+      </p>
+
+      <div class="ch-plot">
+        <div class="ch-yaxis" aria-hidden="true">
+          <i style="top:20px">117.8만</i>
+          <i style="top:80px">113.4만</i>
+          <i style="top:140px">109.0만</i>
+          <i style="top:200px">104.6만</i>
+        </div>
+        <svg viewBox="0 0 1000 260" width="100%" height="260" preserveAspectRatio="none" role="img"
+             aria-label="RTX 5070 Ti 16GB 3개월 최저가 추이. 자세한 값은 아래 데이터 표 참조.">
+          <defs>
+            <linearGradient id="gradB" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#0B0B0B" stop-opacity="0.1"/>
+              <stop offset="100%" stop-color="#0B0B0B" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <g stroke="#D2CFC7" stroke-width="1">
+            <line x1="0" y1="20" x2="1000" y2="20"/><line x1="0" y1="80" x2="1000" y2="80"/>
+            <line x1="0" y1="140" x2="1000" y2="140"/><line x1="0" y1="200" x2="1000" y2="200"/>
+          </g>
+          <polygon points="0,20 90.9,37.7 181.8,69.1 272.7,97.7 363.6,129.1 454.5,146.8 545.5,137.3 636.4,161.8 727.3,183.6 818.2,200 909.1,193.2 1000,176.8 1000,260 0,260" fill="url(#gradB)"/>
+          <polyline points="0,20 90.9,37.7 181.8,69.1 272.7,97.7 363.6,129.1 454.5,146.8 545.5,137.3 636.4,161.8 727.3,183.6 818.2,200 909.1,193.2 1000,176.8" fill="none" stroke="#0B0B0B" stroke-width="2"/>
+        </svg>
+      </div>
+
+      <details class="ch-table-wrap">
+        <summary>데이터 표로 보기 (12건)</summary>
+        <table class="ch-table">
+          <caption>RTX 5070 Ti 16GB · 최저가 관측 기록</caption>
+          <thead>
+            <tr><th scope="col">날짜</th><th scope="col">최저가</th><th scope="col">직전 대비</th></tr>
+          </thead>
+          <tbody>
+            <tr class="mark"><td>2026.05.24 <span class="tag">최고</span></td><td>1,178,000원</td><td>—</td></tr>
+            <tr><td>2026.06.01</td><td>1,165,000원</td><td>▼ 1.1%</td></tr>
+            <tr><td>2026.06.10</td><td>1,142,000원</td><td>▼ 2.0%</td></tr>
+            <tr><td>2026.06.18</td><td>1,121,000원</td><td>▼ 1.8%</td></tr>
+            <tr><td>2026.06.27</td><td>1,098,000원</td><td>▼ 2.1%</td></tr>
+            <tr><td>2026.07.05</td><td>1,085,000원</td><td>▼ 1.2%</td></tr>
+            <tr><td>2026.07.14</td><td>1,092,000원</td><td>▲ 0.6%</td></tr>
+            <tr><td>2026.07.22</td><td>1,074,000원</td><td>▼ 1.6%</td></tr>
+            <tr><td>2026.07.31</td><td>1,058,000원</td><td>▼ 1.5%</td></tr>
+            <tr class="mark"><td>2026.08.08 <span class="tag">최저</span></td><td>1,046,000원</td><td>▼ 1.1%</td></tr>
+            <tr><td>2026.08.16</td><td>1,051,000원</td><td>▲ 0.5%</td></tr>
+            <tr class="mark"><td>2026.08.23 <span class="tag">현재</span></td><td>1,063,000원</td><td>▲ 1.1%</td></tr>
+          </tbody>
+        </table>
+      </details>
+    </div>
+
+    <p class="verdict-line">
+      y축 라벨은 SVG 밖 HTML — 현행 preserveAspectRatio="none" 이 글자까지 늘려서.
+    </p>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <section class="case">
+    <span class="case-tag">C · 제안 · 관측 3점 이하</span>
+    <h2 class="case-title">선을 그리지 않는다</h2>
+    <p class="case-note">
+      점 2개를 이으면 언제나 완벽한 직선이 나온다 — 추세처럼 보이지만
+      <b>추세가 아니다</b>. 신제품이나 조회 기간이 짧을 때 실제로 생기는 상태.
+    </p>
+
+    <div class="chart-card">
+      <div class="chart-legend">
+        <div class="name">
+          RX 9060 XT 16GB
+          <span>2026.08.14 — 2026.08.23 · 관측 2건</span>
+        </div>
+        <div class="chart-stats">
+          <div><span>최저</span><b>45.2만원</b></div>
+          <div><span>최고</span><b>46.9만원</b></div>
+          <div><span>현재</span><b>45.2만원</b></div>
+        </div>
+      </div>
+
+      <p class="ch-summary">
+        관측이 2건뿐이라 추세는 판단할 수 없습니다.
+        <span class="sub">기록된 값만 그대로 표시합니다</span>
+      </p>
+
+      <div class="ch-sparse">
+        <div>
+          <div class="d">2026.08.14</div>
+          <div class="v">469,000원</div>
+          <div class="c">첫 관측</div>
+        </div>
+        <div>
+          <div class="d">2026.08.23</div>
+          <div class="v">452,000원</div>
+          <div class="c">▼ 17,000원 (3.6%)</div>
+        </div>
+      </div>
+
+      <p class="ch-why">
+        점이 4개 미만이면 꺾은선 대신 수치로 표시합니다.
+      </p>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <section class="case">
+    <span class="case-tag">D · 변경 없음</span>
+    <h2 class="case-title">관측 0건</h2>
+    <p class="case-note">이미 처리돼 있음 — 그대로 둔다.</p>
+    <div class="empty-state">
+      <div class="t">가격 히스토리가 없습니다</div>
+      <div class="d">이 기간에는 관측된 가격 데이터가 없어요</div>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

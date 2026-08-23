@@ -1,6 +1,6 @@
 """
 E2E 스모크 테스트 — Playwright로 실제 브라우저에서
-검색->스펙필터(칩셋 연동)->더보기->빌드생성->상세->목록->홈->통계->최근기록->즐겨찾기 흐름 검증.
+검색->스펙필터(칩셋 연동)->더보기->빌드생성->상세->목록->홈->통계(추세요약·데이터표)->최근기록->즐겨찾기 흐름 검증.
 
 이 리포의 유일한 테스트. 타입체크(npm run typecheck)로는 절대 못 잡는 것,
 즉 "다나와 DOM이 바뀌어서 화면에 0건이 뜨는" 류의 조용한 고장을 잡는 게
@@ -249,6 +249,34 @@ def run(page, created):
     tabs = page.locator(".month-tab").count()
     shot(page, "7_stats")
     expect(tabs > 0, "통계 차트 + 월 탭", f"{tabs}개 탭")
+
+    # 추세 요약 한 줄 + 데이터 표(frontend v0.19). 표는 기본 접힘이고
+    # 눌러야 펼쳐진다 — SVG만으로는 읽을 게 없는 경로의 대체 수단이라
+    # "열린다"까지 봐야 검증이 됨
+    expect(
+        page.locator(".ch-summary").count() == 1,
+        "차트 추세 요약 한 줄",
+        page.locator(".ch-summary").first.inner_text().split("\n")[0],
+    )
+    # 관측이 4건 미만이면 꺾은선 대신 수치 카드가 나오는 게 정상이라
+    # 둘 중 하나만 있으면 통과 (실데이터라 건수를 고를 수 없음)
+    sparse = page.locator(".ch-sparse").count() > 0
+    expect(
+        sparse or page.locator(".ch-yaxis i").count() == 4,
+        "y축 금액 라벨 4개" if not sparse else "관측 4건 미만 → 수치 카드",
+        f"{page.locator('.ch-sparse > div').count()}건" if sparse
+        else " / ".join(page.locator(".ch-yaxis i").all_inner_texts()),
+    )
+    expect(
+        page.locator(".ch-table-wrap").count() == 1
+        and page.locator(".ch-table-wrap[open]").count() == 0,
+        "데이터 표 기본 접힘",
+    )
+    page.locator(".ch-table-wrap summary").click()
+    page.wait_for_selector(".ch-table tbody tr", state="visible", timeout=5000)
+    rows = page.locator(".ch-table tbody tr").count()
+    expect(rows > 0, "데이터 표 펼침", f"{rows}행")
+
     page.locator(".month-tab").filter(has_text="12개월").click()
     page.wait_for_selector(".chart-card", timeout=40000)
     expect(page.locator(".chart-card").count() > 0, "12개월 탭 전환 후 차트 유지")
