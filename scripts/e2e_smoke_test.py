@@ -203,6 +203,43 @@ def run(page, created):
     page.locator(".search-spec-filters .spec-clear").click()
     page.wait_for_selector(".answer .because .cond", state="detached", timeout=30000)
 
+    # ---- 2-4) RAM 사용 장치(backend v0.21) ----
+    #      이건 편의 필터가 아니라 정확성 문제라 따로 본다 — 안 걸면 노트북용
+    #      SO-DIMM과 서버용 ECC/REG가 데스크탑 검색에 섞여 나오고, 그게 빌드에
+    #      담기면 합계·판정이 틀어진다
+    page.locator(".category-tab").filter(has_text="RAM").first.click()
+    page.wait_for_selector(".search-spec-filters select", timeout=30000)
+    n = page.locator(".search-spec-filters select").count()
+    expect(n == 4, "RAM 스펙 select 4개", f"{n}개")
+
+    device = page.locator(".search-spec-filters select").nth(1)
+    device.select_option("데스크탑용")
+    page.wait_for_selector(".answer .because .cond", timeout=40000)
+    page.wait_for_selector(".search-result-row", timeout=40000)
+    desktop = {
+        page.locator(".search-result-row").nth(i).inner_text()
+        for i in range(page.locator(".search-result-row").count())
+    }
+    leaked = [t for t in desktop if re.search(r"노트북|SO-?DIMM|ECC", t, re.I)]
+    expect(
+        len(desktop) > 0 and not leaked,
+        "RAM 데스크탑용 필터에 노트북·서버용 미혼입",
+        f"{len(desktop)}건, 혼입 {len(leaked)}건",
+    )
+    device.select_option("노트북용")
+    page.wait_for_selector(".search-result-row", timeout=40000)
+    laptop = {
+        page.locator(".search-result-row").nth(i).inner_text()
+        for i in range(page.locator(".search-result-row").count())
+    }
+    expect(
+        len(laptop) > 0 and not (desktop & laptop),
+        "RAM 사용 장치가 실제로 갈림",
+        f"데스크탑 {len(desktop)}건 / 노트북 {len(laptop)}건, 겹침 {len(desktop & laptop)}건",
+    )
+    page.locator(".search-spec-filters .spec-clear").click()
+    page.wait_for_selector(".answer .because .cond", state="detached", timeout=30000)
+
     # ---- 3) 빌드 생성 ----
     page.goto(f"{BASE}/build/new")
     page.wait_for_selector(".bc-row", timeout=20000)
