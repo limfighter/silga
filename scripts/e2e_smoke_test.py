@@ -1,6 +1,6 @@
 """
 E2E 스모크 테스트 — Playwright로 실제 브라우저에서
-검색->스펙필터->빌드생성->상세->목록->홈->통계->최근기록->즐겨찾기 흐름 검증.
+검색->스펙필터->더보기->빌드생성->상세->목록->홈->통계->최근기록->즐겨찾기 흐름 검증.
 
 이 리포의 유일한 테스트. 타입체크(npm run typecheck)로는 절대 못 잡는 것,
 즉 "다나와 DOM이 바뀌어서 화면에 0건이 뜨는" 류의 조용한 고장을 잡는 게
@@ -121,6 +121,22 @@ def run(page, created):
         "조건 지우기로 전체 해제",
     )
 
+    # ---- 2-2) 40건 상한 해제(backend v0.17) ----
+    #      앞 스텝에서 넣은 검색어("9800X3D")가 남아 있으면 GPU 탭에선 0건이라
+    #      검색어를 비워 카테고리 기본 목록(40건)을 불러온다
+    page.fill(".search-box input", "")
+    page.locator(".search-box button").click()
+    page.wait_for_selector(".search-result-row", timeout=40000)
+    before = page.locator(".search-result-row").count()
+    expect(page.locator(".btn-more").count() == 1, "더 보기 버튼 노출", f"현재 {before}건")
+    page.locator(".btn-more").click()
+    page.wait_for_function(
+        f"document.querySelectorAll('.search-result-row').length > {before}", timeout=60000
+    )
+    after_more = page.locator(".search-result-row").count()
+    shot(page, "2b_more")
+    expect(after_more > before, "더 보기로 결과 누적", f"{before} → {after_more}건")
+
     # ---- 3) 빌드 생성 ----
     page.goto(f"{BASE}/build/new")
     page.wait_for_selector(".bc-row", timeout=20000)
@@ -169,9 +185,33 @@ def run(page, created):
     # ---- 7) 통계 (부품 조회 → 가격 히스토리 차트) ----
     #      최근기록 스텝의 전제 조건이므로 순서를 바꾸지 말 것
     page.goto(f"{BASE}/stats")
-    page.wait_for_selector(".stats-picker .part-input", timeout=20000)
+    page.wait_for_selector(".stats-picker .part-cat-select", timeout=20000)
+    # 카테고리를 안 좁히면 "9800X3D"가 40건 중 39건 완제품 PC로 나온다
+    # (2026-08-23 수정 전까지 실제로 그랬음) — CPU로 좁혀서 단품만 오는지 확인
     page.fill(".stats-picker .part-input", "9800X3D")
     page.wait_for_selector(".autocomplete-item .nm", timeout=40000)
+    badges = page.locator(".autocomplete-item .cat-badge")
+    badge_texts = [badges.nth(i).inner_text() for i in range(badges.count())]
+    expect(
+        "데스크탑" in badge_texts,
+        "전체 검색은 완제품 PC가 섞이고 배지로 드러남",
+        f"배지={badge_texts}",
+    )
+    # CPU로 좁히면 완제품이 빠지고, 카테고리가 확정됐으니 배지도 사라져야 함.
+    # .pr(가격)은 실제 결과 행에만 있어서 "검색 중..." 로딩 행과 구분됨
+    page.select_option(".stats-picker .part-cat-select", "CPU")
+    page.wait_for_function(
+        "(() => {"
+        "const rows = document.querySelectorAll('.autocomplete-item .pr');"
+        "const badges = document.querySelectorAll('.autocomplete-item .cat-badge');"
+        "return rows.length > 0 && rows.length <= 3 && badges.length === 0;"
+        "})()",
+        timeout=40000,
+    )
+    ok(
+        "통계 탭 카테고리 필터 적용",
+        f"완제품 섞임 → {page.locator('.autocomplete-item .pr').count()}건으로 좁혀짐",
+    )
     page.locator(".autocomplete-item").filter(has=page.locator(".nm")).first.click()
     page.wait_for_selector(".chart-card", timeout=40000)
     tabs = page.locator(".month-tab").count()

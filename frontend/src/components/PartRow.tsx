@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, type SearchResultItem } from "../lib/api";
 import { useDebouncedValue } from "../lib/useDebouncedValue";
-import { useSpecFilters } from "../lib/specFilters";
+import { CATEGORIES, useSpecFilters } from "../lib/specFilters";
 
 export interface SelectedPart {
   code: number;
@@ -11,30 +11,36 @@ export interface SelectedPart {
   priceFormatted: string | null;
 }
 
-// .part-spec-filter 폭(144px) + .part-row gap(14px) — 오른쪽에 붙는 select
-// 개수만큼 자동완성 드롭다운 오른쪽 여백을 늘리는 데 씀
-const SPEC_FILTER_SLOT_WIDTH = 158;
-
 export default function PartRow({
   category,
   selected,
   onSelect,
+  categorySelectable = false,
 }: {
   category: string;
   selected: SelectedPart | null;
   onSelect: (part: SelectedPart | null) => void;
+  /**
+   * true면 왼쪽 카테고리 라벨이 select로 바뀌어 사용자가 직접 고른다.
+   * StatsPage/FavoritesPage는 category로 "부품"/"검색"처럼 실제 카테고리가
+   * 아닌 값을 넘겨서 백엔드 카테고리 필터가 통째로 무시되고 있었음 —
+   * "9800X3D"를 치면 40건 중 39건이 완제품 PC로 나오던 버그(2026-08-23 수정).
+   * 고른 카테고리는 검색 필터와 스펙 select를 함께 구동한다.
+   */
+  categorySelectable?: boolean;
 }) {
   const [input, setInput] = useState("");
   const debounced = useDebouncedValue(input, 500); // 매너 크롤링 — 타건마다 호출 방지
   const [focused, setFocused] = useState(false);
-  // 현재 이 컴포넌트를 쓰는 StatsPage/FavoritesPage는 category로 "부품"/"검색"
-  // 을 넘겨서 specDefs가 항상 비어 있음(스펙 select가 렌더되지 않음) — 실제
-  // 카테고리로 쓰이게 될 때를 위해 다른 화면과 같은 훅으로 맞춰만 둔다
-  const { defs: specDefs, spec, setValue } = useSpecFilters(category);
+  // 빈 문자열 = "전체"(카테고리 필터 없음). categorySelectable이 아니면
+  // 부모가 준 category를 그대로 쓴다
+  const [picked, setPicked] = useState("");
+  const activeCategory = categorySelectable ? picked : category;
+  const { defs: specDefs, spec, setValue } = useSpecFilters(activeCategory);
 
   const { data, isFetching } = useQuery({
-    queryKey: ["search", debounced, category, spec],
-    queryFn: () => api.search(debounced, category, spec),
+    queryKey: ["search", debounced, activeCategory, spec],
+    queryFn: () => api.search(debounced, activeCategory || undefined, spec),
     enabled: debounced.trim().length > 1 && focused,
   });
 
@@ -51,7 +57,23 @@ export default function PartRow({
 
   return (
     <div className="part-row">
-      <span className="part-cat">{category}</span>
+      {categorySelectable ? (
+        <select
+          className="part-cat-select"
+          value={picked}
+          onChange={(e) => setPicked(e.target.value)}
+          title="카테고리로 좁혀서 검색 — 안 좁히면 완제품 PC가 섞여 나옵니다"
+        >
+          <option value="">전체</option>
+          {CATEGORIES.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <span className="part-cat">{category}</span>
+      )}
 
       {selected ? (
         <div
@@ -95,11 +117,14 @@ export default function PartRow({
         </>
       )}
 
+      {/* 예전엔 스펙 select 개수만큼 자동완성 드롭다운의 right 오프셋을 줘서
+          오른쪽 끝을 입력창에 맞췄는데, 좁은 컨테이너(.stats-picker는 560px)에서
+          오프셋이 컨테이너 폭을 넘겨 폭이 음수가 되고 목록이 통째로 안 보이는
+          문제가 있었음(스펙 필터가 죽은 경로였던 동안 숨어 있던 버그).
+          드롭다운은 어차피 행 아래(top:52px)라 select를 가리지 않으므로
+          CSS 기본값(left/right)만 쓴다 */}
       {focused && !selected && debounced.trim().length > 1 && (
-        <div
-          className="autocomplete-list"
-          style={specDefs.length > 0 ? { right: 16 + specDefs.length * SPEC_FILTER_SLOT_WIDTH } : undefined}
-        >
+        <div className="autocomplete-list">
           {isFetching && <div className="autocomplete-item" style={{ pointerEvents: "none" }}>검색 중...</div>}
           {!isFetching && data?.length === 0 && (
             <div className="autocomplete-item" style={{ pointerEvents: "none" }}>결과 없음</div>
@@ -111,7 +136,14 @@ export default function PartRow({
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => handlePick(item)}
             >
-              <span className="nm">{item.title}</span>
+              <span className="nm">
+                {item.title}
+                {/* 카테고리를 좁힌 상태면 전부 같은 값이라 중복 — "전체"일 때만
+                    붙인다. 이때가 완제품 PC가 섞여 나오는 경우라 꼭 필요함 */}
+                {!activeCategory && item.category && (
+                  <span className="cat-badge">{item.category}</span>
+                )}
+              </span>
               <span className="pr">{item.price_formatted ?? "-"}</span>
             </div>
           ))}

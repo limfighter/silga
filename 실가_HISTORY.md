@@ -2987,3 +2987,77 @@ backend v0.10.1 → v0.11, frontend v0.12.1 → v0.13.
     → 스크린샷 10장(523KB)이 아티팩트로 정상 업로드되는 것도 확인
 [참고] actions/checkout@v4 등이 Node 20 런타임 deprecation 경고를 냄 —
     실패는 아니고 액션 버전 문제라 당장 조치 안 함
+
+#### backend v0.17 / frontend v0.16 — 카테고리 필터 버그 수정 + 검색 40건 상한 해제
+
+[버그] 통계·즐겨찾기 부품 검색이 카테고리 필터를 안 타고 있었음
+    → PartRow에 category로 "부품"/"검색"을 넘기는데 CATEGORY_LABELS에 없는
+      값이라 백엔드가 통째로 무시 → 필터 없이 검색
+    → 실측: "9800X3D" 무필터 40건의 카테고리 분포 = 데스크탑 39 / CPU 1.
+      자동완성 상위 8건 중 7건이 완제품 PC. CPU 가격 추이를 보려던 사용자가
+      완제품 PC를 고르게 되는 상태였음
+    → main.py 주석에 "카테고리 필터가 실제로 왜 필요한지 보여주는 사례"로
+      적혀 있던 바로 그 케이스인데, 검색 탭에만 적용되고 이 두 화면은 빠져
+      있었음. 검색 탭이 멀쩡해서 오래 안 보였던 것으로 추정
+
+[✓] ① PartRow 카테고리 select + 결과 카테고리 배지
+    → categorySelectable prop 신설 — true면 .part-cat 라벨 자리가 select
+      (전체 + 8개 카테고리)로 바뀌고, 고른 값이 검색 필터와 useSpecFilters를
+      함께 구동. StatsPage/FavoritesPage가 이 prop을 넘김
+    → 기본값 "전체": 기존 동작을 보존하려는 선택. 대신 그 상태에서도 구분이
+      되게 결과에 카테고리 배지를 붙임(SearchResultItem.category 신규)
+    → category 값은 get_product_codes가 category_label 필터링에 어차피 읽고
+      있던 productItem_categoryInfo_{code} 조각이라 추가 스크래핑 없음.
+      예전엔 category_label이 있을 때만 읽던 걸 항상 읽도록 바꾼 게 전부
+    → 부수 효과: PartRow의 스펙 필터 렌더링이 죽은 경로였는데 되살아남
+      (CPU 고르면 종류/소켓/내장그래픽 select가 같이 뜸). 별도 부채로
+      적어뒀던 항목이 이걸로 정리됨
+
+[✓] ③ 검색 40건 상한 해제
+    → danawa.get_product_codes(page=N) — page>1일 때만 &page=N 부착.
+      limit= 파라미터는 안 먹히고 page만 동작(2026-08-22 실측 연장)
+    → /search?page= (1부터, ge=1이라 0 이하는 422)
+    → 페이지 분리 실측: page1∩page2=0, page2∩page3=0
+    → SearchPage를 useInfiniteQuery로 전환. getNextPageParam은 "마지막
+      페이지가 40건을 꽉 채웠으면 다음 페이지 있음"으로 판정
+    → 자동 무한스크롤은 의도적으로 안 씀 — 사용자가 "더 보기"를 누를 때만
+      다나와에 추가 요청이 나가게(매너 크롤링 원칙)
+    → 정렬은 누적 전체 대상. 페이지별로 정렬하면 "낮은가격순"이 페이지
+      안에서만 맞는 목록이 됨
+    → Answer의 pending 판정을 isFetching → isLoading으로 교체. 안 그러면
+      더보기를 누를 때마다 결론 블록 전체가 "불러오는 중"으로 뒤집힘
+    → 자동완성(PartRow/PartSearchPanel)은 1페이지 고정
+
+[✓] 검증
+    → 값 일치 검사기 21쌍 통과(스펙 필터 회귀 없음)
+    → 백엔드 라이브: 무필터 카테고리 분포 데스크탑39·CPU1 / category=CPU 1건 /
+      page1∩page2=0 / page=0 → 422
+    → npm run typecheck 통과
+    → E2E에 신규 스텝 2개 추가 — "더 보기로 결과 누적", "통계 탭 카테고리
+      필터 적용"(자동완성 배지가 전부 CPU인지 확인)
+
+[주의] E2E 새 스텝이 처음엔 실패했는데 앱 버그가 아니라 테스트 전제 오류였음
+    → "GPU 탭이면 기본 목록 40건"이라고 깔았는데, 앞 스텝에서 넣은 검색어
+      ("9800X3D")가 그대로 남아 GPU 탭에선 0건. 화면은 "조건에 맞는 GPU가
+      없습니다"로 정상 동작 중이었음
+    → 스텝을 추가할 때는 앞 스텝이 남긴 상태(검색어/필터/localStorage)를
+      반드시 확인할 것. 선형 스크립트라 상태가 계속 누적됨
+
+[✓] 작업 중 추가로 드러난 문제 2건 — 둘 다 새로 넣은 E2E 스텝이 잡음
+    → **자동완성 드롭다운이 좁은 컨테이너에서 통째로 안 보임**: PartRow가
+      스펙 select 개수만큼 드롭다운 right 오프셋을 주는데(16 + 3×158 = 490px)
+      .stats-picker는 max-width 560px이라 left:106 + right:490 > 560 → 폭이
+      음수가 되어 목록이 hidden. 스펙 필터가 죽은 경로였던 동안 숨어 있던
+      버그가 필터를 되살리면서 드러난 것. 드롭다운은 top:52px로 행 아래에
+      있어 select를 가리지도 않으므로 오프셋 로직을 통째로 제거
+      (SPEC_FILTER_SLOT_WIDTH 상수 삭제). .part-cat-select 폭도 .part-cat
+      라벨과 같은 78px로 맞춤 — 드롭다운 left:106px가 그 폭 전제라서
+    → **검색 결과 배지가 제목을 밀어내 잘림**: 처음엔 SearchPage 결과에도
+      배지를 붙였는데 "SAPPHIRE 라데온 RX 9070 XT PULSE D6 16GB [그래픽카...]"
+      처럼 잘렸음. 검색 탭은 카테고리 탭으로 항상 좁혀져 있어 결과 카테고리가
+      전부 같으니 애초에 중복 정보 → SearchPage에서는 배지를 빼고, PartRow
+      자동완성에서 "전체"일 때만 붙이는 규칙으로 정리
+    → 실측이 규칙을 그대로 보여줌: 전체 검색 배지 ['CPU','데스크탑'×7] →
+      CPU 선택 시 1건 + 배지 없음
+
+[✓] 최종 E2E — 검증 20건 전부 통과, exit 0, 실행 후 잔류 빌드 없음

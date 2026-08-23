@@ -36,6 +36,9 @@ export interface SearchResultItem {
   price: number | null;
   price_formatted: string | null;
   img: string | null;
+  // 다나와 상품 li의 카테고리 조각("CPU"/"데스크탑" 등). 카테고리 필터를
+  // 안 걸었을 때 부품 단품인지 완제품 PC인지 구분하는 용도(backend v0.17)
+  category: string | null;
 }
 
 // /search 스펙 필터 파라미터 — 카테고리와 안 맞는 필드는 백엔드가 무시함
@@ -154,8 +157,10 @@ export const api = {
   // q 생략(빈 문자열/undefined) 시 백엔드가 category 기본 키워드로 대신
   // 검색함(검색 버튼을 안 눌러도 카테고리 선택만으로 기본 목록이 뜨도록) —
   // 이 경우 category는 필수(백엔드가 q/category 둘 다 없으면 400)
-  search: (q: string | undefined, category?: string, spec?: SearchSpecParams) => {
+  search: (q: string | undefined, category?: string, spec?: SearchSpecParams, page?: number) => {
     const params = new URLSearchParams();
+    // 다나와가 한 번에 40건까지만 주므로 그 이상은 page로 넘긴다(backend v0.17)
+    if (page && page > 1) params.set("page", String(page));
     if (q) params.set("q", q);
     if (category) params.set("category", category);
     if (spec?.memoryGb) params.set("memory_gb", String(spec.memoryGb));
