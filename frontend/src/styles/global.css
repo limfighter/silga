@@ -1030,6 +1030,9 @@ input,select{font-family:inherit;}
 .axis-pin.l b{left:14px;}
 .axis-pin.r b{right:14px;}
 .axis-pin.in b{background:var(--ink);color:var(--paper);}
+/* 핀이 하나뿐일 때 — 겹칠 상대가 없으니 라벨을 계속 띄운다(VerdictAxis 참조) */
+.axis-pin.solo b{opacity:1;}
+.axis-pin.solo i{width:4px;margin-left:-2px;}
 .axis-pin:hover,.axis-pin:focus-visible{z-index:2;}
 .axis-pin:hover i,.axis-pin:focus-visible i{width:4px;margin-left:-2px;}
 .axis-pin:hover b,.axis-pin:focus-visible b{opacity:1;}

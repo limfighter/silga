@@ -4,6 +4,10 @@
 # push마다 돌리면 매너 크롤링 원칙에 어긋난다. 그래서 PR이 열리거나
 # 리뷰 준비 상태가 될 때 한 번만 돌리고, 다시 봐야 하면 Actions 탭에서
 # 수동으로(workflow_dispatch) 재실행한다.
+# 액션 버전은 2026-08-23 기준 최신 메이저(v7)로 맞춤 — v4/v5를 쓰던 동안
+# "Node 20 런타임 deprecation" 경고가 매 실행마다 붙었음. 올릴 때는 릴리스
+# 노트의 breaking change를 확인할 것(예: setup-python v7에서 pip-install
+# 입력 제거 — 이 워크플로는 안 쓰므로 영향 없음)
 name: PR 검증
 
 on:
@@ -17,15 +21,15 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "20"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
 
@@ -72,7 +76,7 @@ jobs:
       # (스크립트가 실패 지점을 e2e_FAIL.png로 저장함)
       - name: 스크린샷 업로드
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-screenshots
           path: e2e-shots/
