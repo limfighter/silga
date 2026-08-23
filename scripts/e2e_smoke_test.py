@@ -169,6 +169,40 @@ def run(page, created):
     shot(page, "2b_more")
     expect(after_more > before, "더 보기로 결과 누적", f"{before} → {after_more}건")
 
+    # ---- 2-3) 케이스/파워/쿨러 필터 확장(backend v0.20) ----
+    #      세 카테고리가 필터 2개뿐이던 걸 4개로 늘렸음. 탭을 바꿀 때마다
+    #      실제 스크래핑이 한 번씩 도니까 개수 확인만 하고, 실제로 걸리는지는
+    #      쿨러 하나에서만 확인한다(전부 확인하면 테스트가 배로 길어짐)
+    for cat in ["케이스", "파워", "쿨러"]:
+        page.locator(".category-tab").filter(has_text=cat).first.click()
+        page.wait_for_selector(".search-spec-filters select", timeout=30000)
+        n = page.locator(".search-spec-filters select").count()
+        expect(n == 4, f"{cat} 스펙 select 4개", f"{n}개")
+
+    # 쿨러 탭에 남아 있는 상태 — 냉각 방식은 공랭/수랭 배타라 결과가 갈려야 함
+    cooling = page.locator(".search-spec-filters select").nth(2)
+    cooling.select_option("수랭")
+    page.wait_for_selector(".answer .because .cond", timeout=40000)
+    page.wait_for_selector(".search-result-row", timeout=40000)
+    liquid = {
+        page.locator(".search-result-row").nth(i).inner_text()
+        for i in range(page.locator(".search-result-row").count())
+    }
+    cooling.select_option("공랭")
+    page.wait_for_selector(".search-result-row", timeout=40000)
+    air = {
+        page.locator(".search-result-row").nth(i).inner_text()
+        for i in range(page.locator(".search-result-row").count())
+    }
+    shot(page, "2c_cooler_filters")
+    expect(
+        len(liquid) > 0 and len(air) > 0 and not (liquid & air),
+        "쿨러 냉각 방식 필터가 실제로 갈림",
+        f"수랭 {len(liquid)}건 / 공랭 {len(air)}건, 겹침 {len(liquid & air)}건",
+    )
+    page.locator(".search-spec-filters .spec-clear").click()
+    page.wait_for_selector(".answer .because .cond", state="detached", timeout=30000)
+
     # ---- 3) 빌드 생성 ----
     page.goto(f"{BASE}/build/new")
     page.wait_for_selector(".bc-row", timeout=20000)
