@@ -308,7 +308,7 @@ GET  /search?q={keyword, 선택}&category={선택}&memory_gb={GPU}&chipset={GPU}
   ※ page 파라미터(v0.17 추가) — 1부터, 1 미만은 422. 아래 "40건" 항목 참조
   ※ 스펙 파라미터(memory_gb/chipset/socket/formfactor/ram_type/wattage/
     interface는 v0.5, cooler_type은 v0.7, formfactor의 SSD 적용은 v0.8,
-    length는 v0.9, cpu_type은 v0.14, igpu는 v0.15, capacity/ram_count/
+    length는 v0.9, cpu_type은 v0.14, igpu는 v0.15, gpu_chip은 v0.19, capacity/ram_count/
     efficiency/case_size와 chipset의 메인보드 적용은 v0.16 추가) — category와 달리 다나와 서버측 요청 자체를
     좁히는 필터. danawa.get_product_codes(attribute=...)로 "{속성코드}-
     {값코드}-OR"(또는 케이스만 -AND, 동작상 차이 없음) 형식 문자열을 다나와
@@ -322,6 +322,7 @@ GET  /search?q={keyword, 선택}&category={선택}&memory_gb={GPU}&chipset={GPU}
     | 파라미터    | 적용 category | 값 예시               | 매핑 딕셔너리(main.py)         |
     |-------------|---------------|------------------------|----------------------------------|
     | memory_gb   | GPU           | 16 (GB)                | GPU_MEMORY_ATTRIBUTES            |
+    | gpu_chip    | GPU           | RTX 5070 Ti / RX 9070 XT / ARC B580 등 25종(칩셋 모델) | GPU_CHIP_ATTRIBUTES (chipset이 "누가 만든 칩이냐"면 이건 "어떤 칩이냐". 다나와는 제조사별로 필터 그룹이 갈려 있으나(NVIDIA 658 / AMD 657 / 인텔 338008) 값 이름이 RTX·RX·ARC로 겹치지 않아 쿨러 소켓처럼 한 딕셔너리로 합침. 실측 120종 중 현행 유통 세대 25종만 채택 — RTX 30 이하·GTX·RX 6000 이하 구형과 워크스테이션 라인 제외. 프론트는 제조사 select 값에 따라 보여줄 목록만 고름) |
     | chipset     | GPU, 메인보드   | GPU: NVIDIA/AMD/Intel(칩셋 제조사), 메인보드: X870E/B650/Z890/B760 등 19종(세부 칩셋 모델) | GPU_CHIPSET_ATTRIBUTES / MAINBOARD_CHIPSET_ATTRIBUTES (같은 파라미터명이지만 의미도 값도 완전히 다름 — socket·formfactor와 같은 방식으로 카테고리별 분리 처리. 메인보드 칩셋은 채택 소켓 4종에 대응하는 현행 유통분만, 워크스테이션/서버·구형 단종·임베디드 제외) |
     | length      | GPU           | "300~309mm"/"360mm~" 등(10mm 단위 구간, 7개) | GPU_LENGTH_ATTRIBUTES (케이스 장착 호환성 참고용 — 구간 결합 미지원이라 정확한 "이하/이상" 필터는 아님, 근사치로만 사용) |
     | socket      | CPU, 메인보드, 쿨러 | AM5/AM4/LGA1851/LGA1700| CPU_SOCKET_ATTRIBUTES / MAINBOARD_SOCKET_ATTRIBUTES / COOLER_SOCKET_ATTRIBUTES (카테고리마다 다나와 내부 코드 자체가 달라 값도 다름 — 절대 재사용 불가. 쿨러는 "그 쿨러가 지원하는 소켓" 의미이고, 인텔(6805)/AMD(6806) 필터 그룹이 나뉘어 있어 값에 따라 속성코드까지 갈림) |

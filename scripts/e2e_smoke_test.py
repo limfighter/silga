@@ -1,6 +1,6 @@
 """
 E2E 스모크 테스트 — Playwright로 실제 브라우저에서
-검색->스펙필터->더보기->빌드생성->상세->목록->홈->통계->최근기록->즐겨찾기 흐름 검증.
+검색->스펙필터(칩셋 연동)->더보기->빌드생성->상세->목록->홈->통계->최근기록->즐겨찾기 흐름 검증.
 
 이 리포의 유일한 테스트. 타입체크(npm run typecheck)로는 절대 못 잡는 것,
 즉 "다나와 DOM이 바뀌어서 화면에 0건이 뜨는" 류의 조용한 고장을 잡는 게
@@ -98,21 +98,56 @@ def run(page, created):
     shot(page, "1_search")
     expect(n > 0, "검색 결과 표시", f"{n}건")
 
-    # ---- 2) 스펙 필터 동시 적용(backend v0.13~v0.16) ----
+    # ---- 2) 스펙 필터 동시 적용(backend v0.13~v0.16) + 칩셋 모델 연동(v0.19) ----
+    #      앞 스텝의 검색어("9800X3D")를 그대로 두면 GPU 탭에서 0건이 되므로
+    #      먼저 비워서 카테고리 기본 목록으로 돌려놓는다. 이 선형 스크립트는
+    #      상태가 계속 누적되므로 스텝을 추가할 때 앞 스텝이 남긴 것을 볼 것
+    page.fill(".search-box input", "")
+    page.locator(".search-box button").click()
     page.locator(".category-tab").filter(has_text="GPU").first.click()
     page.wait_for_selector(".search-spec-filters select", timeout=30000)
     sel = page.locator(".search-spec-filters select")
-    expect(sel.count() == 3, "GPU 스펙 select 3개", f"{sel.count()}개")
+    expect(sel.count() == 4, "GPU 스펙 select 4개", f"{sel.count()}개")
+    # 칩셋 모델은 제조사를 골라야 목록이 정해지므로 처음엔 잠겨 있어야 함
+    expect(sel.nth(1).is_disabled(), "칩셋 모델 select 초기 비활성")
+
     sel.nth(0).select_option("NVIDIA")
-    sel.nth(1).select_option("16")
+    chip_opts = [o.strip() for o in sel.nth(1).locator("option").all_inner_texts()]
+    expect(
+        not sel.nth(1).is_disabled() and "RTX 5070 Ti" in chip_opts,
+        "제조사 선택 시 해당 칩셋 목록 노출",
+        f"{len(chip_opts) - 1}종",
+    )
+    sel.nth(1).select_option("RTX 5070 Ti")
     page.wait_for_selector(".answer .because .cond", timeout=40000)
     values = [sel.nth(i).input_value() for i in range(sel.count())]
     chips = page.locator(".answer .because .cond").count()
     shot(page, "2_spec_filters")
     expect(
-        values[0] == "NVIDIA" and values[1] == "16" and chips == 2,
+        values[0] == "NVIDIA" and values[1] == "RTX 5070 Ti" and chips == 2,
         "스펙 필터 2개 동시 유지",
         f"값={values} 조건칩={chips}",
+    )
+    page.wait_for_selector(".search-result-row", timeout=40000)
+    rows = page.locator(".search-result-row")
+    titles = [rows.nth(i).inner_text() for i in range(rows.count())]
+    expect(
+        len(titles) > 0 and all("5070 Ti" in t for t in titles),
+        "칩셋 모델 필터가 실제로 걸림",
+        f"{len(titles)}건 전부 5070 Ti",
+    )
+
+    # 제조사를 바꾸면 앞서 고른 칩셋은 그 제조사에 없는 값이므로 비워져야 함
+    sel.nth(0).select_option("AMD")
+    page.wait_for_function(
+        "document.querySelectorAll('.search-spec-filters select')[1].value === ''",
+        timeout=20000,
+    )
+    amd_opts = [o.strip() for o in sel.nth(1).locator("option").all_inner_texts()]
+    expect(
+        "RX 9070 XT" in amd_opts and "RTX 5070 Ti" not in amd_opts,
+        "제조사 변경 시 칩셋 목록 교체 + 선택 초기화",
+        f"{len(amd_opts) - 1}종",
     )
     page.locator(".search-spec-filters .spec-clear").click()
     page.wait_for_selector(".answer .because .cond", state="detached", timeout=30000)
@@ -122,10 +157,7 @@ def run(page, created):
     )
 
     # ---- 2-2) 40건 상한 해제(backend v0.17) ----
-    #      앞 스텝에서 넣은 검색어("9800X3D")가 남아 있으면 GPU 탭에선 0건이라
-    #      검색어를 비워 카테고리 기본 목록(40건)을 불러온다
-    page.fill(".search-box input", "")
-    page.locator(".search-box button").click()
+    #      조건을 다 푼 GPU 기본 목록은 40건이 꽉 차서 "더 보기"가 떠야 함
     page.wait_for_selector(".search-result-row", timeout=40000)
     before = page.locator(".search-result-row").count()
     expect(page.locator(".btn-more").count() == 1, "더 보기 버튼 노출", f"현재 {before}건")
