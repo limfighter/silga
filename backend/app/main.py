@@ -457,7 +457,11 @@ def _validate_ma_window(ma_window: int) -> int:
         raise HTTPException(status_code=422, detail="ma_window는 7, 14, 30 중 하나여야 함")
     return ma_window
 
-app = FastAPI(title="실가 backend", version="0.1.0")
+# version은 실가_인수인계.md 버전 표의 backend 값과 맞춘다 — /openapi.json에
+# 그대로 노출되는 값이라, AI 라우터가 이 API를 tool로 볼 때 보이는 버전이 됨.
+# 초기값 0.1.0이 v0.16까지 방치돼 있던 걸 2026-08-23에 정정. 두 번째 자리
+# 이상을 올릴 때 이 줄과 frontend/package.json도 같이 올릴 것
+app = FastAPI(title="실가 backend", version="0.17.0")
 
 
 @app.on_event("startup")

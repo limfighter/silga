@@ -63,8 +63,14 @@ VM·디스크·외부IP가 실비로 과금된다 — 대신 사용자 응답속
 서울 리전은 무료 티어 대상이 아니라서 30GB(무료 한도)를 채울 이유가
 없음 — 실제 쓸 만큼(20GB)만 잡아서 디스크 비용을 줄인다.
 
+인스턴스 이름이 `silga-vm-seoul`인 이유: us-central1에 있던 기존
+`silga-vm`과 동시에 떠 있는 기간이 있어서 구분하려고 다르게 지었다.
+GCP는 인스턴스 재명명이 안 되므로(재생성만 가능) 이 이름을 그대로 쓴다 —
+**이 문서의 모든 명령은 서울 VM 기준이니 `silga-vm`으로 바꿔 쓰지 말 것**
+(구 VM을 건드리게 됨).
+
 ```bash
-gcloud compute instances create silga-vm \
+gcloud compute instances create silga-vm-seoul \
   --project=<YOUR_PROJECT_ID> \
   --zone=asia-northeast3-a \
   --machine-type=e2-micro \
@@ -100,7 +106,7 @@ gcloud compute resource-policies create instance-schedule silga-8to20 \
   --vm-stop-schedule="0 20 * * *" \
   --timezone="Asia/Seoul"
 
-gcloud compute instances add-resource-policies silga-vm \
+gcloud compute instances add-resource-policies silga-vm-seoul \
   --zone=asia-northeast3-a \
   --resource-policies=silga-8to20
 ```
@@ -110,10 +116,10 @@ gcloud compute instances add-resource-policies silga-vm \
 
 ```bash
 # 켜기 (완전 부팅까지 약 20~60초 소요 — e2-micro라 다소 걸림)
-gcloud compute instances start silga-vm --zone=asia-northeast3-a
+gcloud compute instances start silga-vm-seoul --zone=asia-northeast3-a
 
 # 끄기
-gcloud compute instances stop silga-vm --zone=asia-northeast3-a
+gcloud compute instances stop silga-vm-seoul --zone=asia-northeast3-a
 ```
 
 디스크는 정지 중에도 유지되므로 SQLite DB(`backend/ppe.db`)는 껐다 켜도
@@ -128,7 +134,7 @@ gcloud compute instances stop silga-vm --zone=asia-northeast3-a
 
 ```bash
 # 현재 배정된 ephemeral IP 확인
-gcloud compute instances describe silga-vm --zone=asia-northeast3-a \
+gcloud compute instances describe silga-vm-seoul --zone=asia-northeast3-a \
   --format='get(networkInterfaces[0].accessConfigs[0].natIP)'
 
 # 그 주소를 그대로 고정 IP로 승격
@@ -146,7 +152,7 @@ gcloud compute addresses create silga-ip \
 ## 2. SSH 접속 + 기본 패키지 설치
 
 ```bash
-gcloud compute ssh silga-vm --zone=asia-northeast3-a
+gcloud compute ssh silga-vm-seoul --zone=asia-northeast3-a
 ```
 
 VM 안에서:
@@ -255,7 +261,7 @@ sudo nginx -t && sudo systemctl reload nginx
 ## 8. 접속 확인
 
 ```bash
-gcloud compute instances describe silga-vm --zone=asia-northeast3-a \
+gcloud compute instances describe silga-vm-seoul --zone=asia-northeast3-a \
   --format='get(networkInterfaces[0].accessConfigs[0].natIP)'
 ```
 
@@ -283,18 +289,20 @@ Swagger UI도 확인 가능.
    세 파일(`ppe.db`, `ppe.db-wal`, `ppe.db-shm`) 전부 같이 받을 것:**
    ```bash
    # 원본 VM에서 먼저 읽기 권한 있는 위치로 복사 (쓰기 중 스냅샷 어긋남 방지로 서비스 잠깐 정지)
-   gcloud compute ssh silga-vm --zone=asia-northeast3-a --command="
+   gcloud compute ssh silga-vm-seoul --zone=asia-northeast3-a --command="
      sudo systemctl stop silga-backend
      sudo cp /opt/silga/backend/ppe.db /opt/silga/backend/ppe.db-wal /opt/silga/backend/ppe.db-shm /tmp/
      sudo chmod 644 /tmp/ppe.db /tmp/ppe.db-wal /tmp/ppe.db-shm
      sudo systemctl start silga-backend
    "
    # 로컬(또는 Cloud Shell 홈)로 세 파일 다 내려받기
-   gcloud compute scp silga-vm:/tmp/ppe.db silga-vm:/tmp/ppe.db-wal silga-vm:/tmp/ppe.db-shm ~/ --zone=asia-northeast3-a
+   gcloud compute scp silga-vm-seoul:/tmp/ppe.db silga-vm-seoul:/tmp/ppe.db-wal silga-vm-seoul:/tmp/ppe.db-shm ~/ --zone=asia-northeast3-a
    ```
 2. 이 문서의 "1. VM 생성"~"8. 접속 확인"을 `--zone=us-central1-a`,
    `--boot-disk-size=30GB`(무료 한도까지)로 그대로 다시 실행해 새 VM을
-   만든다. 백업한 세 파일이 있으면 새 VM의 `/opt/silga/backend/`에
+   만든다. **이때 인스턴스 이름은 `silga-vm-seoul`이 아니라 다른 이름
+   (예: `silga-vm`)으로 만들 것** — 서울 VM을 아직 안 지웠다면 이름이
+   겹치면 안 되고, 지웠더라도 리전과 안 맞는 이름이 남으면 헷갈린다. 백업한 세 파일이 있으면 새 VM의 `/opt/silga/backend/`에
    전부 scp로 올리고 `sudo chown silga:silga /opt/silga/backend/ppe.db*`로
    소유권 맞춰서 교체 (하나라도 빠지면 데이터 유실 — 옮긴 뒤 `sqlite3`나
    파이썬으로 `SELECT COUNT(*) FROM builds` 등으로 실제 개수 확인 권장)
@@ -302,8 +310,8 @@ Swagger UI도 확인 가능.
    us-central1은 24시간 상시가 무료라 스케줄을 걸 이유가 없고, VM이
    안 꺼지니 ephemeral IP도 회수될 일이 없어 그대로 안정적임(단, 외부
    IP 과금 약 170원/일은 리전과 무관하게 계속 남음, 위 "리전 선택" 절 참조)
-4. 서울 VM(`silga-vm`, 존 `asia-northeast3-a`)은 확인 후 삭제:
-   `gcloud compute instances delete silga-vm --zone=asia-northeast3-a`
+4. 서울 VM(`silga-vm-seoul`, 존 `asia-northeast3-a`)은 확인 후 삭제:
+   `gcloud compute instances delete silga-vm-seoul --zone=asia-northeast3-a`
 
 ## 이후 업데이트
 
