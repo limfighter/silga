@@ -570,6 +570,13 @@ def search(
         description="케이스 크기 스펙 필터(빅타워/미들타워/미니타워/미니ITX) — category=케이스일 때만 "
                      "적용, 그 외 무시. formfactor(지원 보드 규격)와는 다른 축이라 동시 지정 가능",
     ),
+    page: int = Query(
+        1,
+        ge=1,
+        description="검색 결과 페이지(1부터). 다나와가 한 번에 40건까지만 주기 때문에 "
+                     "그 이상은 이 파라미터로 넘겨야 함 — 페이지끼리 결과가 겹치지 않는 것은 "
+                     "실측 확인됨. 자동완성처럼 상위 몇 건만 쓰는 화면은 1페이지만 쓸 것",
+    ),
 ):
     """
     GET /search?q={keyword, 선택}&category={CATEGORY_LABELS 키, 선택}&memory_gb={GPU 전용}&chipset={GPU 전용}&
@@ -579,7 +586,9 @@ def search(
         ram_count={RAM 전용}&efficiency={파워 전용}&case_size={케이스 전용}
         (스펙 파라미터는 전부 선택, category와 안 맞으면 무시. 같은 category의
         스펙 파라미터를 여러 개 주면 전부 AND로 결합됨 — v0.13) →
-        [{code, title, price, price_formatted, img}, ...]
+        [{code, title, price, price_formatted, img, category}, ...]
+
+    한 페이지는 다나와가 주는 대로 최대 40건 — 더 보려면 page를 올린다(v0.17).
 
     q 생략 시 category의 CATEGORY_DEFAULT_QUERY 키워드로 대신 검색(검색 버튼을
     누르지 않아도 카테고리 선택만으로 기본 목록이 뜨도록 하기 위함) — q와
@@ -646,7 +655,9 @@ def search(
         ]
     attribute = ",".join(a for a in attributes if a) or None
     try:
-        results = danawa.get_product_codes(q, category_label=category_label, attribute=attribute)
+        results = danawa.get_product_codes(
+            q, category_label=category_label, attribute=attribute, page=page
+        )
     except requests.RequestException:
         # 데이터 소스 자체 장애 (다나와 연결 실패) — 상품 없음과 구분
         raise HTTPException(status_code=503, detail="데이터 소스(다나와) 연결 실패")
@@ -658,6 +669,7 @@ def search(
             price=item.get("price"),
             price_formatted=format_won(item.get("price")),
             img=item.get("img"),
+            category=item.get("category"),
         )
         for item in results
     ]

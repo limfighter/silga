@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type SearchResultItem } from "../lib/api";
 import { CATEGORIES, useSpecFilters } from "../lib/specFilters";
 import type { SelectedPart } from "../components/PartRow";
@@ -10,9 +10,9 @@ import { manwon, won } from "../lib/format";
 
 type SortKey = "popular" | "low" | "high";
 
-// 다나와 검색 결과는 한 페이지 40건이 상한(limit 파라미터로 못 늘림 —
-// 2026-08-22 실측). 40건이 꽉 차서 오면 실제로는 더 있는데 잘린 것이므로
-// 건수를 그대로 "40건"이라고 단정하면 안 된다.
+// 다나와 검색 결과는 한 페이지 40건이 상한(limit 파라미터로는 못 늘리고
+// &page=N으로만 넘길 수 있음 — 2026-08-22/23 실측). 40건이 꽉 차서 왔다는
+// 건 다음 페이지가 있다는 뜻이라 "더 보기"를 띄우는 기준으로도 쓴다.
 const PAGE_LIMIT = 40;
 
 // 인기상품순은 API가 준 순서 그대로(다나와 정렬 기준 위임), 가격순은
@@ -45,13 +45,22 @@ export default function SearchPage() {
 
   // q가 비어 있으면 백엔드가 category 기본 키워드로 대신 검색 — 검색 버튼을
   // 안 눌러도 카테고리 선택만으로 기본 목록이 뜨도록 하기 위함
-  const { data, isFetching, isError, error } = useQuery({
-    queryKey: ["search", query, category, spec],
-    queryFn: () => api.search(query || undefined, category, spec),
-  });
+  // 페이지를 눌러서 더 받는 구조라 무한 쿼리 — 자동 무한스크롤은 쓰지 않는다
+  // (사용자가 누를 때만 다나와에 추가 요청이 나가도록, 매너 크롤링 원칙)
+  const { data, isLoading, isError, error, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useInfiniteQuery({
+      queryKey: ["search", query, category, spec],
+      queryFn: ({ pageParam }) => api.search(query || undefined, category, spec, pageParam),
+      initialPageParam: 1,
+      // 마지막 페이지가 40건을 꽉 채웠으면 다음 페이지가 있다고 본다
+      getNextPageParam: (lastPage, allPages) =>
+        lastPage.length >= PAGE_LIMIT ? allPages.length + 1 : undefined,
+    });
 
-  const results = useMemo(() => sortResults(data ?? [], sort), [data, sort]);
-  const capped = results.length >= PAGE_LIMIT;
+  // 정렬은 지금까지 받아온 전체를 대상으로 — 페이지별로 따로 정렬하면
+  // "낮은가격순"이 페이지 안에서만 맞는 이상한 목록이 된다
+  const loaded = useMemo(() => (data?.pages ?? []).flat(), [data]);
+  const results = useMemo(() => sortResults(loaded, sort), [loaded, sort]);
 
   const submit = () => setQuery(input.trim());
 
@@ -115,7 +124,7 @@ export default function SearchPage() {
         </>
       ) : null;
 
-    if (isFetching) {
+    if (isLoading) {
       return (
         <Answer
           state="pending"
@@ -173,7 +182,7 @@ export default function SearchPage() {
         headline={
           <>
             {category} <mark>
-              {results.length}건{capped ? "+" : ""}
+              {results.length}건{hasNextPage ? "+" : ""}
             </mark>
             {priceLow != null && priceHigh != null && (
               <>
@@ -189,7 +198,7 @@ export default function SearchPage() {
             {sort === "popular" ? "인기상품순" : sort === "low" ? "낮은가격순" : "높은가격순"}
             {query.length === 0 && ` · 검색어 없이 ${category} 기본 목록`}
             {condLine}
-            {capped && " · 다나와가 한 번에 주는 40건까지만 표시 — 조건을 더 걸면 좁혀집니다"}
+            {hasNextPage && " · 아래 \"더 보기\"로 다음 40건을 불러올 수 있습니다"}
             {cartLine}
           </>
         }
@@ -251,7 +260,7 @@ export default function SearchPage() {
             </div>
           )}
 
-          {isFetching && <div className="status-line">검색 중...</div>}
+          {isLoading && <div className="status-line">검색 중...</div>}
 
           {results.length > 0 && (
             <>
@@ -286,6 +295,10 @@ export default function SearchPage() {
                       ) : (
                         <span className="thumb thumb-empty" aria-hidden="true" />
                       )}
+                      {/* 이 화면은 카테고리 탭으로 항상 좁혀져 있어서 결과의
+                          카테고리가 전부 같음 — 배지를 붙이면 중복 정보인 데다
+                          제목을 밀어내서 잘림. 배지는 카테고리를 안 고를 수
+                          있는 PartRow 자동완성에서만 쓴다 */}
                       <span className="nm">
                         {item.title ?? "(제목 없음)"}
                         <span className="code">#{item.code}</span>
@@ -298,6 +311,16 @@ export default function SearchPage() {
                   );
                 })}
               </div>
+
+              {hasNextPage && (
+                <button
+                  className="btn-more"
+                  onClick={() => fetchNextPage()}
+                  disabled={isFetchingNextPage}
+                >
+                  {isFetchingNextPage ? "불러오는 중..." : "더 보기"}
+                </button>
+              )}
             </>
           )}
         </div>

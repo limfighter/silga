@@ -213,7 +213,7 @@ export default function StatsPage() {
       {answer}
 
       <div className="stats-picker" style={{ marginTop: 26 }}>
-        <PartRow category="부품" selected={selected} onSelect={handleSelect} />
+        <PartRow category="부품" categorySelectable selected={selected} onSelect={handleSelect} />
       </div>
 
       {selected && (

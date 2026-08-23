@@ -420,6 +420,50 @@ input,select{font-family:inherit;}
   letter-spacing:.04em;
   text-transform:uppercase;
 }
+/* 통계/즐겨찾기처럼 사용자가 카테고리를 직접 고르는 화면에서 .part-cat
+   라벨 자리를 대신함 — 폭을 라벨과 맞춰 행 정렬이 안 흔들리게 한다 */
+.part-cat-select{
+  appearance:none;
+  -webkit-appearance:none;
+  /* .part-cat 라벨과 같은 78px — 자동완성 드롭다운의 left:106px가 이 폭을
+     전제로 맞춰져 있어서 다르게 두면 정렬이 어긋난다 */
+  width:78px;
+  flex:0 0 78px;
+  background:var(--paper-2);
+  border:var(--rule-1) solid var(--line-lt);
+  padding:9px 6px;
+  color:var(--ink);
+  font-size:12px;
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+}
+.part-cat-select:focus{outline:none;border-color:var(--ink);}
+/* 검색 결과가 부품 단품인지 완제품 PC인지 구분하는 라벨 — 카테고리 필터를
+   안 걸면 "9800X3D" 40건 중 39건이 완제품 PC로 나오기 때문에 필요함 */
+.cat-badge{
+  font-family:var(--font-mono);
+  font-size:10px;
+  color:var(--mute-lt);
+  border:var(--rule-1) solid var(--line-lt);
+  padding:1px 5px;
+  margin-left:8px;
+  white-space:nowrap;
+}
+/* 다나와가 한 번에 40건까지만 주므로 다음 페이지를 사용자가 눌러서 받는다 */
+.btn-more{
+  display:block;
+  width:100%;
+  margin-top:14px;
+  background:none;
+  border:var(--rule-1) solid var(--line-lt);
+  color:var(--mute-lt);
+  padding:13px;
+  font-size:13px;
+  transition:border-color .15s,color .15s;
+}
+.btn-more:hover:not(:disabled){border-color:var(--ink);color:var(--ink);}
+.btn-more:disabled{color:var(--mute-lt);}
 .part-input{
   flex:1;
   background:var(--paper-2);

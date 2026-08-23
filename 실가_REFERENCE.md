@@ -275,7 +275,7 @@ sammy310/Danawa-Crawler (MIT):
 GET  /search?q={keyword, 선택}&category={선택}&memory_gb={GPU}&chipset={GPU}&length={GPU}&socket={CPU|메인보드|쿨러}
      &formfactor={메인보드|케이스|SSD}&ram_type={RAM}&wattage={파워}&interface={SSD}
      &cooler_type={쿨러}
-  → [{code, title, price, price_formatted, img}, ...]
+  → [{code, title, price, price_formatted, img, category}, ...]
   ※ q 선택화 + img 필드(v0.9.2, 2026-08-07 추가) — 검색 버튼을 안 눌러도
     카테고리 선택만으로 기본 목록이 뜨도록, q 생략 시 backend/app/main.py의
     CATEGORY_DEFAULT_QUERY(카테고리별 기본 검색어, 예: GPU→"그래픽카드")로
@@ -291,6 +291,11 @@ GET  /search?q={keyword, 선택}&category={선택}&memory_gb={GPU}&chipset={GPU}
     각 상품 li의 input#productItem_categoryInfo_{code} 값 마지막 "_" 뒤 조각과
     비교해서 사후 필터링(요청 URL에 새 파라미터를 추가하는 방식이 아님) — 8개
     전부 실제 상품 li HTML로 직접 검증 완료(실가_HISTORY.md 2026-08-05 참조)
+  ※ category 필드(v0.17 추가) — 상품 li에 이미 박혀 있는 카테고리 조각을
+    그대로 실어 보냄(추가 스크래핑 없음). category 필터를 안 걸었을 때 결과가
+    부품 단품인지 완제품 PC인지 화면에서 구분하는 용도. 필요한 이유는
+    "9800X3D" 무필터 검색이 40건 중 39건 완제품 PC라는 실측(2026-08-23)
+  ※ page 파라미터(v0.17 추가) — 1부터, 1 미만은 422. 아래 "40건" 항목 참조
   ※ 스펙 파라미터(memory_gb/chipset/socket/formfactor/ram_type/wattage/
     interface는 v0.5, cooler_type은 v0.7, formfactor의 SSD 적용은 v0.8,
     length는 v0.9, cpu_type은 v0.14, igpu는 v0.15, capacity/ram_count/
@@ -339,10 +344,13 @@ GET  /search?q={keyword, 선택}&category={선택}&memory_gb={GPU}&chipset={GPU}
     ※ 프론트는 lib/specFilters.ts의 useSpecFilters() 훅이 카테고리별 select
       상태를 객체 하나로 들고 있고, select끼리 더 이상 상호 배타가 아님
       (SearchPage / PartSearchPanel / PartRow가 이 훅을 공유)
-    ※ 검색 결과는 **다나와가 한 번에 40건까지만 반환**한다(limit 파라미터로
-      늘릴 수 없음, 2026-08-22 실측). 40건이 꽉 차서 오면 잘린 것이므로 건수를
-      단정하면 안 되고, 조건을 더 걸어 좁히는 것이 유일한 방법 — 프론트
-      SearchPage는 이때 건수를 "40건+"로 표기함
+    ※ 검색 결과는 **다나와가 한 번에 40건까지만 반환**한다(limit 파라미터로는
+      늘릴 수 없음, 2026-08-22 실측). v0.17부터 `page` 파라미터로 다음 40건을
+      받을 수 있음 — 페이지끼리 결과 집합이 겹치지 않는 것 실측 확인
+      (1p∩2p=0, 2p∩3p=0). 프론트 SearchPage는 마지막 페이지가 40건을 꽉
+      채웠으면 건수를 "40건+"로 표기하고 "더 보기" 버튼을 띄운다(자동
+      무한스크롤은 매너 크롤링 원칙상 쓰지 않음). 자동완성 계열 화면
+      (PartRow/PartSearchPanel)은 1페이지 고정
   ※ 다른 카테고리/스펙으로 더 확장하려면 매번 그 카테고리 자체의 필터
     사이드바에서 다시 확보해야 함(체크박스 클릭 → 바뀐 URL의 attribute= 값
     확인) — 카테고리 간 attribute 코드는 절대 재사용 불가로 확인됨(예: CPU

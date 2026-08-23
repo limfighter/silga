@@ -151,7 +151,7 @@ export default function FavoritesPage() {
       )}
 
       <div className="stats-picker" style={{ marginTop: 26 }}>
-        <PartRow key={pickerKey} category="검색" selected={null} onSelect={handleSelect} />
+        <PartRow key={pickerKey} category="검색" categorySelectable selected={null} onSelect={handleSelect} />
       </div>
 
       {addMutation.isError && (

@@ -44,7 +44,9 @@ def _get_header(host: str, referer: str = None):
     return header
 
 
-def get_product_codes(keyword: str, category_label: str = None, attribute: str = None) -> list:
+def get_product_codes(
+    keyword: str, category_label: str = None, attribute: str = None, page: int = 1
+) -> list:
     """
     검색어로 상품 코드 목록을 조회한다.
 
@@ -75,11 +77,20 @@ def get_product_codes(keyword: str, category_label: str = None, attribute: str =
         2026-08-22 라이브 실측으로 확인(실가_HISTORY.md 참조). 조립할 문자열은
         호출부(main.py::search())가 만들고 여기서는 받은 값을 그대로 전달함.
         None이면 기존과 동일하게 미적용
+      - page 인자 신규 추가(2026-08-23): 다나와는 한 번에 40건까지만 주고
+        그 이상은 &page=N으로 넘겨야 함(limit= 파라미터는 안 먹힘). 1이면
+        기존과 동일하게 파라미터를 안 붙인다. 페이지끼리 결과 집합이 완전히
+        분리되는 것은 실측 확인(1p∩2p=0, 2p∩3p=0)
+      - 반환 항목에 category 키 추가(2026-08-23): category_label 필터링에
+        쓰려고 어차피 읽고 있던 값이라 스크래핑이 늘지 않음. 카테고리 필터를
+        안 걸었을 때 결과가 단품인지 완제품 PC인지 화면에서 구분하는 용도
     """
     from urllib.parse import quote
     url = "https://search.danawa.com/dsearch.php?query={}&tab=main".format(quote(keyword))
     if attribute:
         url += "&attribute={}".format(quote(attribute))
+    if page and page > 1:
+        url += "&page={}".format(int(page))
     response = requests.get(url, headers=_get_header(host="search.danawa.com"), timeout=20)
     if response.status_code != 200:
         response.raise_for_status()
@@ -103,13 +114,15 @@ def get_product_codes(keyword: str, category_label: str = None, attribute: str =
             continue
         code3 = int(code2)
 
-        if category_label is not None:
-            cate_input = product.find(
-                "input", {"id": lambda x: x and x.startswith("productItem_categoryInfo_")}
-            )
-            cate_value = (cate_input or None) and cate_input.get("value")
-            if cate_value is None or cate_value.rsplit("_", 1)[-1] != category_label:
-                continue
+        # 예전엔 category_label이 있을 때만 읽었는데, 값 자체를 응답에도
+        # 실어 보내야 해서 항상 읽는다(추가 요청 없음 — 같은 li 안의 값)
+        cate_input = product.find(
+            "input", {"id": lambda x: x and x.startswith("productItem_categoryInfo_")}
+        )
+        cate_value = (cate_input or None) and cate_input.get("value")
+        item_category = cate_value.rsplit("_", 1)[-1] if cate_value else None
+        if category_label is not None and item_category != category_label:
+            continue
 
         price1 = product.find_next("input", {"id": "min_price_{}".format(code3)})
         price2 = (price1 or None) and price1.get("value")
@@ -122,6 +135,8 @@ def get_product_codes(keyword: str, category_label: str = None, attribute: str =
         img_src = (img or None) and (img.get("data-src") or img.get("src"))
 
         prod = {"code": code3}
+        if item_category is not None:
+            prod["category"] = item_category
         if price2 is not None:
             prod["price"] = int(price2)
         if title is not None:
