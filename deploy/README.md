@@ -298,7 +298,11 @@ Swagger UI도 확인 가능.
    # 로컬(또는 Cloud Shell 홈)로 세 파일 다 내려받기
    gcloud compute scp silga-vm-seoul:/tmp/ppe.db silga-vm-seoul:/tmp/ppe.db-wal silga-vm-seoul:/tmp/ppe.db-shm ~/ --zone=asia-northeast3-a
    ```
-2. 이 문서의 "1. VM 생성"~"8. 접속 확인"을 `--zone=us-central1-a`,
+2. **기존 us-central1 VM(`silga-vm`)이 정지 상태로 남아 있다면 새로 만들
+   필요 없이 그걸 켜면 된다**(2026-08-23 결정 — 삭제하지 않고 남겨둠).
+   단 코드가 그 시점에 멈춰 있으므로 켠 뒤 `sudo /opt/silga/deploy/deploy.sh`
+   부터 돌릴 것. 그 VM마저 없다면 아래대로 새로 만든다:
+   이 문서의 "1. VM 생성"~"8. 접속 확인"을 `--zone=us-central1-a`,
    `--boot-disk-size=30GB`(무료 한도까지)로 그대로 다시 실행해 새 VM을
    만든다. **이때 인스턴스 이름은 `silga-vm-seoul`이 아니라 다른 이름
    (예: `silga-vm`)으로 만들 것** — 서울 VM을 아직 안 지웠다면 이름이

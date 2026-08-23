@@ -20,12 +20,20 @@ import {
 //
 // 인쇄물에는 hover도 포커스도 없으므로 같은 내용을 정렬된 목록(.axis-list)으로
 // 항상 렌더해두고 @media print에서만 펼친다.
+//
+// 예외 하나 — 핀이 딱 하나면 겹칠 상대가 없으므로 라벨을 상시 노출한다.
+// 그 경우 축이 "어디에 있는지 알 수 없는 눈금 한 줄"이 돼서 섹션 하나를
+// 쓰고도 정보를 못 주고 있었음(빌드 1개 상태 실화면에서 확인, 2026-08-23).
 export default function VerdictAxis({ builds }: { builds: BuildSummary[] }) {
   const plotted = builds
     .filter((b) => b.diff_percent != null)
     .sort((a, b) => a.diff_percent! - b.diff_percent!);
 
   if (plotted.length === 0) return null;
+
+  // 겹침 걱정이 없는 유일한 경우 — 2개부터는 적정 밴드에 몰릴 수 있어서
+  // 기존대로 hover/포커스에만 띄운다
+  const alwaysLabel = plotted.length === 1;
 
   const describe = (b: BuildSummary) => {
     const glyph = rangeGlyph(b.diff_percent!);
@@ -63,6 +71,7 @@ export default function VerdictAxis({ builds }: { builds: BuildSummary[] }) {
               aria-label={describe(b)}
               className={[
                 "axis-pin",
+                alwaysLabel ? "solo" : "",
                 inBand ? "in" : "",
                 // 이동평균이 즉시가로 대체된 빌드는 파선 — 카드(.bc-diff.low)와 같은 규칙
                 b.verdict_confidence === "low" ? "low" : "",
@@ -88,7 +97,9 @@ export default function VerdictAxis({ builds }: { builds: BuildSummary[] }) {
         <span>적정 ±{VERDICT_THRESHOLD_PERCENT}%</span>
         <span>고가 +{GAUGE_RANGE}%</span>
       </p>
-      <p className="axis-hint">핀에 마우스를 올리거나 탭 키로 이동하면 어느 빌드인지 표시됩니다</p>
+      {!alwaysLabel && (
+        <p className="axis-hint">핀에 마우스를 올리거나 탭 키로 이동하면 어느 빌드인지 표시됩니다</p>
+      )}
 
       {/* 인쇄 전용 — 화면에서는 숨김(축의 hover 라벨이 그 역할을 함) */}
       <ol className="axis-list">
