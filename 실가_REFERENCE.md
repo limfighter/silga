@@ -283,9 +283,13 @@ sammy310/Danawa-Crawler (MIT):
 
 ## 엔드포인트 설계 (계약 정본 — 프론트 api.ts / 백엔드 schemas가 여기 맞춤)
 ```
-GET  /search?q={keyword, 선택}&category={선택}&memory_gb={GPU}&chipset={GPU}&length={GPU}&socket={CPU|메인보드|쿨러}
-     &formfactor={메인보드|케이스|SSD}&ram_type={RAM}&wattage={파워}&interface={SSD}
-     &cooler_type={쿨러}
+GET  /search?q={keyword, 선택}&category={선택}&page={선택}
+     &memory_gb={GPU}&chipset={GPU}&gpu_chip={GPU}&length={GPU}
+     &socket={CPU|메인보드|쿨러}&cpu_type={CPU}&igpu={CPU}
+     &formfactor={메인보드|케이스|SSD|파워}&ram_type={RAM}&capacity={RAM|SSD}&ram_count={RAM}
+     &case_size={케이스}&max_vga_length={케이스}&max_cooler_height={케이스}
+     &wattage={파워}&efficiency={파워}&cable_type={파워}
+     &interface={SSD}&cooler_type={쿨러}&cooling={쿨러}&height={쿨러}
   → [{code, title, price, price_formatted, img, category}, ...]
   ※ q 선택화 + img 필드(v0.9.2, 2026-08-07 추가) — 검색 버튼을 안 눌러도
     카테고리 선택만으로 기본 목록이 뜨도록, q 생략 시 backend/app/main.py의
@@ -295,6 +299,17 @@ GET  /search?q={keyword, 선택}&category={선택}&memory_gb={GPU}&chipset={GPU}
     소수만 즉시로딩(src)이고 대다수는 lazyload라 실제 URL이 data-src에 있어
     data-src 우선 사용(둘 다 없거나 noImg 플레이스홀더면 None, 프론트가 자체
     플레이스홀더 처리)
+  ※ 스펙 필터 파라미터는 전부 선택이고 **해당 category일 때만** 적용된다.
+    다른 category에서 넘어오거나 대응 ATTRIBUTES 딕셔너리에 없는 값이면
+    400이 아니라 조용히 무시 — 다나와가 카테고리마다 속성코드를 따로 쓰기
+    때문에 값 자체가 의미를 갖는 범위가 카테고리로 한정됨. 같은 category
+    안에서는 여러 개를 동시에 걸 수 있고 서로 AND로 결합된다(v0.13~).
+    formfactor처럼 여러 category가 같은 이름을 재사용하는 파라미터가 있는데,
+    카테고리마다 딕셔너리가 따로라 값이 섞이지 않는다(메인보드=자기 크기,
+    케이스=장착 가능한 보드 크기, SSD=M.2 규격, 파워=파워 자체 규격).
+    케이스의 max_vga_length/max_cooler_height는 "케이스가 받아주는 최대치"라
+    GPU의 length(카드 자체 길이), 쿨러의 height(쿨러 자체 높이)와 반대편
+    축이다 — 이름이 비슷하다고 합치지 말 것 (v0.20, 2026-08-23)
   ※ category(v0.5, 2026-08-05 추가) — 검색어가 다른 카테고리 상품과 겹칠 때
     결과를 좁히는 선택적 필터. 값은 backend/app/main.py의 CATEGORY_LABELS 키
     (CPU/GPU/메인보드/RAM/SSD/케이스/파워/쿨러)와 정확히 일치해야 적용됨

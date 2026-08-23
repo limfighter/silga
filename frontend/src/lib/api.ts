@@ -60,6 +60,11 @@ export interface SearchSpecParams {
   ramCount?: string; // RAM 전용
   efficiency?: string; // 파워 전용 (80PLUS 등급)
   caseSize?: string; // 케이스 전용
+  maxVgaLength?: string; // 케이스 전용 (받아주는 최대 그래픽카드 길이 — GPU의 length와 반대편 축)
+  maxCoolerHeight?: string; // 케이스 전용 (받아주는 최대 CPU 쿨러 높이 — 쿨러의 height와 짝)
+  cableType?: string; // 파워 전용 (풀/세미 모듈러)
+  cooling?: string; // 쿨러 전용 (공랭/수랭 — coolerType과는 다른 축)
+  height?: string; // 쿨러 전용 (쿨러 자체 높이 — 케이스의 maxCoolerHeight와 짝)
 }
 
 export interface ProductVariant {
@@ -194,6 +199,11 @@ export const api = {
     if (spec?.ramCount) params.set("ram_count", spec.ramCount);
     if (spec?.efficiency) params.set("efficiency", spec.efficiency);
     if (spec?.caseSize) params.set("case_size", spec.caseSize);
+    if (spec?.maxVgaLength) params.set("max_vga_length", spec.maxVgaLength);
+    if (spec?.maxCoolerHeight) params.set("max_cooler_height", spec.maxCoolerHeight);
+    if (spec?.cableType) params.set("cable_type", spec.cableType);
+    if (spec?.cooling) params.set("cooling", spec.cooling);
+    if (spec?.height) params.set("height", spec.height);
     return request<SearchResultItem[]>(`/search?${params.toString()}`);
   },
 

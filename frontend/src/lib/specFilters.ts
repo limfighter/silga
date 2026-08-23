@@ -80,6 +80,23 @@ const PSU_EFFICIENCY_OPTIONS = [
   "80 PLUS 스탠다드",
 ];
 const CASE_SIZE_OPTIONS = ["빅타워", "미들타워", "미니타워", "미니ITX"];
+// 케이스가 "받아주는" 최대치 — GPU의 length(카드 자체 길이), 쿨러의 height
+// (쿨러 자체 높이)와 반대편 축이라 이름을 max_로 시작함
+const CASE_MAX_VGA_LENGTH_OPTIONS = [
+  "270~289mm", "290~309mm", "310~329mm", "330~349mm",
+  "350~369mm", "370~399mm", "400mm~",
+];
+const CASE_MAX_COOLER_HEIGHT_OPTIONS = [
+  "119mm 이하", "130~139mm", "140~149mm", "150~159mm", "160~169mm",
+  "170~179mm", "180~189mm", "190~199mm", "200mm 이상",
+];
+const PSU_CABLE_OPTIONS = ["풀모듈러", "세미모듈러", "케이블일체형"];
+const PSU_FORMFACTOR_OPTIONS = ["ATX", "M-ATX(SFX)", "TFX"];
+const COOLER_COOLING_OPTIONS = ["공랭", "수랭"];
+const COOLER_HEIGHT_OPTIONS = [
+  "75~99mm", "100~124mm", "125~149mm", "150~159mm",
+  "160~169mm", "170~199mm", "200mm~",
+];
 // 메인보드 세부 칩셋 — 채택 소켓 4종에 대응하는 현행 유통 칩셋만(소켓 순서로 정렬)
 const MAINBOARD_CHIPSET_OPTIONS = [
   "X870E", "X870", "B850", "B840", "X670E", "X670", "B650E", "B650", "A620",
@@ -209,6 +226,18 @@ export const CATEGORY_SPEC_FILTERS: Record<string, SpecFilterDef[]> = {
       title: "장착 가능한 메인보드 폼팩터로 좁혀서 검색",
       options: FORMFACTOR_OPTIONS,
     },
+    {
+      specKey: "maxVgaLength",
+      placeholder: "VGA 길이 전체",
+      title: "받아주는 최대 그래픽카드 길이로 좁혀서 검색",
+      options: CASE_MAX_VGA_LENGTH_OPTIONS,
+    },
+    {
+      specKey: "maxCoolerHeight",
+      placeholder: "쿨러 높이 전체",
+      title: "받아주는 최대 CPU 쿨러 높이로 좁혀서 검색(쿨러 탭의 '높이'와 맞춰볼 것)",
+      options: CASE_MAX_COOLER_HEIGHT_OPTIONS,
+    },
   ],
   RAM: [
     { specKey: "ramType", placeholder: "규격 전체", title: "DDR 규격으로 좁혀서 검색", options: RAM_TYPE_OPTIONS },
@@ -233,6 +262,20 @@ export const CATEGORY_SPEC_FILTERS: Record<string, SpecFilterDef[]> = {
       placeholder: "인증 전체",
       title: "80PLUS 인증 등급으로 좁혀서 검색(같은 출력이라도 등급이 가격을 가름)",
       options: PSU_EFFICIENCY_OPTIONS,
+    },
+    {
+      specKey: "cableType",
+      placeholder: "케이블 전체",
+      title: "케이블 연결 방식으로 좁혀서 검색(같은 출력·등급이어도 가격을 가름)",
+      options: PSU_CABLE_OPTIONS,
+    },
+    {
+      // 케이스/메인보드/SSD와 같은 formfactor 키를 쓰지만 카테고리마다
+      // 딕셔너리가 따로라 값이 섞이지 않음 — 여기선 파워 자체의 규격
+      specKey: "formfactor",
+      placeholder: "규격 전체",
+      title: "파워 규격으로 좁혀서 검색(케이스의 지원파워규격과 맞춰볼 것)",
+      options: PSU_FORMFACTOR_OPTIONS,
     },
   ],
   SSD: [
@@ -272,6 +315,19 @@ export const CATEGORY_SPEC_FILTERS: Record<string, SpecFilterDef[]> = {
       placeholder: "소켓 전체",
       title: "지원하는 CPU 소켓으로 좁혀서 검색",
       options: SOCKET_OPTIONS,
+    },
+    {
+      // coolerType("어디에 붙이는 쿨러냐")과는 다른 축이라 동시에 걸 수 있음
+      specKey: "cooling",
+      placeholder: "냉각 전체",
+      title: "냉각 방식(공랭/수랭)으로 좁혀서 검색",
+      options: COOLER_COOLING_OPTIONS,
+    },
+    {
+      specKey: "height",
+      placeholder: "높이 전체",
+      title: "쿨러 자체 높이로 좁혀서 검색(케이스 탭의 '쿨러 높이'와 맞춰볼 것)",
+      options: COOLER_HEIGHT_OPTIONS,
     },
   ],
 };

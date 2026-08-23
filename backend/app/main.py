@@ -316,11 +316,48 @@ MAINBOARD_CHIPSET_ATTRIBUTES = {
     "B760": "504-823213-OR",
     "H610": "504-757642-OR",
 }
+# ※ "ITX"에 다나와 라벨 "M-ITX"의 코드(22398)가 들어가 있는 건 오타가 아니다.
+#   다나와는 6196 그룹에 ITX(22397)와 M-ITX(22398)를 따로 두는데, 라벨만 보고
+#   22397로 "고치면" 오히려 깨진다 — 2026-08-23 실측:
+#     케이스 크기=미니ITX 단독 40건 / +22397 → 25건(겹침 1) / +22398 → 40건(겹침 39)
+#   즉 미니ITX 케이스가 실제로 지원하는 건 22398이고, 사용자가 "ITX"라고 할 때
+#   뜻하는 것도 이쪽이다. 22397은 국내 유통이 거의 없는 별개 규격으로 보임.
 CASE_FORMFACTOR_ATTRIBUTES = {
     "ATX": "6196-22391-AND",
     "M-ATX": "6196-22392-AND",
     "ITX": "6196-22398-AND",
     "E-ATX": "6196-22394-AND",
+}
+
+# /search?max_vga_length= 값(케이스 전용) → 속성코드 1009 = VGA 길이.
+# "케이스가 최대 몇 mm짜리 그래픽카드를 받아주나"라서 GPU 카테고리의
+# length(카드 자체 길이, 속성 682)와는 반대편 축이다 — 이름을 max_ 로
+# 시작하게 지은 이유. 실측 10구간 중 소형/슬림 케이스대(~199mm, 200~249mm,
+# 250~269mm)를 뺀 7구간 채택 — GPU_LENGTH_ATTRIBUTES와 같은 트리밍 기준.
+CASE_MAX_VGA_LENGTH_ATTRIBUTES = {
+    "270~289mm": "1009-1037092-OR",
+    "290~309mm": "1009-1037089-OR",
+    "310~329mm": "1009-1037086-OR",
+    "330~349mm": "1009-1037083-OR",
+    "350~369mm": "1009-1037080-OR",
+    "370~399mm": "1009-1037077-OR",
+    "400mm~": "1009-340930-OR",
+}
+
+# /search?max_cooler_height= 값(케이스 전용) → 속성코드 21573 = CPU쿨러 높이.
+# 쿨러 카테고리의 height(쿨러 자체 높이, 속성 21022)와 짝을 이룬다 —
+# "이 케이스에 이 쿨러가 들어가나"를 두 화면에서 맞춰보라고 같이 넣음.
+# 실측 9구간 전부 채택 — 전부 소비자 조립에서 실제로 갈리는 범위라 뺄 게 없음.
+CASE_MAX_COOLER_HEIGHT_ATTRIBUTES = {
+    "119mm 이하": "21573-138794-OR",
+    "130~139mm": "21573-138796-OR",
+    "140~149mm": "21573-138797-OR",
+    "150~159mm": "21573-138798-OR",
+    "160~169mm": "21573-138799-OR",
+    "170~179mm": "21573-811522-OR",
+    "180~189mm": "21573-811525-OR",
+    "190~199mm": "21573-811528-OR",
+    "200mm 이상": "21573-811531-OR",
 }
 
 # /search?case_size= 값(케이스 전용, category=케이스일 때만 적용) →
@@ -404,6 +441,27 @@ PSU_EFFICIENCY_ATTRIBUTES = {
     "80 PLUS 실버": "13033-71553-OR",
     "80 PLUS 브론즈": "13033-71552-OR",
     "80 PLUS 스탠다드": "13033-71551-OR",
+}
+
+# /search?cable_type= 값(파워 전용) → 속성코드 40062 = 케이블연결.
+# 실측 3종 전부 채택 — 같은 정격출력·같은 인증 등급이어도 모듈러 여부가
+# 가격을 크게 가르는 축이라 wattage/efficiency와 짝이 된다.
+PSU_CABLE_ATTRIBUTES = {
+    "풀모듈러": "40062-264941-OR",
+    "세미모듈러": "40062-264942-OR",
+    "케이블일체형": "40062-720493-OR",
+}
+
+# /search?formfactor= 값(파워 전용, category=파워일 때만 적용) →
+# 속성코드 1086 = 제품 분류. 케이스의 "지원파워규격"(속성 977)과 짝.
+# 실측 9종 중 개인 조립 범위인 3종만 채택 — 서버용/Flex-ATX/UPS/리던던트/
+# DC to DC/전용 액세서리는 제외(CASE_SIZE_ATTRIBUTES와 같은 트리밍 기준).
+# 파라미터 이름을 formfactor로 재사용하는 건 메인보드/케이스/SSD와 같은
+# 컨벤션 — 카테고리마다 딕셔너리가 따로라 값이 섞이지 않는다.
+PSU_FORMFACTOR_ATTRIBUTES = {
+    "ATX": "1086-5529-OR",
+    "M-ATX(SFX)": "1086-5530-OR",
+    "TFX": "1086-5531-OR",
 }
 
 # /search?interface= 값(SSD 전용, category=SSD일 때만 적용) →
@@ -490,6 +548,30 @@ COOLER_SOCKET_ATTRIBUTES = {
     "LGA1700": "6805-743326-AND",
 }
 
+# /search?cooling= 값(쿨러 전용) → 속성코드 315758 = 냉각 방식.
+# cooler_type(속성 687, "CPU 쿨러/시스템 쿨러/VGA 쿨러/…")과는 다른 축이다 —
+# 그쪽은 "어디에 붙이는 쿨러냐", 이쪽은 "공랭이냐 수랭이냐". 쿨러를 고를 때
+# 실제로 가장 먼저 정하는 축인데 지금까지 걸 방법이 없었음. 실측 2종 전부 채택.
+COOLER_COOLING_ATTRIBUTES = {
+    "공랭": "315758-657797-OR",
+    "수랭": "315758-657800-OR",
+}
+
+# /search?height= 값(쿨러 전용) → 속성코드 21022 = 높이.
+# 케이스의 max_cooler_height(속성 21573)와 짝 — 케이스가 받아주는 최대 높이와
+# 쿨러 자체 높이를 맞춰보라고 같이 넣음. 실측 15구간 중 CPU 쿨러 범위인
+# 75mm 이상 7구간만 채택 — 그 아래(4~6mm, ~3mm 등)는 써멀패드/M.2 쿨러라
+# CPU 쿨러 높이 비교에 섞이면 안 된다.
+COOLER_HEIGHT_ATTRIBUTES = {
+    "75~99mm": "21022-135417-OR",
+    "100~124mm": "21022-135418-OR",
+    "125~149mm": "21022-135419-OR",
+    "150~159mm": "21022-135420-OR",
+    "160~169mm": "21022-1050460-OR",
+    "170~199mm": "21022-846877-OR",
+    "200mm~": "21022-1050286-OR",
+}
+
 
 def _validate_ma_window(ma_window: int) -> int:
     """
@@ -507,7 +589,7 @@ def _validate_ma_window(ma_window: int) -> int:
 # 그대로 노출되는 값이라, AI 라우터가 이 API를 tool로 볼 때 보이는 버전이 됨.
 # 초기값 0.1.0이 v0.16까지 방치돼 있던 걸 2026-08-23에 정정. 두 번째 자리
 # 이상을 올릴 때 이 줄과 frontend/package.json도 같이 올릴 것
-app = FastAPI(title="실가 backend", version="0.19.0")
+app = FastAPI(title="실가 backend", version="0.20.0")
 
 
 @app.on_event("startup")
@@ -566,8 +648,36 @@ def search(
         None,
         description="폼팩터 스펙 필터 — category=메인보드/케이스일 때는 ATX/M-ATX/ITX/E-ATX "
                      "(메인보드=자기 크기, 케이스=장착 가능한 보드 크기), category=SSD일 때는 "
-                     "M.2 2280/M.2 2242/M.2 2230/2.5인치. 그 외 category에서는 무시. "
+                     "M.2 2280/M.2 2242/M.2 2230/2.5인치, category=파워일 때는 "
+                     "ATX/M-ATX(SFX)/TFX(파워 자체 규격). 그 외 category에서는 무시. "
                      "메인보드는 socket과, SSD는 interface와 동시 지정 가능(AND로 결합)",
+    ),
+    max_vga_length: Optional[str] = Query(
+        None,
+        description="케이스가 지원하는 최대 그래픽카드 길이(예: 330~349mm, 400mm~) — "
+                     "category=케이스일 때만 적용, CASE_MAX_VGA_LENGTH_ATTRIBUTES 키와 "
+                     "정확히 일치해야 함, 그 외 무시. GPU 카테고리의 length(카드 자체 길이)와 "
+                     "반대편 축임. case_size/formfactor와 동시 지정 가능(AND로 결합)",
+    ),
+    max_cooler_height: Optional[str] = Query(
+        None,
+        description="케이스가 지원하는 최대 CPU 쿨러 높이(예: 160~169mm) — category=케이스일 "
+                     "때만 적용, 그 외 무시. 쿨러 카테고리의 height(쿨러 자체 높이)와 짝",
+    ),
+    cable_type: Optional[str] = Query(
+        None,
+        description="파워 케이블연결 방식(풀모듈러/세미모듈러/케이블일체형) — category=파워일 "
+                     "때만 적용, 그 외 무시. wattage/efficiency와 동시 지정 가능(AND로 결합)",
+    ),
+    cooling: Optional[str] = Query(
+        None,
+        description="쿨러 냉각 방식(공랭/수랭) — category=쿨러일 때만 적용, 그 외 무시. "
+                     "cooler_type(어디에 붙이는 쿨러냐)과는 다른 축이며 동시 지정 가능",
+    ),
+    height: Optional[str] = Query(
+        None,
+        description="쿨러 자체 높이(예: 150~159mm) — category=쿨러일 때만 적용, 그 외 무시. "
+                     "케이스의 max_cooler_height와 짝",
     ),
     ram_type: Optional[str] = Query(
         None,
@@ -689,6 +799,8 @@ def search(
         attributes = [
             CASE_SIZE_ATTRIBUTES.get(case_size),
             CASE_FORMFACTOR_ATTRIBUTES.get(formfactor),
+            CASE_MAX_VGA_LENGTH_ATTRIBUTES.get(max_vga_length),
+            CASE_MAX_COOLER_HEIGHT_ATTRIBUTES.get(max_cooler_height),
         ]
     elif category == "RAM":
         attributes = [
@@ -700,6 +812,8 @@ def search(
         attributes = [
             PSU_WATTAGE_ATTRIBUTES.get(wattage),
             PSU_EFFICIENCY_ATTRIBUTES.get(efficiency),
+            PSU_CABLE_ATTRIBUTES.get(cable_type),
+            PSU_FORMFACTOR_ATTRIBUTES.get(formfactor),
         ]
     elif category == "SSD":
         attributes = [
@@ -711,6 +825,8 @@ def search(
         attributes = [
             COOLER_TYPE_ATTRIBUTES.get(cooler_type),
             COOLER_SOCKET_ATTRIBUTES.get(socket),
+            COOLER_COOLING_ATTRIBUTES.get(cooling),
+            COOLER_HEIGHT_ATTRIBUTES.get(height),
         ]
     attribute = ",".join(a for a in attributes if a) or None
     try:
