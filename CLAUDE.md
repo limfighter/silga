@@ -56,6 +56,11 @@ python3 scripts/e2e_smoke_test.py
 생략). **셀렉터는 화면 문구가 아니라 구조 클래스로 잡을 것** — placeholder
 문자열로 잡아뒀다가 2026-08-05 디자인 개편 때 통째로 썩은 전례가 있음.
 
+CI는 `.github/workflows/e2e.yml` 하나뿐 — **PR이 열릴 때만** 타입체크 +
+E2E를 돌린다(매 push마다 안 돎). 실제 다나와를 긁는 테스트라 push마다
+돌리는 건 매너 크롤링 원칙에 어긋나서 그렇게 잡았고, 다시 봐야 하면
+Actions 탭에서 수동 재실행(workflow_dispatch).
+
 ## 작업 시 지켜야 할 것 (핵심 규칙)
 - **응답 필드명 임의 변경 금지**: `app-shell-mockup.html` / `silga-mockup.html`이
   REFERENCE.md의 API 계약을 전제로 이미 만들어져 있음.

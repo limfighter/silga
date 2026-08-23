@@ -2965,3 +2965,19 @@ backend v0.10.1 → v0.11, frontend v0.12.1 → v0.13.
 
 [미결] CI가 없어서 이 테스트를 강제로 돌리는 장치가 없음 — 안 돌리면 또 썩는다.
     깃 훅이나 GitHub Actions 도입은 사용자 판단 필요(현재 워크플로 0개)
+
+#### CI 신설 — .github/workflows/e2e.yml (리포 최초 워크플로)
+
+[✓] 트리거를 "PR 열릴 때만"으로 잡은 이유
+    → E2E가 실제 다나와를 그대로 긁어서(전체 2~4분, 요청 수십 회) push마다
+      돌리면 매너 크롤링 원칙에 어긋남. 사용자와 합의해서 pull_request의
+      opened/reopened/ready_for_review + workflow_dispatch(수동 재실행)로 결정.
+      synchronize(브랜치에 push할 때마다)는 일부러 뺌
+[✓] 구성 — npm ci → 타입체크 → 백엔드 의존성 → playwright chromium →
+    서버 2개 기동 대기(최대 120초) → E2E → 실패 시 서버 로그 tail + 스크린샷
+    아티팩트 업로드. 타입체크를 앞에 둔 건 빠르고 결정적이라 무거운 E2E 전에
+    일찍 실패시키려는 것
+[미검증] GitHub 러너(해외 IP)에서 다나와가 정상 응답하는지는 이 환경에서
+    확인 불가. 국내 사이트가 해외 데이터센터 IP를 차단/제한하는 경우가 있어
+    워크플로가 계속 빨갛게 뜨면 트리거를 workflow_dispatch만 남기고 로컬
+    실행으로 돌릴 것 — 깨진 게이트는 없는 것보다 나쁨
