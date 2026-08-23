@@ -38,6 +38,25 @@ class BuildSummary(BaseModel):
     diff_percent: Optional[float] = None
 
 
+class BuildPrice(BaseModel):
+    """GET /builds/prices 응답 한 건.
+
+    홈/목록 화면이 저장된 빌드를 전부 조회하는 구조라, 이름·부품수처럼 DB에서
+    바로 나오는 값까지 스크래핑이 끝날 때까지 못 보여주는 문제가 있었음.
+    구조(GET /builds?with_prices=false)와 가격(이 엔드포인트)을 나눠서
+    첫 화면을 즉시 그리기 위한 것 — 필드 의미는 BuildSummary의 동명 필드와
+    완전히 같고, id로 매칭해서 채워 넣으면 된다(v0.18).
+    """
+
+    id: int
+    total_price: Optional[int] = None
+    total_price_formatted: Optional[str] = None
+    verdict: Optional[str] = None
+    verdict_confidence: Optional[str] = None
+    ma_window: Optional[int] = None
+    diff_percent: Optional[float] = None
+
+
 class BuildItemDetail(BaseModel):
     category: str
     code: int

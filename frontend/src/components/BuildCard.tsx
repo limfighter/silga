@@ -14,9 +14,16 @@ function tagClass(verdict: BuildSummary["verdict"]): string {
 export default function BuildCard({
   build,
   onDelete,
+  pricesPending = false,
 }: {
   build: BuildSummary;
   onDelete: (id: number, name: string) => void;
+  /**
+   * 구조만 먼저 받아 카드를 그린 상태(가격 응답 대기 중)라는 뜻.
+   * total_price가 null인 건 같지만 "아직 안 옴"과 "조회 실패"는 전혀 다른
+   * 이야기라 문구를 나눠야 함(backend v0.18의 2단계 로딩)
+   */
+  pricesPending?: boolean;
 }) {
   return (
     <Link className="build-card" to={`/build/${build.id}`}>
@@ -45,6 +52,8 @@ export default function BuildCard({
             {won(build.total_price)}
             <span>원</span>
           </>
+        ) : pricesPending ? (
+          <span className="bc-price-pending">조회 중</span>
         ) : (
           "조회 실패"
         )}
