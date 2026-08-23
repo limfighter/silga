@@ -62,8 +62,11 @@ E2E를 돌린다(매 push마다 안 돎). 실제 다나와를 긁는 테스트�
 Actions 탭에서 수동 재실행(workflow_dispatch).
 
 ## 작업 시 지켜야 할 것 (핵심 규칙)
-- **응답 필드명 임의 변경 금지**: `app-shell-mockup.html` / `silga-mockup.html`이
-  REFERENCE.md의 API 계약을 전제로 이미 만들어져 있음.
+- **응답 필드명 임의 변경 금지**: API 계약의 정본은 `실가_REFERENCE.md`
+  #엔드포인트-설계이고, `frontend/src/lib/api.ts`의 TS 타입과
+  `backend/app/schemas/*.py`가 그 계약과 1:1로 맞춰져 있음. 셋을 같은
+  변경에서 함께 고칠 것. (예전엔 목업 HTML 2개가 계약의 근거로 적혀
+  있었는데, 2026-08-23에 삭제했음 — 아래 참조)
 - **실측 합계·판정 계산에는 `lowest_price` 필드만 사용** — `prices` 리스트에서
   직접 min() 계산하는 코드는 작성 금지. `prices`는 화면 표시 전용이고 상위
   일부(약 10건)만 잘려 있으며, 다나와가 공식 최저가 산정에서 제외한 판매처가
@@ -128,7 +131,16 @@ frontend/src/
   styles/global.css  디자인 토큰 CSS 변수
 
 scripts/             e2e_smoke_test.py (위 참조)
+
+stats-chart-mockup.html   통계 차트 개선안 목업 (2026-08-23, 현행 톤)
 ```
+루트의 `*-mockup.html`은 **구현 전에 화면을 합의하려고 만드는 일회성
+산출물**이지 디자인 정본이 아니다. 정본은 `frontend/src/styles/global.css`의
+토큰 — 목업을 새로 만들 땐 옛 목업이 아니라 global.css에서 토큰을 가져올 것.
+2026-08-01에 만든 `app-shell-mockup.html` / `silga-mockup.html` 2개는
+2026-08-05 디자인 개편(다크·네온 → 종이/잉크 모노크롬) 이후로 아무도 안 보는
+옛날 톤이 됐는데 문서엔 계속 "계약의 근거"로 적혀 있어서, 2026-08-23에
+삭제했다. 필요하면 `git show 77ca8ce:app-shell-mockup.html`로 꺼내볼 것.
 `flutter/`는 Phase 5(모바일 이식)용으로 예정돼 있으나 아직 없음 — 미리
 스캐폴딩하지 말 것.
 
@@ -144,8 +156,12 @@ scripts/             e2e_smoke_test.py (위 참조)
 `services/verdict.py::calc_verdict(estimate_total, market_price)`가
 `diff_percent = (market_price - estimate_total) / estimate_total * 100`을
 계산해서 ±5%(`VERDICT_THRESHOLD_PERCENT`) 기준으로 `저가`/`적정가`/`고가`로
-분류한다. 이 ±5%는 검증되지 않은 가정값 — `실가_인수인계.md`에 결정 필요
-항목으로 남아 있음. `/estimate`와 `/build/compare`는 `main.py`의
+분류한다. 이 ±5%는 실측이 아니라 어림으로 잡은 판단값이고, **2026-08-23에
+"그대로 둔다"로 확정**됐다 — 판정 라벨(저가/적정가/고가)은 눈길을 끄는
+요약일 뿐이고 실제 판단은 사용자가 화면에 같이 뜨는 `diff_percent`를 보고
+한다. 기준가 쪽 흔들림은 이동평균 기간(설정 탭, 7/14/30일)으로 조절한다.
+검증할 방법이 없다는 이유로 이 상수를 다시 미결로 올리거나 임의로 바꾸지 말 것.
+`/estimate`와 `/build/compare`는 `main.py`의
 `_compute_estimate()` 헬퍼로 이 합산 로직을 공유하므로, 따로 중복
 구현하지 말 것.
 

@@ -62,7 +62,8 @@ Git 커밋 기준:
     → 오늘 작업과 겹치는 항목 있으면 같이 처리
 
 [ ] API 계약(본 문서 "엔드포인트 설계") ↔ 실제 코드 일치 확인
-    → 프론트가 이미 이 계약대로 목업돼 있음 (app-shell-mockup.html) — 응답 필드명 임의 변경 금지
+    → 계약 정본은 본 문서 #엔드포인트-설계. frontend/src/lib/api.ts의 TS 타입과
+      backend/app/schemas/*.py가 여기에 1:1 대응 — 응답 필드명 임의 변경 금지
 
 [ ] 수정 파일 버전 주석 업데이트
 [ ] 엔드포인트/DB 스키마 수정 시:
@@ -94,7 +95,7 @@ silga/                (git 리포 루트, 커밋 4개: v0.2 백엔드/v0.3 빌�
 │   │   └── schemas/             search/product/history/estimate/compare/build.py
 │   │                            (#엔드포인트-설계 계약과 1:1 대응)
 │   └── requirements.txt
-├── frontend/         Vite+React+TS+React Router+TanStack Query (app-shell-mockup.html 재구현)
+├── frontend/         Vite+React+TS+React Router+TanStack Query
 │   └── src/
 │       ├── components/  AppShell.tsx(사이드바/탑바), PartRow.tsx(단일
 │       │                검색+자동완성 위젯 — StatsPage/FavoritesPage/
@@ -280,7 +281,7 @@ sammy310/Danawa-Crawler (MIT):
 
 ---
 
-## 엔드포인트 설계 (계약 — app-shell-mockup.html이 이 계약 전제로 만들어짐)
+## 엔드포인트 설계 (계약 정본 — 프론트 api.ts / 백엔드 schemas가 여기 맞춤)
 ```
 GET  /search?q={keyword, 선택}&category={선택}&memory_gb={GPU}&chipset={GPU}&length={GPU}&socket={CPU|메인보드|쿨러}
      &formfactor={메인보드|케이스|SSD}&ram_type={RAM}&wattage={파워}&interface={SSD}
@@ -491,9 +492,13 @@ verdict 판정 임계값:
     이동평균 대비 몇 % 인지"로 판정됨(2026-08-08 결정, 아래 원본 공식은
     market_price 표기 그대로 유지 — 최초 검증 근거를 남기기 위함)
   ※ ±5%는 REFERENCE.md에 수치가 없어 2026-08-03 구현 시 임의로 잡은 가정값
-    (backend/app/services/verdict.py::VERDICT_THRESHOLD_PERCENT). silga-mockup.html
+    (backend/app/services/verdict.py::VERDICT_THRESHOLD_PERCENT). 당시 목업의
     API 예시(estimate_total=3390000, market_price=3464000 → diff_percent=2.1,
-    "적정가")로 공식 자체는 검증됨. 2026-08-04 재논의 결과 임계값 자체(±5%,
+    "적정가")로 공식 자체는 검증됨.
+    2026-08-23 확정: 이 임계값은 검증 대상이 아니라 판단값으로 둔다. 판정
+    라벨은 요약일 뿐이고 실제 판단은 사용자가 같이 표시되는 diff_percent를
+    보고 하며, 기준가 흔들림은 이동평균 기간(7/14/30일)으로 조절한다.
+    "검증 안 됐다"를 이유로 다시 미결 항목으로 올리지 말 것. 2026-08-04 재논의 결과 임계값 자체(±5%,
     대칭)는 그대로 유지하기로 확정 — 대신 아래처럼 basis_price(판정 기준가)
     계산 방식을 이동평균 도입으로 개선함 (실가_인수인계.md 2026-08-04
     "결정 완료" 참조)
@@ -568,7 +573,7 @@ verdict 판정 기준가(basis_price) — 이동평균 도입 (2026-08-04, v0.4 
 
 ---
 
-## 화면/탭 구조 (app-shell-mockup.html 기준 → frontend/에 실제 구현, 2026-08-03,
+## 화면/탭 구조 (frontend/에 실제 구현된 것 기준, 2026-08-03,
    2026-08-04 홈/통계/최근기록/설정/즐겨찾기 5개 탭 추가 완료로 갱신,
    2026-08-13 결론 블록 도입 + 사이드바 접힘 폐기로 갱신)
 ```
@@ -772,8 +777,11 @@ accent — 없음(모노크롬 원칙). 상태 구분은 색이 아니라 기호
 
 ## 산출물 파일 목록
 ```
-/mnt/user-data/outputs/silga-mockup.html       랜딩형 목업 (참고용, 앱 셸로 대체됨)
-/mnt/user-data/outputs/app-shell-mockup.html   초기 채택 목업 — frontend/에 실제 구현으로 대체됨
+(삭제됨) silga-mockup.html                     랜딩형 목업 — 2026-08-23 삭제
+(삭제됨) app-shell-mockup.html                 초기 채택 목업 — 2026-08-23 삭제
+                                                둘 다 2026-08-05 개편 이전 다크/네온 톤이라
+                                                디자인 참조로 쓸 수 없게 됐음. 꺼내려면
+                                                git show 77ca8ce:<파일명>
 /mnt/user-data/outputs/ppe-final.zip           2026-08-03 세션 최종 산출물 — git 리포 전체
                                                 (backend/ frontend/ scripts/ + 커밋 4개)
                                                 ※ 컨테이너 세션 리셋되므로 로컬 보관 후

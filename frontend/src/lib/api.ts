@@ -202,11 +202,14 @@ export const api = {
   getHistory: (code: number, months: number) =>
     request<PriceHistory>(`/product/${code}/history?months=${months}`),
 
-  listBuilds: (maWindow: number) =>
-    request<BuildSummary[]>(`/builds?ma_window=${maWindow}`),
-
   // 구조(DB만, 즉시)와 가격(스크래핑)을 나눠 받는 2단계 로딩 — lib/useBuilds.ts
-  // 참조. listBuilds는 한 방에 다 받는 기존 방식으로 남겨둠(backend v0.18)
+  // 참조(backend v0.18).
+  //
+  // 한 방에 다 받는 listBuilds(GET /builds?ma_window=N) 래퍼는 여기 남아
+  // 있었는데 호출처가 0곳이라 2026-08-23에 지웠다. 백엔드의
+  // with_prices=true(기본값) 경로는 그대로 살아 있음 — 프론트만 안 쓸 뿐,
+  // REST를 tool처럼 부르는 AI 라우터에겐 한 번에 받는 쪽이 맞는 모양이라
+  // 엔드포인트를 없애면 안 된다
   listBuildStructure: () =>
     request<BuildSummary[]>(`/builds?with_prices=false`),
 
