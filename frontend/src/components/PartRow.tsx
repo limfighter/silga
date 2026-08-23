@@ -36,7 +36,7 @@ export default function PartRow({
   // 부모가 준 category를 그대로 쓴다
   const [picked, setPicked] = useState("");
   const activeCategory = categorySelectable ? picked : category;
-  const { defs: specDefs, spec, setValue } = useSpecFilters(activeCategory);
+  const { defs: specDefs, spec, setValue, optionsFor } = useSpecFilters(activeCategory);
 
   const { data, isFetching } = useQuery({
     queryKey: ["search", debounced, activeCategory, spec],
@@ -98,22 +98,28 @@ export default function PartRow({
             onFocus={() => setFocused(true)}
             onBlur={() => setTimeout(() => setFocused(false), 150)}
           />
-          {specDefs.map((def) => (
-            <select
-              key={def.specKey}
-              className="part-spec-filter"
-              value={String(spec[def.specKey] ?? "")}
-              onChange={(e) => setValue(def.specKey, e.target.value)}
-              title={def.title}
-            >
-              <option value="">{def.placeholder}</option>
-              {def.options.map((opt) => (
-                <option key={opt} value={opt}>
-                  {def.formatOption ? def.formatOption(opt) : opt}
+          {specDefs.map((def) => {
+            const opts = optionsFor(def);
+            return (
+              <select
+                key={def.specKey}
+                className="part-spec-filter"
+                value={String(spec[def.specKey] ?? "")}
+                onChange={(e) => setValue(def.specKey, e.target.value)}
+                title={def.title}
+                disabled={opts.length === 0}
+              >
+                <option value="">
+                  {opts.length === 0 ? (def.emptyPlaceholder ?? def.placeholder) : def.placeholder}
                 </option>
-              ))}
-            </select>
-          ))}
+                {opts.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {def.formatOption ? def.formatOption(opt) : opt}
+                  </option>
+                ))}
+              </select>
+            );
+          })}
         </>
       )}
 

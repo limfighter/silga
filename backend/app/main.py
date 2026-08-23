@@ -174,6 +174,51 @@ GPU_CHIPSET_ATTRIBUTES = {
     "Intel": "654-805627-OR",
 }
 
+# /search?gpu_chip= 값(GPU 전용, category=GPU일 때만 적용) →
+# danawa.get_product_codes(attribute=...) 전달값 매핑. 위 chipset이 "누가
+# 만든 칩이냐"(제조사)라면 이건 "어떤 칩이냐"(모델) — RTX 5070 Ti처럼 실제로
+# 사람들이 GPU를 부르는 이름이라 검색에서 가장 직관적인 축이다.
+# 다나와는 제조사별로 필터 그룹이 갈려 있어(NVIDIA 658 / AMD 657 / 인텔
+# 338008) 쿨러 소켓(6805/6806)과 같은 방식으로 한 딕셔너리에 합쳤음 —
+# 값 이름이 RTX/RX/ARC로 겹치지 않아서 가능. 프론트는 제조사 select 값에
+# 따라 보여줄 목록만 골라 쓴다(frontend/src/lib/specFilters.ts).
+# chipset(제조사)과는 서로 다른 속성이라 동시 지정 가능하지만, 모델을 고르면
+# 제조사는 사실상 정해지므로 실사용에서는 둘 중 하나만 쓰게 됨.
+# 실측 120종 중 25종 채택 — 현행 유통 세대(NVIDIA RTX 50·40, AMD RX 9000·
+# 7000, 인텔 ARC B)만. RTX 30 이하·GTX·RX 6000 이하 구형과 워크스테이션
+# 라인(AMD W/WX, R9700)은 기존 트리밍 원칙대로 제외.
+# frontend/src/lib/specFilters.ts의 GPU_CHIP_BY_MAKER와 키를 맞출 것
+GPU_CHIP_ATTRIBUTES = {
+    # NVIDIA (속성코드 658)
+    "RTX 5090": "658-1018234-OR",
+    "RTX 5080": "658-1018237-OR",
+    "RTX 5070 Ti": "658-1018240-OR",
+    "RTX 5070": "658-1018246-OR",
+    "RTX 5060 Ti": "658-1035862-OR",
+    "RTX 5060": "658-1018243-OR",
+    "RTX 5050": "658-1052509-OR",
+    "RTX 4080 SUPER": "658-925852-OR",
+    "RTX 4070 Ti": "658-823393-OR",
+    "RTX 4070 SUPER": "658-925846-OR",
+    "RTX 4070": "658-846919-OR",
+    "RTX 4060 Ti": "658-863683-OR",
+    "RTX 4060": "658-863686-OR",
+    # AMD (속성코드 657)
+    "RX 9070 XT": "657-1022905-OR",
+    "RX 9070 GRE": "657-1147345-OR",
+    "RX 9070": "657-1022908-OR",
+    "RX 9060 XT": "657-1050613-OR",
+    "RX 9060": "657-1056586-OR",
+    "RX 7900 XTX": "657-818815-OR",
+    "RX 7800 XT": "657-901393-OR",
+    "RX 7700 XT": "657-901396-OR",
+    "RX 7600 XT": "657-944461-OR",
+    "RX 7600": "657-864124-OR",
+    # 인텔 (속성코드 338008)
+    "ARC PRO B70": "338008-1146295-OR",
+    "ARC B580": "338008-1014580-OR",
+}
+
 # /search?length= 값(GPU 전용, category=GPU일 때만 적용) →
 # danawa.get_product_codes(attribute=...) 전달값 매핑(속성코드 682 = 가로(길이)).
 # "그래픽카드"(전체 모델) 검색 결과 #prodArea 실측 — 이 필터는 지금까지 쓴
@@ -505,7 +550,8 @@ def search(
     ),
     chipset: Optional[str] = Query(
         None,
-        description="칩셋 스펙 필터 — category=GPU일 때는 칩셋 제조사(NVIDIA/AMD/Intel), "
+        description="칩셋 제조사/모델 스펙 필터 — category=GPU일 때는 칩셋 제조사(NVIDIA/AMD/Intel. "
+                     "모델로 좁히려면 gpu_chip을 쓸 것), "
                      "category=메인보드일 때는 세부 칩셋(X870E/B650/Z890/B760 등 19종). "
                      "그 외 category에서는 무시. GPU는 memory_gb/length와, 메인보드는 "
                      "socket/formfactor와 동시 지정 가능(AND로 결합)",
@@ -575,6 +621,13 @@ def search(
         description="케이스 크기 스펙 필터(빅타워/미들타워/미니타워/미니ITX) — category=케이스일 때만 "
                      "적용, 그 외 무시. formfactor(지원 보드 규격)와는 다른 축이라 동시 지정 가능",
     ),
+    gpu_chip: Optional[str] = Query(
+        None,
+        description="GPU 칩셋 모델 스펙 필터(RTX 5070 Ti / RX 9070 XT / ARC B580 등 25종) — "
+                     "category=GPU일 때만 적용, 그 외 무시. chipset이 제조사라면 이건 모델. "
+                     "GPU_CHIP_ATTRIBUTES 키와 정확히 일치해야 함. chipset/memory_gb/length와 "
+                     "동시 지정 가능(AND로 결합)",
+    ),
     page: int = Query(
         1,
         ge=1,
@@ -587,7 +640,7 @@ def search(
     GET /search?q={keyword, 선택}&category={CATEGORY_LABELS 키, 선택}&memory_gb={GPU 전용}&chipset={GPU 전용}&
         length={GPU 전용}&socket={CPU/메인보드/쿨러 전용}&formfactor={메인보드/케이스/SSD 전용}&
         ram_type={RAM 전용}&wattage={파워 전용}&interface={SSD 전용}&cooler_type={쿨러 전용}&
-        cpu_type={CPU 전용}&igpu={CPU 전용}&capacity={RAM/SSD 전용}&
+        cpu_type={CPU 전용}&igpu={CPU 전용}&gpu_chip={GPU 전용}&capacity={RAM/SSD 전용}&
         ram_count={RAM 전용}&efficiency={파워 전용}&case_size={케이스 전용}
         (스펙 파라미터는 전부 선택, category와 안 맞으면 무시. 같은 category의
         스펙 파라미터를 여러 개 주면 전부 AND로 결합됨 — v0.13) →
@@ -616,6 +669,7 @@ def search(
     if category == "GPU":
         attributes = [
             GPU_CHIPSET_ATTRIBUTES.get(chipset),
+            GPU_CHIP_ATTRIBUTES.get(gpu_chip),
             GPU_MEMORY_ATTRIBUTES.get(memory_gb),
             GPU_LENGTH_ATTRIBUTES.get(length),
         ]

@@ -403,6 +403,9 @@ input,select{font-family:inherit;}
 }
 .part-row{
   display:flex;
+  /* GPU는 스펙 select가 4개(제조사/칩셋/용량/길이)라 좁은 컨테이너
+     (.stats-picker는 560px)에서는 한 줄에 안 들어감 — 넘치면 줄을 바꾼다 */
+  flex-wrap:wrap;
   align-items:center;
   gap:14px;
   padding:14px 16px;
@@ -450,6 +453,15 @@ input,select{font-family:inherit;}
   margin-left:8px;
   white-space:nowrap;
 }
+/* 의존 select(GPU 칩셋 모델)는 제조사를 고르기 전엔 고를 게 없어 잠근다 —
+   비활성 상태가 "값이 없는 것"과 구분되게 톤을 낮춘다 */
+.part-spec-filter:disabled,
+.bc-spec-filter:disabled{
+  color:var(--mute-lt);
+  background:none;
+  cursor:not-allowed;
+}
+
 /* 구조만 먼저 온 상태의 가격 자리 — "조회 실패"와 같은 크기로 보이면 안 되고,
    숫자가 들어올 자리라는 것만 낮은 톤으로 알린다 */
 .bc-price-pending{color:var(--mute-lt);font-size:14px;letter-spacing:.02em;}
@@ -510,7 +522,8 @@ input,select{font-family:inherit;}
 
 .autocomplete-list{
   position:absolute;
-  left:106px;right:16px;top:52px;
+  /* 행이 줄바꿈되면 높이가 달라지므로 고정 52px가 아니라 행 바로 아래로 */
+  left:106px;right:16px;top:100%;
   background:var(--paper);
   border:var(--rule-1) solid var(--ink);
   max-height:220px;

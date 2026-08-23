@@ -41,7 +41,8 @@ export default function SearchPage() {
 
   // 같은 카테고리의 스펙 필터를 동시에 걸 수 있음(백엔드가 AND로 결합).
   // 카테고리 전환 시 조건 초기화도 훅이 처리함
-  const { defs: specDefs, spec, setValue, clear, activeLabels } = useSpecFilters(category);
+  const { defs: specDefs, spec, setValue, clear, activeLabels, optionsFor } =
+    useSpecFilters(category);
 
   // q가 비어 있으면 백엔드가 category 기본 키워드로 대신 검색 — 검색 버튼을
   // 안 눌러도 카테고리 선택만으로 기본 목록이 뜨도록 하기 위함
@@ -238,22 +239,29 @@ export default function SearchPage() {
 
           {specDefs.length > 0 && (
             <div className="search-spec-filters">
-              {specDefs.map((def) => (
-                <select
-                  key={def.specKey}
-                  className="part-spec-filter"
-                  value={String(spec[def.specKey] ?? "")}
-                  onChange={(e) => setValue(def.specKey, e.target.value)}
-                  title={def.title}
-                >
-                  <option value="">{def.placeholder}</option>
-                  {def.options.map((opt) => (
-                    <option key={opt} value={opt}>
-                      {def.formatOption ? def.formatOption(opt) : opt}
+              {specDefs.map((def) => {
+                const opts = optionsFor(def);
+                return (
+                  <select
+                    key={def.specKey}
+                    className="part-spec-filter"
+                    value={String(spec[def.specKey] ?? "")}
+                    onChange={(e) => setValue(def.specKey, e.target.value)}
+                    title={def.title}
+                    // 의존 select(제조사)가 비어 있으면 고를 게 없으므로 잠근다
+                    disabled={opts.length === 0}
+                  >
+                    <option value="">
+                      {opts.length === 0 ? (def.emptyPlaceholder ?? def.placeholder) : def.placeholder}
                     </option>
-                  ))}
-                </select>
-              ))}
+                    {opts.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {def.formatOption ? def.formatOption(opt) : opt}
+                      </option>
+                    ))}
+                  </select>
+                );
+              })}
               {activeLabels.length > 0 && (
                 <button className="spec-clear" onClick={clear}>조건 지우기</button>
               )}

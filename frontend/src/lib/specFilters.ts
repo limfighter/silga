@@ -10,6 +10,40 @@ export const CATEGORIES = ["CPU", "GPU", "메인보드", "RAM", "SSD", "케이�
 // 정확히 일치해야 함(값이 어긋나면 필터가 조용히 무시됨 — main.py 주석 참조)
 const GPU_MEMORY_OPTIONS = ["4", "6", "8", "10", "11", "12", "16", "20", "24", "32", "48"];
 const GPU_CHIPSET_OPTIONS = ["NVIDIA", "AMD", "Intel"];
+// 칩셋 모델 — 제조사를 고르면 그 제조사 것만 보여준다. 다나와도 제조사별로
+// 필터 그룹이 갈려 있고(NVIDIA 658 / AMD 657 / 인텔 338008), 백엔드는
+// GPU_CHIP_ATTRIBUTES 한 딕셔너리로 합쳐서 받으므로 여기서는 "무엇을
+// 보여줄지"만 정하면 된다. 키는 GPU_CHIPSET_OPTIONS 값과 일치해야 함
+const GPU_CHIP_BY_MAKER: Record<string, string[]> = {
+  NVIDIA: [
+    "RTX 5090",
+    "RTX 5080",
+    "RTX 5070 Ti",
+    "RTX 5070",
+    "RTX 5060 Ti",
+    "RTX 5060",
+    "RTX 5050",
+    "RTX 4080 SUPER",
+    "RTX 4070 Ti",
+    "RTX 4070 SUPER",
+    "RTX 4070",
+    "RTX 4060 Ti",
+    "RTX 4060",
+  ],
+  AMD: [
+    "RX 9070 XT",
+    "RX 9070 GRE",
+    "RX 9070",
+    "RX 9060 XT",
+    "RX 9060",
+    "RX 7900 XTX",
+    "RX 7800 XT",
+    "RX 7700 XT",
+    "RX 7600 XT",
+    "RX 7600",
+  ],
+  Intel: ["ARC PRO B70", "ARC B580"],
+};
 const GPU_LENGTH_OPTIONS = [
   "190~199mm",
   "260~269mm",
@@ -74,6 +108,16 @@ export interface SpecFilterDef {
   title: string;
   options: string[];
   formatOption?: (value: string) => string;
+  /**
+   * 다른 select의 선택값에 따라 목록이 바뀌는 경우 그 select의 키.
+   * 지금은 GPU 칩셋 모델 하나뿐 — 제조사를 골라야 목록이 정해진다.
+   * 부모 값이 바뀌면 이 select 값은 무효가 되므로 useSpecFilters가 비운다.
+   */
+  dependsOn?: keyof SearchSpecParams;
+  /** dependsOn 값 → 보여줄 목록. 없는 값이면 빈 목록(= select 비활성) */
+  optionsBy?: Record<string, string[]>;
+  /** dependsOn이 아직 안 골라졌을 때 보여줄 문구 */
+  emptyPlaceholder?: string;
 }
 
 // 카테고리별 스펙 필터 select 구성. 같은 카테고리 안의 필터는 동시에 걸 수
@@ -89,6 +133,15 @@ export const CATEGORY_SPEC_FILTERS: Record<string, SpecFilterDef[]> = {
       placeholder: "제조사 전체",
       title: "칩셋 제조사로 좁혀서 검색",
       options: GPU_CHIPSET_OPTIONS,
+    },
+    {
+      specKey: "gpuChip",
+      placeholder: "칩셋 전체",
+      title: "칩셋 모델로 좁혀서 검색 — 제조사를 먼저 고르면 그 제조사 칩셋만 나옵니다",
+      options: [],
+      dependsOn: "chipset",
+      optionsBy: GPU_CHIP_BY_MAKER,
+      emptyPlaceholder: "제조사 먼저",
     },
     {
       specKey: "memoryGb",
@@ -245,8 +298,19 @@ export function useSpecFilters(category: string) {
       if (!raw) delete next[key];
       else if (key === "memoryGb") next.memoryGb = Number(raw);
       else next[key] = raw;
+      // 이 값에 딸린 select(예: 제조사→칩셋 모델)는 목록이 통째로 바뀌므로
+      // 기존 선택이 남아 있으면 안 됨 — NVIDIA에서 고른 RTX가 AMD로 바꾼
+      // 뒤에도 남아 있으면 검색 결과가 0건이 된다
+      for (const d of defs) if (d.dependsOn === key) delete next[d.specKey];
       return next;
     });
+
+  /** 그 select가 지금 보여줘야 할 목록 — 의존 select가 비었으면 빈 배열 */
+  const optionsFor = (def: SpecFilterDef): string[] => {
+    if (!def.dependsOn) return def.options;
+    const parent = spec[def.dependsOn];
+    return (parent != null && def.optionsBy?.[String(parent)]) || [];
+  };
 
   // 지금 걸려 있는 조건 목록 — 라벨은 select에 표시되는 문자열(formatOption
   // 적용분)과 같은 값을 쓴다. 라벨은 필터끼리 겹칠 수 있어서 React key로는
@@ -258,5 +322,5 @@ export function useSpecFilters(category: string) {
       return { key: d.specKey, label: d.formatOption ? d.formatOption(v) : v };
     });
 
-  return { defs, spec, setValue, clear: () => setSpec({}), activeLabels };
+  return { defs, spec, setValue, clear: () => setSpec({}), activeLabels, optionsFor };
 }

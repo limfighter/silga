@@ -20,7 +20,8 @@ export default function PartSearchPanel({
   const [query, setQuery] = useState("");
   const debounced = useDebouncedValue(query, 500); // 매너 크롤링 — 타건마다 호출 방지
   // 같은 카테고리의 스펙 필터를 동시에 걸 수 있음(백엔드가 AND로 결합)
-  const { defs: specDefs, spec, setValue, clear, activeLabels } = useSpecFilters(category);
+  const { defs: specDefs, spec, setValue, clear, activeLabels, optionsFor } =
+    useSpecFilters(category);
 
   // query가 비어있어도 category 기본 목록이 바로 뜸(검색어 없이도 기본
   // 크롤링 결과를 보여주는 /search 동작을 그대로 활용 — SearchPage와 동일 패턴)
@@ -38,22 +39,28 @@ export default function PartSearchPanel({
 
       {specDefs.length > 0 && (
         <div className="bc-panel-specs">
-          {specDefs.map((def) => (
-            <select
-              key={def.specKey}
-              className="bc-spec-filter"
-              value={String(spec[def.specKey] ?? "")}
-              onChange={(e) => setValue(def.specKey, e.target.value)}
-              title={def.title}
-            >
-              <option value="">{def.placeholder}</option>
-              {def.options.map((opt) => (
-                <option key={opt} value={opt}>
-                  {def.formatOption ? def.formatOption(opt) : opt}
+          {specDefs.map((def) => {
+            const opts = optionsFor(def);
+            return (
+              <select
+                key={def.specKey}
+                className="bc-spec-filter"
+                value={String(spec[def.specKey] ?? "")}
+                onChange={(e) => setValue(def.specKey, e.target.value)}
+                title={def.title}
+                disabled={opts.length === 0}
+              >
+                <option value="">
+                  {opts.length === 0 ? (def.emptyPlaceholder ?? def.placeholder) : def.placeholder}
                 </option>
-              ))}
-            </select>
-          ))}
+                {opts.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {def.formatOption ? def.formatOption(opt) : opt}
+                  </option>
+                ))}
+              </select>
+            );
+          })}
           {activeLabels.length > 0 && (
             <button className="spec-clear" onClick={clear}>조건 지우기</button>
           )}
