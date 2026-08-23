@@ -15,3 +15,6 @@ dist/
 
 # OS
 .DS_Store
+
+# E2E 스모크 테스트 스크린샷
+e2e-shots/

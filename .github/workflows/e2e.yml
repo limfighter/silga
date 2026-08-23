@@ -1,0 +1,80 @@
+# PR 열릴 때만 도는 검증 — 매 push마다 돌리지 않는다.
+#
+# E2E 스모크는 실제 다나와를 그대로 긁기 때문에(전체 2~4분, 요청 수십 회)
+# push마다 돌리면 매너 크롤링 원칙에 어긋난다. 그래서 PR이 열리거나
+# 리뷰 준비 상태가 될 때 한 번만 돌리고, 다시 봐야 하면 Actions 탭에서
+# 수동으로(workflow_dispatch) 재실행한다.
+name: PR 검증
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 프론트 의존성 설치
+        working-directory: frontend
+        run: npm ci
+
+      # 타입체크가 이 리포의 유일한 자동 정적 검증 — 빠르고 결정적이라
+      # 무거운 E2E보다 먼저 돌려서 일찍 실패시킨다
+      - name: 타입체크
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: 백엔드 의존성 설치
+        run: pip install -r backend/requirements.txt
+
+      - name: Playwright 설치
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
+
+      - name: 백엔드/프론트 기동
+        run: |
+          (cd backend && uvicorn app.main:app --port 8000 > /tmp/backend.log 2>&1 &)
+          (cd frontend && npm run dev -- --port 5173 > /tmp/frontend.log 2>&1 &)
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:8000/docs >/dev/null \
+              && curl -sf http://localhost:5173/ >/dev/null && exit 0
+            sleep 2
+          done
+          echo "서버 기동 실패"; exit 1
+
+      - name: E2E 스모크 테스트
+        run: python3 scripts/e2e_smoke_test.py
+
+      # 서버가 죽어서 실패한 건지 테스트가 실패한 건지 구분하려면 필요함
+      - name: 서버 로그 (실패 시)
+        if: failure()
+        run: |
+          echo "── backend ──"; tail -50 /tmp/backend.log || true
+          echo "── frontend ──"; tail -50 /tmp/frontend.log || true
+
+      # 실패했을 때 어느 화면에서 깨졌는지 봐야 하므로 스크린샷을 남긴다
+      # (스크립트가 실패 지점을 e2e_FAIL.png로 저장함)
+      - name: 스크린샷 업로드
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots
+          path: e2e-shots/
+          if-no-files-found: ignore
+          retention-days: 7
