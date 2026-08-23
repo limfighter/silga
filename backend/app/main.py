@@ -507,7 +507,7 @@ def _validate_ma_window(ma_window: int) -> int:
 # 그대로 노출되는 값이라, AI 라우터가 이 API를 tool로 볼 때 보이는 버전이 됨.
 # 초기값 0.1.0이 v0.16까지 방치돼 있던 걸 2026-08-23에 정정. 두 번째 자리
 # 이상을 올릴 때 이 줄과 frontend/package.json도 같이 올릴 것
-app = FastAPI(title="실가 backend", version="0.17.0")
+app = FastAPI(title="실가 backend", version="0.19.0")
 
 
 @app.on_event("startup")

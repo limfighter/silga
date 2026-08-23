@@ -5,7 +5,7 @@ import { api, type PriceHistory, type PricePoint } from "../lib/api";
 import PartRow, { type SelectedPart } from "../components/PartRow";
 import { addRecentProduct } from "../lib/recentProducts";
 import Answer, { errorMessage } from "../components/Answer";
-import { manwon, won } from "../lib/format";
+import { manwon, signedPercent, won } from "../lib/format";
 
 const MONTH_OPTIONS = [1, 3, 6, 12] as const;
 type MonthOption = (typeof MONTH_OPTIONS)[number];
@@ -14,9 +14,28 @@ const CHART_WIDTH = 1000;
 const CHART_HEIGHT = 260;
 const PLOT_TOP = 20;
 const PLOT_BOTTOM = 200;
+// 격자선이 그려지는 y좌표 — y축 금액 라벨도 같은 좌표에 붙는다
+const GRID_Y = [PLOT_TOP, 80, 140, PLOT_BOTTOM] as const;
+
+// 점 2개를 이으면 무슨 값이든 완벽한 직선이 나온다 — 추세처럼 보이지만
+// 추세가 아니다. 이 미만이면 꺾은선 대신 관측값을 그대로 나열한다
+// (신제품이나 조회 기간이 짧을 때 실제로 생기는 상태).
+const MIN_POINTS_FOR_LINE = 4;
 
 function formatWon(value: number): string {
   return `${(value / 10000).toFixed(1)}만원`;
+}
+
+/** 직전 관측 대비 증감 — 색 대신 기호로만 구분(모노크롬 원칙) */
+function deltaLabel(prev: number, curr: number): string {
+  const diff = curr - prev;
+  if (diff === 0) return "— 변동 없음";
+  const glyph = diff > 0 ? "▲" : "▼";
+  const pct = prev > 0 ? Math.abs((diff / prev) * 100) : 0;
+  // 1,534,000 → 1,533,990처럼 몇 원짜리 변동은 "▼ 0.0%"가 되어 화살표와
+  // 숫자가 서로 다른 말을 한다. 그런 건 퍼센트 대신 금액으로 적는다.
+  if (pct < 0.05) return `${glyph} ${won(Math.abs(diff))}원`;
+  return `${glyph} ${pct.toFixed(1)}%`;
 }
 
 // full_date는 "YY-MM-DD" 포맷으로 실측 확인됨 (실가_HISTORY.md 2026-08-04
@@ -46,6 +65,86 @@ function buildPoints(history: PriceHistory): string {
     .join(" ");
 }
 
+/**
+ * 관측 기록 표 — 화면에서는 기본 접힘, 눌러야 아래로 펼쳐진다.
+ *
+ * SVG 하나만 있으면 스크린리더 입장에서는 빈 그림 한 장이라 읽을 게 없다.
+ * 홈 판정 축이 같은 문제를 .axis-list로 풀어놨는데(VerdictAxis.tsx) 이
+ * 차트에만 대응이 없었음. <details>는 닫혀 있어도 접근성 트리에 남으므로
+ * 화면은 안 어지럽히면서 표를 읽을 수 있다.
+ */
+function HistoryTable({ title, prices }: { title: string; prices: PricePoint[] }) {
+  const values = prices.map((p) => Number(p.price));
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+
+  return (
+    <details className="ch-table-wrap">
+      <summary>데이터 표로 보기 ({prices.length}건)</summary>
+      <table className="ch-table">
+        <caption>{title} · 최저가 관측 기록</caption>
+        <thead>
+          <tr>
+            <th scope="col">날짜</th>
+            <th scope="col">최저가</th>
+            <th scope="col">직전 대비</th>
+          </tr>
+        </thead>
+        <tbody>
+          {prices.map((p, i) => {
+            const value = values[i];
+            // 같은 값이 여러 번 나오면 첫 번째에만 배지 — 최저/최고는 하나씩만.
+            // 마지막 행이 곧 최고가인 경우가 흔해서 배지는 겹쳐 붙인다
+            // (하나만 고르면 "최고"가 통째로 사라짐)
+            const tags = [
+              value === min && values.indexOf(min) === i ? "최저" : null,
+              value === max && values.indexOf(max) === i ? "최고" : null,
+              i === prices.length - 1 ? "마지막" : null,
+            ].filter((t): t is string => t !== null);
+            return (
+              <tr key={`${p.full_date ?? p.date}-${i}`} className={tags.length ? "mark" : undefined}>
+                <td>
+                  {formatDateLabel(p)}
+                  {tags.map((t) => (
+                    <span key={t} className="tag">{t}</span>
+                  ))}
+                </td>
+                <td>{won(value)}원</td>
+                <td>{i === 0 ? "—" : deltaLabel(values[i - 1], value)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </details>
+  );
+}
+
+/** 관측이 MIN_POINTS_FOR_LINE 미만일 때 — 선 대신 값을 그대로 보여준다 */
+function SparsePrices({ prices }: { prices: PricePoint[] }) {
+  return (
+    <>
+      <div className="ch-sparse">
+        {prices.map((p, i) => {
+          const value = Number(p.price);
+          return (
+            <div key={`${p.full_date ?? p.date}-${i}`}>
+              <div className="d">{formatDateLabel(p)}</div>
+              <div className="v">{won(value)}원</div>
+              <div className="c">
+                {i === 0 ? "첫 관측" : deltaLabel(Number(prices[i - 1].price), value)}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <p className="ch-why">
+        관측이 {MIN_POINTS_FOR_LINE}건 미만이면 꺾은선 대신 수치로 표시합니다.
+      </p>
+    </>
+  );
+}
+
 function HistoryChart({ title, selectedPrice, history }: {
   title: string;
   selectedPrice: string | null;
@@ -60,43 +159,135 @@ function HistoryChart({ title, selectedPrice, history }: {
     );
   }
 
+  const prices = history.prices;
+  const first = prices[0];
+  const last = prices[prices.length - 1];
+  const min = Number(history.min);
+  const max = Number(history.max);
+  const sparse = prices.length < MIN_POINTS_FOR_LINE;
+
   const linePoints = buildPoints(history);
   const polygonPoints = `${linePoints} ${CHART_WIDTH},${CHART_HEIGHT} 0,${CHART_HEIGHT}`;
-  const first = history.prices[0];
-  const last = history.prices[history.prices.length - 1];
+
+  // 첫 관측 → 지금까지의 변화. 판정이 아니라 관측 구간의 사실 서술이라
+  // verdict.py의 ±5% 기준과는 무관하다.
+  const firstValue = Number(first.price);
+  const lastValue = Number(last.price);
+  const overall = firstValue > 0 ? ((lastValue - firstValue) / firstValue) * 100 : null;
+  const fromBottom = min > 0 ? ((lastValue - min) / min) * 100 : null;
+
+  const summary = (() => {
+    if (sparse) {
+      return (
+        <>
+          관측이 {prices.length}건뿐이라 추세는 판단할 수 없습니다.
+          <span className="sub">기록된 값만 그대로 표시합니다</span>
+        </>
+      );
+    }
+    if (overall == null) return null;
+    const verb = overall < 0 ? "내렸" : overall > 0 ? "올랐" : "변동이 없었";
+    // 현재가 최고/최저와 같으면 "바닥에서 +0.0% 올라온" 같은 말이 나온다.
+    // 그 경우엔 상대 거리 대신 지금 서 있는 자리를 그대로 말한다.
+    // "지금"이라고 쓰면 안 된다 — 위 legend의 "현재"는 상품의 실시간 최저가
+    // (selectedPrice)이고 여기 lastValue는 마지막 주 단위 관측치라 서로 다른
+    // 값이다. 한 카드 안에서 같은 이름표로 다른 숫자를 보여주면 거짓말이 됨.
+    // 바닥이 곧 첫 관측이면 fromBottom과 overall이 같은 값이라
+    // "+18.0% 올랐고, 바닥에서 +18.0% 올라온 자리입니다"가 된다 — 그럴 땐
+    // 앞 문장이 이미 다 말했으므로 덧붙이지 않는다
+    const bottomIsFirst = firstValue <= min;
+    const tail =
+      lastValue >= max ? (
+        <> 마지막 관측이 이 구간의 최고가입니다</>
+      ) : fromBottom == null || fromBottom < 0.05 ? (
+        <> 마지막 관측이 이 구간의 바닥입니다</>
+      ) : bottomIsFirst ? null : (
+        <>
+          {" "}
+          마지막 관측은 바닥에서{" "}
+          <span className="num">{signedPercent(fromBottom, 1)}</span> 올라온 자리입니다
+        </>
+      );
+    return (
+      <>
+        이 구간에서 <span className="num">{signedPercent(overall, 1)}</span>{" "}
+        {/* 뒤에 붙일 절이 있으면 연결어미("내렸고,"), 없으면 종결("내렸습니다") */}
+        {tail ? `${verb}고,` : `${verb}습니다`}
+        {tail}.
+        {/* 최저·최고는 이미 위 legend에 있으므로 되풀이하지 않고, 대신 위
+            퍼센트가 어디서 어디까지를 잰 값인지를 밝힌다 */}
+        <span className="sub">
+          {formatDateLabel(first)} {formatWon(firstValue)} → {formatDateLabel(last)}{" "}
+          {formatWon(lastValue)}
+        </span>
+      </>
+    );
+  })();
 
   return (
     <div className="chart-card">
       <div className="chart-legend">
         <div className="name">
           {title}
-          <span>{formatDateLabel(first)} — {formatDateLabel(last)}</span>
+          <span>
+            {formatDateLabel(first)} — {formatDateLabel(last)} · 관측 {prices.length}건
+          </span>
         </div>
         <div className="chart-stats">
-          <div><span>최저</span><b className="min">{formatWon(Number(history.min))}</b></div>
-          <div><span>최고</span><b className="max">{formatWon(Number(history.max))}</b></div>
+          <div><span>최저</span><b className="min">{formatWon(min)}</b></div>
+          <div><span>최고</span><b className="max">{formatWon(max)}</b></div>
           <div><span>현재</span><b style={{ color: "var(--text)" }}>{selectedPrice ?? "-"}</b></div>
         </div>
       </div>
 
-      <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} width="100%" height="260" preserveAspectRatio="none">
-        <defs>
-          <linearGradient id="statsFillGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#0B0B0B" stopOpacity="0.1" />
-            <stop offset="100%" stopColor="#0B0B0B" stopOpacity="0" />
-          </linearGradient>
-        </defs>
+      {summary && <p className="ch-summary">{summary}</p>}
 
-        <g stroke="#D2CFC7" strokeWidth="1">
-          <line x1="0" y1="20" x2={CHART_WIDTH} y2="20" />
-          <line x1="0" y1="80" x2={CHART_WIDTH} y2="80" />
-          <line x1="0" y1="140" x2={CHART_WIDTH} y2="140" />
-          <line x1="0" y1="200" x2={CHART_WIDTH} y2="200" />
-        </g>
+      {sparse ? (
+        <SparsePrices prices={prices} />
+      ) : (
+        // y축 금액 라벨은 SVG가 아니라 HTML로 얹는다 — 이 SVG는
+        // preserveAspectRatio="none"으로 가로를 늘려 그리기 때문에
+        // <text>를 안에 넣으면 글자까지 같이 늘어난다
+        <div className="ch-plot">
+          <div className="ch-yaxis" aria-hidden="true">
+            {GRID_Y.map((y) => {
+              const ratio = 1 - (y - PLOT_TOP) / (PLOT_BOTTOM - PLOT_TOP);
+              return (
+                <i key={y} style={{ top: y }}>
+                  {/* 눈금 4줄에 "만원"을 네 번 반복하면 노이즈라 단위는 뗀다 */}
+                  {((min + ratio * (max - min)) / 10000).toFixed(1)}만
+                </i>
+              );
+            })}
+          </div>
+          <svg
+            viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
+            width="100%"
+            height="260"
+            preserveAspectRatio="none"
+            role="img"
+            aria-label={`${title} 최저가 추이. 자세한 값은 아래 데이터 표 참조.`}
+          >
+            <defs>
+              <linearGradient id="statsFillGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#0B0B0B" stopOpacity="0.1" />
+                <stop offset="100%" stopColor="#0B0B0B" stopOpacity="0" />
+              </linearGradient>
+            </defs>
 
-        <polygon points={polygonPoints} fill="url(#statsFillGrad)" />
-        <polyline points={linePoints} fill="none" stroke="#0B0B0B" strokeWidth="2" />
-      </svg>
+            <g stroke="#D2CFC7" strokeWidth="1">
+              {GRID_Y.map((y) => (
+                <line key={y} x1="0" y1={y} x2={CHART_WIDTH} y2={y} />
+              ))}
+            </g>
+
+            <polygon points={polygonPoints} fill="url(#statsFillGrad)" />
+            <polyline points={linePoints} fill="none" stroke="#0B0B0B" strokeWidth="2" />
+          </svg>
+        </div>
+      )}
+
+      <HistoryTable title={title} prices={prices} />
     </div>
   );
 }

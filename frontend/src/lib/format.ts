@@ -27,7 +27,14 @@ export function verdictGlyph(verdict: string | null): string {
   return "—";
 }
 
-/** +6.5 -> "+6.5%", -1.2 -> "−1.2%" (빼기표는 U+2212로 자릿수 정렬 유지) */
-export function signedPercent(value: number): string {
-  return value < 0 ? `−${Math.abs(value)}%` : `+${value}%`;
+/**
+ * +6.5 -> "+6.5%", -1.2 -> "−1.2%" (빼기표는 U+2212로 자릿수 정렬 유지)
+ *
+ * digits를 주면 소수 자릿수를 고정한다 — 서버가 이미 반올림해서 주는 값
+ * (diff_percent 등)은 그냥 호출하고, 프론트에서 계산한 값은 18과 18.0이
+ * 섞여 보이지 않도록 자릿수를 넘긴다.
+ */
+export function signedPercent(value: number, digits?: number): string {
+  const abs = digits == null ? `${Math.abs(value)}` : Math.abs(value).toFixed(digits);
+  return value < 0 ? `−${abs}%` : `+${abs}%`;
 }
