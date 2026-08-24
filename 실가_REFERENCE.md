@@ -802,6 +802,9 @@ accent — 없음(모노크롬 원칙). 상태 구분은 색이 아니라 기호
                                                 둘 다 2026-08-05 개편 이전 다크/네온 톤이라
                                                 디자인 참조로 쓸 수 없게 됐음. 꺼내려면
                                                 git show 77ca8ce:<파일명>
+stats-chart-mockup.html                        통계 차트 개선안 목업(2026-08-23) — 현행
+                                                global.css 톤. 구현 완료 후에도 화면 합의
+                                                근거로 보관 중(CLAUDE.md #저장소-구조 참조)
 /mnt/user-data/outputs/ppe-final.zip           2026-08-03 세션 최종 산출물 — git 리포 전체
                                                 (backend/ frontend/ scripts/ + 커밋 4개)
                                                 ※ 컨테이너 세션 리셋되므로 로컬 보관 후
